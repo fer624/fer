@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mostrador · Tablero de espera</title>
+<style>
+/* ============================================================
+   MONITOR.HTML — Tablero de TV (solo lectura)
+   Lee el LocalStorage que escribe operador.html y se refresca solo.
+   Sin formularios, sin edición, sin dependencias externas.
+   ============================================================ */
+
+:root{
+  --fondo:#080d13;
+  --panel:#111c26;
+  --panel-2:#16232f;
+  --linea:#253644;
+  --tinta:#ffffff;
+  --tinta-suave:#8ca2b5;
+
+  --verde:#128a42;
+  --verde-vivo:#2fd472;
+  --amarillo:#b96a05;
+  --amarillo-vivo:#fbbf24;
+  --rojo:#c31c14;
+  --rojo-vivo:#ff6b63;
+
+  --fuente:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--fondo);
+  color:var(--tinta);
+  font-family:var(--fuente);
+  overflow-x:hidden;
+}
+:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
+
+/* ---------- Franja superior ---------- */
+.franja{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:2vw;
+  padding:1.4vh 2vw;
+  background:var(--panel);
+  border-bottom:2px solid var(--linea);
+  flex-wrap:wrap;
+}
+.rotulo h1{
+  margin:0;
+  font-size:clamp(20px,2.1vw,40px);
+  font-weight:700;
+  letter-spacing:.4px;
+}
+.rotulo p{
+  margin:.2vh 0 0;
+  font-size:clamp(12px,1vw,19px);
+  color:var(--tinta-suave);
+}
+.hora{
+  display:flex;
+  align-items:center;
+  gap:1.6vw;
+}
+.hora .digito{
+  font-size:clamp(28px,3.2vw,60px);
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  line-height:1;
+}
+.hora .fecha{
+  font-size:clamp(11px,.95vw,18px);
+  color:var(--tinta-suave);
+  text-align:right;
+  margin-top:.6vh;
+}
+.btn-pantalla{
+  background:var(--panel-2);
+  border:1px solid var(--linea);
+  color:var(--tinta-suave);
+  border-radius:10px;
+  padding:.9vh 1.2vw;
+  font-family:inherit;
+  font-size:clamp(12px,.9vw,16px);
+  cursor:pointer;
+}
+.btn-pantalla:hover{color:var(--tinta);border-color:var(--tinta-suave)}
+
+/* ---------- KPIs ---------- */
+.kpis{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:1vw;
+  padding:1.4vh 2vw;
+}
+.kpi{
+  background:var(--panel);
+  border:2px solid var(--linea);
+  border-radius:18px;
+  padding:1.2vh 1.4vw;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:1vw;
+}
+.kpi b{
+  font-size:clamp(34px,4.6vw,86px);
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+  line-height:1;
+}
+.kpi span{
+  font-size:clamp(13px,1.25vw,24px);
+  color:var(--tinta-suave);
+  font-weight:600;
+}
+.kpi.v{border-color:rgba(47,212,114,.5)}  .kpi.v b{color:var(--verde-vivo)}
+.kpi.a{border-color:rgba(251,191,36,.5)}  .kpi.a b{color:var(--amarillo-vivo)}
+.kpi.r{border-color:rgba(255,107,99,.55)} .kpi.r b{color:var(--rojo-vivo)}
+
+/* ---------- Grilla de tarjetas ---------- */
+.grilla{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));
+  gap:1.2vw;
+  padding:.6vh 2vw 3vh;
+}
+.ficha{
+  border-radius:22px;
+  border:4px solid;
+  padding:1.6vh 1.6vw;
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  gap:1vw;
+  color:#fff;
+  min-height:20vh;
+}
+.ficha.verde   {background:var(--verde);   border-color:var(--verde-vivo)}
+.ficha.amarillo{background:var(--amarillo);border-color:var(--amarillo-vivo)}
+.ficha.rojo    {background:var(--rojo);    border-color:var(--rojo-vivo); animation:alerta 1.7s ease-in-out infinite}
+
+/* Parpadeo suave para los casos fuera de SLA */
+@keyframes alerta{
+  0%,100%{ filter:brightness(1);    box-shadow:0 0 0 0 rgba(255,107,99,0) }
+  50%    { filter:brightness(1.22); box-shadow:0 0 0 12px rgba(255,107,99,.28) }
+}
+@media (prefers-reduced-motion:reduce){
+  .ficha.rojo{animation:none;box-shadow:0 0 0 10px rgba(255,107,99,.3)}
+}
+
+.ficha .cliente{
+  font-size:clamp(26px,2.6vw,50px);
+  font-weight:800;
+  line-height:1.1;
+  word-break:break-word;
+}
+.ficha .datos{
+  font-size:clamp(16px,1.5vw,28px);
+  font-weight:600;
+  opacity:.95;
+  margin-top:.6vh;
+}
+.ficha .llegada{
+  font-size:clamp(13px,1.1vw,20px);
+  opacity:.85;
+  margin-top:.4vh;
+}
+.ficha .crono{
+  font-size:clamp(44px,5vw,96px);
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:1px;
+  line-height:1;
+  text-align:right;
+  white-space:nowrap;
+}
+.ficha .estado{
+  display:block;
+  text-align:right;
+  font-size:clamp(12px,1vw,19px);
+  font-weight:700;
+  letter-spacing:2px;
+  opacity:.9;
+  margin-top:.6vh;
+}
+@media (max-width:700px){
+  .ficha{grid-template-columns:1fr}
+  .ficha .crono,.ficha .estado{text-align:left}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ---------- Sin clientes ---------- */
+.libre{
+  text-align:center;
+  padding:12vh 2vw;
+  color:var(--tinta-suave);
+}
+.libre b{
+  display:block;
+  color:var(--tinta);
+  font-size:clamp(30px,3.6vw,70px);
+  font-weight:700;
+  margin-bottom:1.2vh;
+}
+.libre span{font-size:clamp(15px,1.4vw,26px)}
+</style>
+</head>
+<body>
+
+<header class="franja">
+  <div class="rotulo">
+    <h1>Tiempos de espera en mostrador</h1>
+    <p>Verde hasta 10 min · Amarillo hasta 15 min · Rojo por encima de 15 min</p>
+  </div>
+  <div class="hora">
+    <button class="btn-pantalla" id="btnPantalla">Pantalla completa</button>
+    <div>
+      <div class="digito" id="reloj">--:--:--</div>
+      <div class="fecha" id="fecha"></div>
+    </div>
+  </div>
+</header>
+
+<section class="kpis">
+  <div class="kpi"><b id="kActivos">0</b><span>En espera</span></div>
+  <div class="kpi v"><b id="kVerde">0</b><span>En verde</span></div>
+  <div class="kpi a"><b id="kAmarillo">0</b><span>En amarillo</span></div>
+  <div class="kpi r"><b id="kRojo">0</b><span>En rojo</span></div>
+</section>
+
+<main class="grilla" id="grilla"></main>
+
+<div class="libre" id="libre">
+  <b>Mostrador libre</b>
+  <span>No hay clientes esperando. Las nuevas llegadas se registran en operador.html y aparecen acá al instante.</span>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   MÓDULO 1 — Lectura del almacenamiento compartido
+   La clave es la misma que escribe operador.html.
+   ============================================================ */
+var Datos = (function(){
+  var K_ACTIVOS = "mostrador.activos.v1";
+
+  function activos(){
+    try{
+      var crudo = localStorage.getItem(K_ACTIVOS);
+      var v = crudo ? JSON.parse(crudo) : [];
+      return Array.isArray(v) ? v : [];
+    }catch(e){
+      console.warn("No se pudo leer el listado de clientes activos", e);
+      return [];
+    }
+  }
+
+  return { activos:activos };
+})();
+
+/* ============================================================
+   MÓDULO 2 — Semáforo y formato de tiempo
+   ============================================================ */
+var Sla = (function(){
+  var LIMITE_VERDE    = 10 * 60 * 1000; // 10 minutos
+  var LIMITE_AMARILLO = 15 * 60 * 1000; // 15 minutos
+
+  function estado(ms){
+    if(ms >= LIMITE_AMARILLO) return "rojo";
+    if(ms >= LIMITE_VERDE)    return "amarillo";
+    return "verde";
+  }
+
+  function dos(n){ return (n < 10 ? "0" : "") + n; }
+
+  function hhmmss(ms){
+    if(!isFinite(ms) || ms < 0) ms = 0;
+    var t = Math.floor(ms / 1000);
+    return dos(Math.floor(t / 3600)) + ":" + dos(Math.floor((t % 3600) / 60)) + ":" + dos(t % 60);
+  }
+
+  function hora(ts){
+    var d = new Date(ts);
+    return dos(d.getHours()) + ":" + dos(d.getMinutes()) + ":" + dos(d.getSeconds());
+  }
+
+  return { estado:estado, hhmmss:hhmmss, hora:hora, dos:dos };
+})();
+
+/* ============================================================
+   MÓDULO 3 — Utilidades
+   ============================================================ */
+function $(id){ return document.getElementById(id); }
+
+function texto(v){
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/** Rojo primero, después amarillo, después verde; dentro de cada color, el que más espera arriba. */
+function ordenar(lista){
+  var peso = { rojo:0, amarillo:1, verde:2 };
+  var ahora = Date.now();
+  return lista.slice().sort(function(a, b){
+    var ea = peso[Sla.estado(ahora - a.inicio)];
+    var eb = peso[Sla.estado(ahora - b.inicio)];
+    if(ea !== eb) return ea - eb;
+    return a.inicio - b.inicio;
+  });
+}
+
+/* ============================================================
+   MÓDULO 4 — Render del tablero
+   Se reconstruye el DOM solo cuando cambia la composición, el orden
+   o el color de alguna tarjeta; el resto de los segundos únicamente
+   avanzan los cronómetros.
+   ============================================================ */
+var firmaActual = "";
+
+function firma(lista){
+  var ahora = Date.now();
+  var partes = [];
+  for(var i = 0; i < lista.length; i++){
+    partes.push(lista[i].id + ":" + Sla.estado(ahora - lista[i].inicio));
+  }
+  return partes.join("|");
+}
+
+function dibujar(lista){
+  var ahora = Date.now();
+  var html = "";
+
+  for(var i = 0; i < lista.length; i++){
+    var c = lista[i];
+    var ms = ahora - c.inicio;
+    var est = Sla.estado(ms);
+    html +=
+      '<article class="ficha ' + est + '">' +
+        "<div>" +
+          '<div class="cliente">' + texto(c.cliente) + "</div>" +
+          '<div class="datos">Entrega ' + texto(c.entrega) + " · " + texto(c.lineas) + " líneas</div>" +
+          '<div class="llegada">Llegada ' + Sla.hora(c.inicio) + "</div>" +
+        "</div>" +
+        "<div>" +
+          '<div class="crono" data-inicio="' + c.inicio + '">' + Sla.hhmmss(ms) + "</div>" +
+          '<span class="estado">' + rotuloEstado(est) + "</span>" +
+        "</div>" +
+      "</article>";
+  }
+
+  $("grilla").innerHTML = html;
+  $("libre").style.display = lista.length ? "none" : "block";
+}
+
+function rotuloEstado(est){
+  if(est === "rojo")     return "FUERA DE SLA";
+  if(est === "amarillo") return "EN RIESGO";
+  return "EN TIEMPO";
+}
+
+function dibujarKpis(lista){
+  var ahora = Date.now();
+  var v = 0, a = 0, r = 0;
+  for(var i = 0; i < lista.length; i++){
+    var est = Sla.estado(ahora - lista[i].inicio);
+    if(est === "verde") v++; else if(est === "amarillo") a++; else r++;
+  }
+  $("kActivos").textContent  = lista.length;
+  $("kVerde").textContent    = v;
+  $("kAmarillo").textContent = a;
+  $("kRojo").textContent     = r;
+}
+
+function refrescarCronos(){
+  var ahora = Date.now();
+  var cronos = document.querySelectorAll(".crono");
+  for(var i = 0; i < cronos.length; i++){
+    cronos[i].textContent = Sla.hhmmss(ahora - Number(cronos[i].getAttribute("data-inicio")));
+  }
+}
+
+/* ============================================================
+   MÓDULO 5 — Latido de un segundo
+   Relee el almacenamiento en cada tick: así el tablero refleja lo
+   que hace el operador sin que nadie recargue la página.
+   ============================================================ */
+function latido(){
+  var ahora = Date.now();
+  $("reloj").textContent = Sla.hora(ahora);
+
+  var lista = ordenar(Datos.activos());
+  var nueva = firma(lista);
+
+  if(nueva !== firmaActual){
+    firmaActual = nueva;
+    dibujar(lista);
+  }else{
+    refrescarCronos();
+  }
+
+  dibujarKpis(lista);
+}
+
+/* ============================================================
+   MÓDULO 6 — Arranque
+   ============================================================ */
+(function iniciar(){
+  var hoy = new Date();
+  $("fecha").textContent = Sla.dos(hoy.getDate()) + "/" + Sla.dos(hoy.getMonth()+1) + "/" + hoy.getFullYear();
+
+  $("btnPantalla").addEventListener("click", function(){
+    if(document.fullscreenElement){
+      document.exitFullscreen();
+      this.textContent = "Pantalla completa";
+    }else{
+      document.documentElement.requestFullscreen();
+      this.textContent = "Salir de pantalla completa";
+    }
+  });
+
+  // Reacción inmediata cuando operador.html guarda un cambio
+  window.addEventListener("storage", function(){
+    firmaActual = "";
+    latido();
+  });
+
+  latido();
+  setInterval(latido, 1000);
+})();
+</script>
+</body>
+</html>

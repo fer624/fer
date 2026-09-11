@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mostrador · Operador</title>
+<style>
+/* ============================================================
+   OPERADOR.HTML — Registro y gestión de esperas de mostrador
+   Estilos embebidos. Sin dependencias externas.
+   ============================================================ */
+
+/* ---------- Tokens ---------- */
+:root{
+  --acero-900:#182029;
+  --acero-700:#2b3742;
+  --acero-500:#5a6a78;
+  --acero-300:#a9b6c1;
+  --acero-100:#e6ebef;
+  --papel:#f4f6f8;
+  --blanco:#ffffff;
+
+  --verde:#18794e;
+  --verde-suave:#e2f4ea;
+  --amarillo:#9a6700;
+  --amarillo-suave:#fdf3d7;
+  --rojo:#c0261f;
+  --rojo-suave:#fbe5e3;
+
+  --radio:14px;
+  --sombra:0 1px 2px rgba(24,32,41,.08), 0 8px 24px rgba(24,32,41,.06);
+  --borde:1px solid var(--acero-100);
+  --fuente:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--fuente);
+  background:var(--papel);
+  color:var(--acero-900);
+  font-size:15px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit}
+:focus-visible{outline:3px solid #2f6feb;outline-offset:2px}
+
+/* ---------- Encabezado ---------- */
+.barra{
+  background:var(--acero-900);
+  color:var(--blanco);
+  padding:14px 24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.barra h1{
+  margin:0;
+  font-size:19px;
+  font-weight:600;
+  letter-spacing:.2px;
+}
+.barra p{margin:2px 0 0;font-size:13px;color:var(--acero-300)}
+.reloj{
+  font-size:26px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+}
+.reloj span{display:block;font-size:12px;font-weight:400;color:var(--acero-300);text-align:right}
+
+.contenedor{max-width:1280px;margin:0 auto;padding:22px 24px 60px}
+
+/* ---------- KPI ---------- */
+.kpis{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;
+  margin-bottom:22px;
+}
+.kpi{
+  background:var(--blanco);
+  border:var(--borde);
+  border-radius:var(--radio);
+  padding:14px 16px;
+  box-shadow:var(--sombra);
+}
+.kpi .valor{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .rotulo{font-size:13px;color:var(--acero-500);margin-top:4px}
+.kpi.v .valor{color:var(--verde)}
+.kpi.a .valor{color:var(--amarillo)}
+.kpi.r .valor{color:var(--rojo)}
+
+/* ---------- Grilla principal ---------- */
+.columnas{
+  display:grid;
+  grid-template-columns:340px 1fr;
+  gap:20px;
+  align-items:start;
+}
+@media (max-width:900px){ .columnas{grid-template-columns:1fr} }
+
+.panel{
+  background:var(--blanco);
+  border:var(--borde);
+  border-radius:var(--radio);
+  box-shadow:var(--sombra);
+  padding:18px;
+}
+.panel h2{
+  margin:0 0 14px;
+  font-size:16px;
+  font-weight:600;
+}
+.panel h2 small{
+  font-weight:400;
+  color:var(--acero-500);
+  font-size:13px;
+  margin-left:6px;
+}
+
+/* ---------- Formulario ---------- */
+label{display:block;font-size:13px;color:var(--acero-700);margin:0 0 5px}
+input[type=text],input[type=number]{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--acero-300);
+  border-radius:10px;
+  font-size:15px;
+  background:var(--blanco);
+  color:var(--acero-900);
+}
+input::placeholder{color:var(--acero-300)}
+.campo{margin-bottom:14px}
+.error{color:var(--rojo);font-size:13px;min-height:18px;margin:-6px 0 10px}
+
+.btn{
+  border:none;
+  border-radius:10px;
+  padding:11px 16px;
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  background:var(--acero-900);
+  color:var(--blanco);
+  transition:background .12s ease;
+}
+.btn:hover{background:var(--acero-700)}
+.btn.ancho{width:100%}
+.btn.chico{padding:7px 12px;font-size:13px;border-radius:8px}
+.btn.claro{background:var(--acero-100);color:var(--acero-900)}
+.btn.claro:hover{background:var(--acero-300)}
+.btn.peligro{background:var(--rojo-suave);color:var(--rojo)}
+.btn.peligro:hover{background:#f6cfcb}
+
+/* ---------- Tarjetas activas ---------- */
+.activas{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.tarjeta{
+  border-radius:12px;
+  padding:14px;
+  border-left:7px solid;
+  background:var(--blanco);
+  border-top:var(--borde);
+  border-right:var(--borde);
+  border-bottom:var(--borde);
+}
+.tarjeta.verde{border-left-color:var(--verde);background:var(--verde-suave)}
+.tarjeta.amarillo{border-left-color:var(--amarillo);background:var(--amarillo-suave)}
+.tarjeta.rojo{border-left-color:var(--rojo);background:var(--rojo-suave)}
+.tarjeta .cliente{font-size:17px;font-weight:650;word-break:break-word}
+.tarjeta .meta{font-size:13px;color:var(--acero-700);margin-top:2px}
+.tarjeta .crono{
+  font-size:34px;
+  font-weight:650;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.5px;
+  margin:8px 0 10px;
+}
+.tarjeta.verde .crono{color:var(--verde)}
+.tarjeta.amarillo .crono{color:var(--amarillo)}
+.tarjeta.rojo .crono{color:var(--rojo)}
+.acciones{display:flex;gap:8px}
+
+/* ---------- Tabla historial ---------- */
+.tabla-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{
+  text-align:left;
+  font-weight:600;
+  color:var(--acero-500);
+  font-size:12.5px;
+  padding:8px 10px;
+  border-bottom:2px solid var(--acero-100);
+  white-space:nowrap;
+}
+td{padding:9px 10px;border-bottom:1px solid var(--acero-100);white-space:nowrap}
+td.duracion{font-variant-numeric:tabular-nums;font-weight:600}
+tbody tr:hover{background:var(--papel)}
+.pill{
+  display:inline-block;
+  padding:3px 10px;
+  border-radius:999px;
+  font-size:12.5px;
+  font-weight:600;
+}
+.pill.verde{background:var(--verde-suave);color:var(--verde)}
+.pill.amarillo{background:var(--amarillo-suave);color:var(--amarillo)}
+.pill.rojo{background:var(--rojo-suave);color:var(--rojo)}
+
+.vacio{
+  color:var(--acero-500);
+  font-size:14px;
+  padding:22px;
+  text-align:center;
+  border:1px dashed var(--acero-300);
+  border-radius:12px;
+}
+.pie-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.nota{font-size:12.5px;color:var(--acero-500);margin-top:16px}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div>
+    <h1>Mostrador de atención · Operador</h1>
+    <p>Registro de llegadas y control del tiempo de espera</p>
+  </div>
+  <div class="reloj" id="reloj">--:--:--<span id="fechaHoy"></span></div>
+</header>
+
+<main class="contenedor">
+
+  <!-- ===== Indicadores ===== -->
+  <section class="kpis" id="kpis">
+    <div class="kpi"><div class="valor" id="kEspera">0</div><div class="rotulo">En espera</div></div>
+    <div class="kpi"><div class="valor" id="kAtendidos">0</div><div class="rotulo">Atendidos</div></div>
+    <div class="kpi"><div class="valor" id="kPromedio">00:00:00</div><div class="rotulo">Espera promedio</div></div>
+    <div class="kpi v"><div class="valor" id="kVerde">0</div><div class="rotulo">En verde</div></div>
+    <div class="kpi a"><div class="valor" id="kAmarillo">0</div><div class="rotulo">En amarillo</div></div>
+    <div class="kpi r"><div class="valor" id="kRojo">0</div><div class="rotulo">En rojo</div></div>
+  </section>
+
+  <div class="columnas">
+
+    <!-- ===== Alta de cliente ===== -->
+    <section class="panel">
+      <h2>Nueva espera</h2>
+      <div class="campo">
+        <label for="cliente">Cliente</label>
+        <input type="text" id="cliente" autocomplete="off" placeholder="Nombre o razón social">
+      </div>
+      <div class="campo">
+        <label for="entrega">Entrega / pedido</label>
+        <input type="text" id="entrega" autocomplete="off" placeholder="N° de documento">
+      </div>
+      <div class="campo">
+        <label for="lineas">Cantidad de líneas</label>
+        <input type="number" id="lineas" min="1" step="1" placeholder="0">
+      </div>
+      <p class="error" id="error"></p>
+      <button class="btn ancho" id="btnIniciar">Iniciar espera</button>
+      <p class="nota">El cronómetro arranca en el momento del registro y sigue corriendo aunque se cierre esta ventana.</p>
+    </section>
+
+    <!-- ===== Clientes activos ===== -->
+    <section class="panel">
+      <h2>En espera <small id="rotuloActivos"></small></h2>
+      <div class="activas" id="activas"></div>
+      <div class="vacio" id="vacioActivas">No hay clientes esperando. Registrá una llegada para iniciar el conteo.</div>
+    </section>
+
+  </div>
+
+  <!-- ===== Historial ===== -->
+  <section class="panel" style="margin-top:20px">
+    <h2>Historial de atenciones <small id="rotuloHistorial"></small></h2>
+    <div class="tabla-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th><th>Entrega</th><th>Líneas</th>
+            <th>Inicio</th><th>Fin</th><th>Tiempo total</th><th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="cuerpoHistorial"></tbody>
+      </table>
+    </div>
+    <div class="vacio" id="vacioHistorial">Todavía no se finalizó ninguna atención.</div>
+    <div class="pie-acciones">
+      <button class="btn claro" id="btnCsv">Exportar historial a CSV</button>
+      <button class="btn peligro" id="btnLimpiarHist">Limpiar historial</button>
+      <button class="btn peligro" id="btnReiniciarAct">Reiniciar clientes activos</button>
+    </div>
+    <p class="nota">Los datos quedan guardados en este equipo (LocalStorage). Abrí monitor.html en la pantalla grande para ver las esperas en tiempo real.</p>
+  </section>
+
+</main>
+
+<script>
+"use strict";
+/* ============================================================
+   MÓDULO 1 — Almacenamiento compartido con monitor.html
+   ============================================================ */
+var Datos = (function(){
+  var K_ACTIVOS   = "mostrador.activos.v1";
+  var K_HISTORIAL = "mostrador.historial.v1";
+  var K_SENAL     = "mostrador.senal.v1"; // dispara el evento 'storage' en el monitor
+
+  /** Lee un arreglo desde LocalStorage de forma segura. */
+  function leer(clave){
+    try{
+      var crudo = localStorage.getItem(clave);
+      var valor = crudo ? JSON.parse(crudo) : [];
+      return Array.isArray(valor) ? valor : [];
+    }catch(e){
+      console.warn("No se pudo leer " + clave, e);
+      return [];
+    }
+  }
+
+  /** Escribe un arreglo y avisa a las demás ventanas. */
+  function escribir(clave, valor){
+    try{
+      localStorage.setItem(clave, JSON.stringify(valor));
+      localStorage.setItem(K_SENAL, String(Date.now()));
+      return true;
+    }catch(e){
+      console.error("No se pudo guardar " + clave, e);
+      alert("No se pudieron guardar los datos en este equipo. Verificá que el navegador permita almacenamiento local.");
+      return false;
+    }
+  }
+
+  return {
+    activos:      function(){ return leer(K_ACTIVOS); },
+    guardarActivos:   function(lista){ return escribir(K_ACTIVOS, lista); },
+    historial:    function(){ return leer(K_HISTORIAL); },
+    guardarHistorial: function(lista){ return escribir(K_HISTORIAL, lista); }
+  };
+})();
+
+/* ============================================================
+   MÓDULO 2 — Tiempo y semáforo SLA
+   ============================================================ */
+var Sla = (function(){
+  var LIMITE_VERDE    = 10 * 60 * 1000; // 10 minutos
+  var LIMITE_AMARILLO = 15 * 60 * 1000; // 15 minutos
+
+  /** Devuelve "verde" | "amarillo" | "rojo" según los milisegundos transcurridos. */
+  function estado(ms){
+    if(ms >= LIMITE_AMARILLO) return "rojo";
+    if(ms >= LIMITE_VERDE)    return "amarillo";
+    return "verde";
+  }
+
+  /** Formatea milisegundos como HH:MM:SS. */
+  function hhmmss(ms){
+    if(!isFinite(ms) || ms < 0) ms = 0;
+    var total = Math.floor(ms / 1000);
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+    return dos(h) + ":" + dos(m) + ":" + dos(s);
+  }
+
+  function dos(n){ return (n < 10 ? "0" : "") + n; }
+
+  /** Hora local corta HH:MM:SS a partir de un timestamp. */
+  function hora(ts){
+    var d = new Date(ts);
+    return dos(d.getHours()) + ":" + dos(d.getMinutes()) + ":" + dos(d.getSeconds());
+  }
+
+  /** Fecha y hora completas dd/mm/aaaa HH:MM:SS. */
+  function fechaHora(ts){
+    var d = new Date(ts);
+    return dos(d.getDate()) + "/" + dos(d.getMonth() + 1) + "/" + d.getFullYear() + " " + hora(ts);
+  }
+
+  return { estado:estado, hhmmss:hhmmss, hora:hora, fechaHora:fechaHora, dos:dos };
+})();
+
+/* ============================================================
+   MÓDULO 3 — Utilidades
+   ============================================================ */
+function idUnico(){
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+/** Evita inyección de HTML al mostrar texto ingresado por el operador. */
+function texto(valor){
+  return String(valor == null ? "" : valor)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function $(id){ return document.getElementById(id); }
+
+/* ============================================================
+   MÓDULO 4 — Alta de clientes
+   ============================================================ */
+function iniciarEspera(){
+  var cliente = $("cliente").value.trim();
+  var entrega = $("entrega").value.trim();
+  var lineas  = $("lineas").value.trim();
+  var err     = $("error");
+
+  if(!cliente){ err.textContent = "Ingresá el nombre del cliente."; $("cliente").focus(); return; }
+  if(!entrega){ err.textContent = "Ingresá el número de entrega o pedido."; $("entrega").focus(); return; }
+  if(!lineas || Number(lineas) <= 0){ err.textContent = "Ingresá una cantidad de líneas mayor a cero."; $("lineas").focus(); return; }
+  err.textContent = "";
+
+  var lista = Datos.activos();
+  lista.push({
+    id: idUnico(),
+    cliente: cliente,
+    entrega: entrega,
+    lineas: Number(lineas),
+    inicio: Date.now()
+  });
+  Datos.guardarActivos(lista);
+
+  $("cliente").value = "";
+  $("entrega").value = "";
+  $("lineas").value  = "";
+  $("cliente").focus();
+
+  pintar();
+}
+
+/* ============================================================
+   MÓDULO 5 — Finalizar y eliminar
+   ============================================================ */
+function finalizarEspera(id){
+  var activos = Datos.activos();
+  var i = buscarIndice(activos, id);
+  if(i === -1) return;
+
+  var reg = activos[i];
+  var fin = Date.now();
+  var total = fin - reg.inicio;
+
+  activos.splice(i, 1);
+  Datos.guardarActivos(activos);
+
+  var historial = Datos.historial();
+  historial.unshift({
+    id: reg.id,
+    cliente: reg.cliente,
+    entrega: reg.entrega,
+    lineas: reg.lineas,
+    inicio: reg.inicio,
+    fin: fin,
+    duracion: total,
+    estado: Sla.estado(total)
+  });
+  Datos.guardarHistorial(historial);
+
+  pintar();
+}
+
+function eliminarEspera(id){
+  var activos = Datos.activos();
+  var i = buscarIndice(activos, id);
+  if(i === -1) return;
+  if(!confirm('¿Eliminar el registro de "' + activos[i].cliente + '"? No se guarda en el historial.')) return;
+  activos.splice(i, 1);
+  Datos.guardarActivos(activos);
+  pintar();
+}
+
+function buscarIndice(lista, id){
+  for(var i = 0; i < lista.length; i++){ if(lista[i].id === id) return i; }
+  return -1;
+}
+
+/* ============================================================
+   MÓDULO 6 — Render
+   ============================================================ */
+
+/** Ordena los activos por criticidad y antigüedad (el más urgente primero). */
+function ordenarActivos(lista){
+  var peso = { rojo:0, amarillo:1, verde:2 };
+  var ahora = Date.now();
+  return lista.slice().sort(function(a, b){
+    var ea = peso[Sla.estado(ahora - a.inicio)];
+    var eb = peso[Sla.estado(ahora - b.inicio)];
+    if(ea !== eb) return ea - eb;
+    return a.inicio - b.inicio;
+  });
+}
+
+function pintarActivos(){
+  var lista = ordenarActivos(Datos.activos());
+  var cont = $("activas");
+  var ahora = Date.now();
+  var html = "";
+
+  for(var i = 0; i < lista.length; i++){
+    var c = lista[i];
+    var ms = ahora - c.inicio;
+    var est = Sla.estado(ms);
+    html +=
+      '<article class="tarjeta ' + est + '">' +
+        '<div class="cliente">' + texto(c.cliente) + '</div>' +
+        '<div class="meta">Entrega ' + texto(c.entrega) + ' · ' + c.lineas + ' líneas · desde ' + Sla.hora(c.inicio) + '</div>' +
+        '<div class="crono" data-inicio="' + c.inicio + '">' + Sla.hhmmss(ms) + '</div>' +
+        '<div class="acciones">' +
+          '<button class="btn chico" data-finalizar="' + c.id + '">Finalizar atención</button>' +
+          '<button class="btn chico claro" data-eliminar="' + c.id + '">Eliminar</button>' +
+        '</div>' +
+      '</article>';
+  }
+
+  cont.innerHTML = html;
+  $("vacioActivas").style.display = lista.length ? "none" : "block";
+  $("rotuloActivos").textContent = lista.length ? "(" + lista.length + ")" : "";
+}
+
+function pintarHistorial(){
+  var lista = Datos.historial();
+  var filas = "";
+
+  for(var i = 0; i < lista.length; i++){
+    var h = lista[i];
+    filas +=
+      "<tr>" +
+        "<td>" + texto(h.cliente) + "</td>" +
+        "<td>" + texto(h.entrega) + "</td>" +
+        "<td>" + h.lineas + "</td>" +
+        "<td>" + Sla.fechaHora(h.inicio) + "</td>" +
+        "<td>" + Sla.fechaHora(h.fin) + "</td>" +
+        '<td class="duracion">' + Sla.hhmmss(h.duracion) + "</td>" +
+        '<td><span class="pill ' + h.estado + '">' + etiquetaEstado(h.estado) + "</span></td>" +
+      "</tr>";
+  }
+
+  $("cuerpoHistorial").innerHTML = filas;
+  $("vacioHistorial").style.display = lista.length ? "none" : "block";
+  $("rotuloHistorial").textContent = lista.length ? "(" + lista.length + ")" : "";
+}
+
+function etiquetaEstado(est){
+  return est.charAt(0).toUpperCase() + est.slice(1);
+}
+
+function pintarKpis(){
+  var activos = Datos.activos();
+  var historial = Datos.historial();
+  var ahora = Date.now();
+  var v = 0, a = 0, r = 0;
+
+  for(var i = 0; i < activos.length; i++){
+    var est = Sla.estado(ahora - activos[i].inicio);
+    if(est === "verde") v++; else if(est === "amarillo") a++; else r++;
+  }
+
+  var suma = 0;
+  for(var j = 0; j < historial.length; j++){ suma += historial[j].duracion; }
+  var promedio = historial.length ? suma / historial.length : 0;
+
+  $("kEspera").textContent   = activos.length;
+  $("kAtendidos").textContent = historial.length;
+  $("kPromedio").textContent = Sla.hhmmss(promedio);
+  $("kVerde").textContent    = v;
+  $("kAmarillo").textContent = a;
+  $("kRojo").textContent     = r;
+}
+
+/** Redibuja todo (se usa tras cada cambio de datos). */
+function pintar(){
+  pintarActivos();
+  pintarHistorial();
+  pintarKpis();
+}
+
+/* ============================================================
+   MÓDULO 7 — Latido de un segundo
+   Actualiza cronómetros y colores sin reconstruir el DOM completo.
+   ============================================================ */
+function latido(){
+  var ahora = Date.now();
+
+  // Reloj del encabezado
+  $("reloj").firstChild.nodeValue = Sla.hora(ahora);
+
+  // Cronómetros y color de cada tarjeta
+  var cronos = document.querySelectorAll(".crono");
+  var recalcular = false;
+
+  for(var i = 0; i < cronos.length; i++){
+    var inicio = Number(cronos[i].getAttribute("data-inicio"));
+    var ms = ahora - inicio;
+    cronos[i].textContent = Sla.hhmmss(ms);
+
+    var tarjeta = cronos[i].parentNode;
+    var nuevo = Sla.estado(ms);
+    if(!tarjeta.classList.contains(nuevo)){
+      tarjeta.classList.remove("verde","amarillo","rojo");
+      tarjeta.classList.add(nuevo);
+      recalcular = true; // cambió el semáforo: reordenar y recontar
+    }
+  }
+
+  if(recalcular){ pintarActivos(); pintarKpis(); }
+  else{ pintarKpis(); }
+}
+
+/* ============================================================
+   MÓDULO 8 — Exportación y limpieza
+   ============================================================ */
+function exportarCsv(){
+  var lista = Datos.historial();
+  if(!lista.length){ alert("El historial está vacío: no hay nada para exportar."); return; }
+
+  var sep = ";"; // separador habitual en Excel configurado en español
+  var filas = [["Cliente","Entrega","Lineas","Inicio","Fin","Tiempo total","Estado"].join(sep)];
+
+  for(var i = 0; i < lista.length; i++){
+    var h = lista[i];
+    filas.push([
+      csv(h.cliente), csv(h.entrega), h.lineas,
+      Sla.fechaHora(h.inicio), Sla.fechaHora(h.fin),
+      Sla.hhmmss(h.duracion), etiquetaEstado(h.estado)
+    ].join(sep));
+  }
+
+  // BOM para que Excel respete los acentos
+  var blob = new Blob(["\uFEFF" + filas.join("\r\n")], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  var d = new Date();
+  a.href = url;
+  a.download = "historial_mostrador_" + d.getFullYear() + Sla.dos(d.getMonth()+1) + Sla.dos(d.getDate()) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** Escapa comillas y separadores dentro de un campo CSV. */
+function csv(valor){
+  var s = String(valor == null ? "" : valor).replace(/"/g,'""');
+  return '"' + s + '"';
+}
+
+function limpiarHistorial(){
+  var cantidad = Datos.historial().length;
+  if(!cantidad){ alert("El historial ya está vacío."); return; }
+  if(!confirm("Se van a borrar " + cantidad + " atenciones del historial. Esta acción no se puede deshacer.\n\n¿Continuar?")) return;
+  Datos.guardarHistorial([]);
+  pintar();
+}
+
+function reiniciarActivos(){
+  var cantidad = Datos.activos().length;
+  if(!cantidad){ alert("No hay clientes en espera."); return; }
+  if(!confirm("Se van a quitar " + cantidad + " clientes en espera sin pasarlos al historial.\n\n¿Continuar?")) return;
+  Datos.guardarActivos([]);
+  pintar();
+}
+
+/* ============================================================
+   MÓDULO 9 — Arranque y eventos
+   ============================================================ */
+(function iniciar(){
+  // Fecha del encabezado
+  var hoy = new Date();
+  $("fechaHoy").textContent = Sla.dos(hoy.getDate()) + "/" + Sla.dos(hoy.getMonth()+1) + "/" + hoy.getFullYear();
+
+  // Alta
+  $("btnIniciar").addEventListener("click", iniciarEspera);
+  ["cliente","entrega","lineas"].forEach(function(campo){
+    $(campo).addEventListener("keydown", function(ev){
+      if(ev.key === "Enter") iniciarEspera();
+    });
+  });
+
+  // Delegación de eventos sobre las tarjetas activas
+  $("activas").addEventListener("click", function(ev){
+    var btn = ev.target.closest("button");
+    if(!btn) return;
+    if(btn.hasAttribute("data-finalizar")) finalizarEspera(btn.getAttribute("data-finalizar"));
+    if(btn.hasAttribute("data-eliminar"))  eliminarEspera(btn.getAttribute("data-eliminar"));
+  });
+
+  // Acciones del historial
+  $("btnCsv").addEventListener("click", exportarCsv);
+  $("btnLimpiarHist").addEventListener("click", limpiarHistorial);
+  $("btnReiniciarAct").addEventListener("click", reiniciarActivos);
+
+  // Si otra ventana modifica los datos, refrescar
+  window.addEventListener("storage", function(){ pintar(); });
+
+  pintar();
+  setInterval(latido, 1000);
+})();
+</script>
+</body>
+</html>
