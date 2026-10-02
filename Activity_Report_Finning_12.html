@@ -83,6 +83,12 @@ button{cursor:pointer}
 .bdg.s{background:#e1f0e7;color:#1f6b42;box-shadow:inset 0 0 0 1.5px #9fd1b1}
 textarea[data-k]{background:#fff0b8;border-color:#e3b53c}
 
+.ob{display:inline-block;background:#dce6f4;color:#0f2744;font-family:var(--num);font-weight:700;font-style:normal;border-radius:3px;padding:0 1.6mm;line-height:1.5;box-shadow:inset 0 0 0 1px #9db6d8}
+.tile .m .ob{font-size:11.5px}
+.p1b .mini .ob,.tile .v .ob{font-size:10px;vertical-align:middle}
+.kpi .h .ob{font-size:12px;color:#0f2744}
+table.hm td.obc{background:#dce6f4!important;color:#0f2744!important;font-weight:700}
+.stg .p .ob{background:rgba(255,255,255,.92);color:#0f2744;box-shadow:none}
 /* ---------- App shell ---------- */
 :root{--num:Bahnschrift,"DIN Alternate","Segoe UI",Calibri,sans-serif;--surf:#f3f5f8}
 body{background:var(--surf)}
@@ -617,8 +623,8 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
      <table class="mhet" id="mheList"></table>
    </section>
 
-   <section class="sec manual" id="s-prod">
-     <header><h2><i data-ic="bolt"></i>Productividad</h2><span class="bdg m">Manual · opcional</span><p>Vacío = usa el valor gris, tomado de las otras secciones</p></header>
+   <section class="sec" id="s-prod">
+     <header><h2><i data-ic="bolt"></i>Productividad</h2><span class="bdg s">Calculado · bloqueado</span><p>Se calcula solo con los datos de las otras secciones; no se edita</p></header>
      <div class="grid">
        <div class="fld"><label>Descargas CNTR + control</label><input data-k="prod.desc" inputmode="decimal"><div class="prev"></div></div>
        <div class="fld"><label>Desconsolidado + XD</label><input data-k="prod.desco" inputmode="decimal"><div class="prev"></div></div>
@@ -851,7 +857,7 @@ function M(f){
   // productividad
   const fb={desc:m.cntr,desco:(m.desco!=null||m.zixd!=null)?(m.desco||0)+(m.zixd||0):null,guard:m.guard,prep:m.prep,ctrl:m.ctrl,mov:m.mov,inv:m.inv};
   let sum=0,any=false;
-  Object.keys(c.coef).forEach(k=>{let v=n('prod.'+k);if(v==null)v=fb[k];m['p_'+k]=v;if(v!=null){any=true;sum+=v*c.coef[k]}});
+  Object.keys(c.coef).forEach(k=>{let v=fb[k];m['p_'+k]=v;if(v!=null){any=true;sum+=v*c.coef[k]}});
   m.lph=any&&m.bcTot?sum/m.bcTot:null;
   m._fb=fb;
   return m;
@@ -1197,7 +1203,7 @@ function renderRail(){
 }
 function kpiHTML(lab,v,obj,sem,opt={},icn=''){
   const scale=obj?obj*1.5:1,w=v!=null?Math.min(100,v/scale*100):0;
-  return`<div class="kpi ${v!=null?sem:''}"><div class="h"><span>${ic(icn)}${lab}</span><span>obj ${fmt(obj)}${opt.unit||''}</span></div><div class="v">${v!=null?fmt(v,opt.dec):'—'}${opt.unit&&v!=null?`<small>${opt.unit}</small>`:''}${opt.sub?`<small>${opt.sub}</small>`:''}</div><div class="track"><span style="width:${w}%"></span><em style="left:${100/1.5}%"></em></div></div>`;
+  return`<div class="kpi ${v!=null?sem:''}"><div class="h"><span>${ic(icn)}${lab}</span><span class="ob">obj ${fmt(obj)}${opt.unit||''}</span></div><div class="v">${v!=null?fmt(v,opt.dec):'—'}${opt.unit&&v!=null?`<small>${opt.unit}</small>`:''}${opt.sub?`<small>${opt.sub}</small>`:''}</div><div class="track"><span style="width:${w}%"></span><em style="left:${100/1.5}%"></em></div></div>`;
 }
 function renderLive(){
   const m=M(F)||{},o=S.cfg.obj;
@@ -1224,6 +1230,7 @@ function renderPrev(){
 }
 function refresh(){
   const m=M(F)||{};
+  $$('[data-k^="prod."]').forEach(el=>{const v=m['p_'+el.dataset.k.slice(5)];el.value=v!=null?fmt(v,0):'';el.placeholder=v==null?'sin datos':''});
   $('[data-k="out.ctot"]').value=fmt(m.ctot);$('[data-k="bk.tot"]').value=fmt(m.bkTot);$('#salAcum').value=fmt(wSum(monday(F),'sal'));
   $$('[data-k^="prod."]').forEach(el=>{const fb=m._fb?m._fb[el.dataset.k.slice(5)]:null;el.placeholder=fb!=null?fmt(fb):''});
   $('#persSum').textContent=m.bcPers!=null?`${m.bcTot} presentes de ${m.bcPers} · ausentismo ${fmt(m.ausPct,0)}%`:'';
@@ -1242,6 +1249,7 @@ function fillForm(){
   const d=day();
   $$('[data-k]').forEach(el=>{
     const k=el.dataset.k;if(k==='out.ctot'||k==='bk.tot')return;
+    if(k.startsWith('prod.')){el.disabled=true;el.parentElement.classList.add('lock');return}
     const v=gp(d,k);el.value=v??'';
     const box=el.parentElement,lab=box.querySelector('label');
     const setTag=(cls,txt)=>{let t=box.querySelector('.tag');if(!t){t=document.createElement('span');t.className='tag';(lab||box).prepend(t)}t.className='tag '+cls;t.textContent=txt};
@@ -1339,7 +1347,7 @@ function spark(k){
 }
 function tile(k,opt={}){
   const me=MET[k],m=M(F)||{},v=m[k],o=me.o?me.o():null,st=v!=null?me.st(v):'';
-  return`<div class="tile ${st}" data-met="${k}" data-tip="${esc('<b>'+me.l+'</b><br>Clic para ver las últimas 3 semanas')}"><div class="l">${ic(me.ic)}${opt.l||me.l}</div><div class="v">${v!=null?fmt(v,me.dec):'—'}${me.u&&v!=null?`<small>${me.u.trim()}</small>`:''}${opt.sub?`<small>${opt.sub}</small>`:''}</div><div class="m"><span>${o!=null?(me.ol||'obj')+' '+fmt(o)+(me.u||''):'&nbsp;'}</span>${deltaHTML(k,v)}</div>${spark(k)}</div>`;
+  return`<div class="tile ${st}" data-met="${k}" data-tip="${esc('<b>'+me.l+'</b><br>Clic para ver las últimas 3 semanas')}"><div class="l">${ic(me.ic)}${opt.l||me.l}</div><div class="v">${v!=null?fmt(v,me.dec):'—'}${me.u&&v!=null?`<small>${me.u.trim()}</small>`:''}${opt.sub?`<small>${opt.sub}</small>`:''}</div><div class="m"><span>${o!=null?`<span class="ob">${me.ol||'obj'} ${fmt(o)}${me.u||''}</span>`:'&nbsp;'}</span>${deltaHTML(k,v)}</div>${spark(k)}</div>`;
 }
 const CLS_C={ZOBV:'#e3a21a',ZODL:'#285a93',ZODS:'#0f2744',ZOTR:'#6fa8d6'};
 function logoN(){const c=S.cfg;return`<img src="${c.logoL||LOGO_FIN}" alt="Finning CAT"><img src="${c.logoR||LOGO_CEVA}" alt="CEVA Logistics">`}
@@ -1356,8 +1364,8 @@ function pageN1(){
   const st=[['Creadas','ctot'],['Preparadas','prep'],['Controladas','ctrl'],['Salida de merc.','sal']];
   const flow=st.map(([l,k],i)=>{const v=m[k],s=v!=null?MET[k].st(v):'';
     let p;if(k==='ctot')p=v!=null?`demanda: ${fmt(v/c.obj.prep*100,0)}% de la capacidad (${fmt(c.obj.prep)})`:'';
-    else if(k==='prep'||k==='ctrl')p=v!=null?`${capTxt(k,v)} · ${m.ctot?fmt(v/m.ctot*100,0)+'% de lo creado':''}`:'cap. '+fmt(MET[k].o());
-    else p=v!=null&&m.ctot?fmt(v/m.ctot*100,0)+'% de lo creado':'obj '+fmt(MET[k].o());
+    else if(k==='prep'||k==='ctrl')p=v!=null?`${capTxt(k,v)} · ${m.ctot?fmt(v/m.ctot*100,0)+'% de lo creado':''}`:`<span class="ob">cap. ${fmt(MET[k].o())}</span>`;
+    else p=v!=null&&m.ctot?fmt(v/m.ctot*100,0)+'% de lo creado':`<span class="ob">obj ${fmt(MET[k].o())}</span>`;
     return`<div class="stg" data-met="${k}" data-tip="${tipFor(F,k,v)}"><div class="l">${s?`<i class="${s}"></i>`:''}${ic(MET[k].ic)}${l}</div><div class="v">${v!=null?fmt(v):'—'}</div><div class="p">${p}</div></div>`}).join('');
   const bal=m.ctot!=null&&m.sal!=null?(()=>{const g=m.ctot-m.sal;return`<div class="bal" data-met="bkTot"><span class="bn ${g>0?'dn':'up'}">${g>0?'+':''}${fmt(g)}</span><span>${g>0?'Se creó más de lo que se despachó: el backlog tiende a crecer.':g<0?'Se despachó más de lo que se creó: el backlog tiende a bajar.':'Se despachó lo mismo que se creó.'}<br><small>Creadas ${fmt(m.ctot)} − salida ${fmt(m.sal)}</small></span></div>`})():'';
   const bkT=m.bkTot||0;
@@ -1383,7 +1391,7 @@ function pageN1(){
   let pt=`<table class="hm pt"><tr><th style="text-align:left"></th><th>Cap./Obj</th><th>S-2</th><th>S-1</th><th>Semana</th><th class="cur">Hoy</th><th>Acum.</th></tr>`;
   PR.forEach(k=>{const me=MET[k],o=me.o?me.o():null,v=m[k];const a=me.agg==='sum'?wSum(mon,k):null;
     const cell=(x,w)=>`<td class="avg" data-tip="${esc('Promedio diario semana '+isoWeek(w)+': <b>'+(x!=null?fmt(x,1):'sin datos')+'</b>')}">${x!=null?fmt(x,0):'·'}</td>`;
-    pt+=`<tr><td class="rl" data-met="${k}">${ic(me.ic)}${me.l}</td><td class="e" style="color:#5b6574">${o!=null?fmt(o):'—'}</td>${cell(wAvg(w2,k),w2)}${cell(wAvg(w1,k),w1)}${cell(wAvg(mon,k),mon)}<td class="${v!=null?me.st(v):'e'} cur" ${v!=null?`data-tip="${tipFor(F,k,v)}"`:''}>${v!=null?fmt(v):'·'}</td><td class="avg">${a!=null?fmt(a):'—'}</td></tr>`});
+    pt+=`<tr><td class="rl" data-met="${k}">${ic(me.ic)}${me.l}</td><td class="e obc">${o!=null?fmt(o):'—'}</td>${cell(wAvg(w2,k),w2)}${cell(wAvg(w1,k),w1)}${cell(wAvg(mon,k),mon)}<td class="${v!=null?me.st(v):'e'} cur" ${v!=null?`data-tip="${tipFor(F,k,v)}"`:''}>${v!=null?fmt(v):'·'}</td><td class="avg">${a!=null?fmt(a):'—'}</td></tr>`});
   pt+='</table><div style="font-size:9.5px;color:#8a94a3;margin-top:1mm">S-2, S-1 y Semana: promedio diario de los días operados. Acum.: suma de la semana en curso.</div>';
   // inbound + recursos
   const x=d.bkinx||{},SL=c.stockLbl||{};
@@ -1392,7 +1400,7 @@ function pageN1(){
   const inb=`<div class="box"><h3><span>${ic('inbox')}Inbound</span></h3><div class="mini">
       <div data-met="desco">${ic('boxOpen')}Desconsolidadas<b>${fmt(m.desco)||'—'}</b></div>
       <div data-met="guard">${ic('shelves')}Guardadas<b>${fmt(m.guard)||'—'}</b></div>
-      <div data-met="zixd">${ic('cross')}Cross dock (ZIXD)<b>${m.zixd!=null?fmt(m.zixd):'—'} <small>obj ${fmt(c.obj.zixd)}</small></b></div>
+      <div data-met="zixd">${ic('cross')}Cross dock (ZIXD)<b>${m.zixd!=null?fmt(m.zixd):'—'} <span class="ob">obj ${fmt(c.obj.zixd)}</span></b></div>
       <div data-met="bkinS">${ic('hourglass')}Backlog IN<b>${fmt(m.bkinS)||'—'} <small>${m.bkinDias!=null?fmt(m.bkinDias,1)+' d':''}</small></b></div>
       <div>0Q <small style="color:#8a94a3">${esc((SL['0Q']||'').split(' - ')[0])}</small><b>${fmt(m.q0)||'—'}</b></div>
       <div>1Q <small style="color:#8a94a3">${esc((SL['1Q']||'').split(' - ')[0])}</small><b>${fmt(m.q1)||'—'}</b></div>
@@ -1532,7 +1540,7 @@ function pageN3(){
   h+=`<div class="tiles t3">
     <div class="tile"><div class="l">Operarios con tareas</div><div class="v">${ops.length}<small>de ${m.bcPers??'—'} en la lista</small></div></div>
     <div class="tile"><div class="l">Tareas productivas</div><div class="v">${fmt(cats.reduce((a,k)=>a+t.tot[k],0))}</div><div class="m"><span>${cats.map(k=>TCAT[k].split(' ')[0]+' '+t.tot[k]).slice(0,5).join(' · ')}</span></div></div>
-    <div class="tile"><div class="l">Líneas equivalentes por operario</div><div class="v">${ops.length?fmt(ops.reduce((a,o)=>a+o.eq,0)/ops.length,0):'—'}<small>obj ${fmt(c.obj.lph)}</small></div></div>
+    <div class="tile"><div class="l">Líneas equivalentes por operario</div><div class="v">${ops.length?fmt(ops.reduce((a,o)=>a+o.eq,0)/ops.length,0):'—'}<span class="ob">obj ${fmt(c.obj.lph)}</span></div></div>
     <div class="tile tops">${tops}</div>
   </div>`;
   h+=`<div class="t3g"><div class="box"><h3><span>${ic('users')}Producción por operario</span> <small>tareas confirmadas en SAP · líneas eq. = tareas × coeficiente</small></h3>${tb}</div>
