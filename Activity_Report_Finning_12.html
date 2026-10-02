@@ -394,7 +394,7 @@ table.pt td,table.pt th{padding:1.1mm .6mm;font-size:11px}
 .rec{font-size:11px;color:#5b6574;display:grid;gap:1mm}
 .rec b{font-family:var(--num);font-size:15px;color:#16202e}
 .rec .rw{color:#b0671a;font-size:10.5px}
-.rec .sem{display:grid;grid-template-columns:1fr;gap:.5mm;margin-top:.5mm}
+.rec .sem{display:grid;grid-template-columns:1fr 1fr;gap:.4mm 3mm;margin-top:.5mm}
 .rec .sem span{display:flex;align-items:center;gap:5px;font-size:10px;color:#16202e;white-space:nowrap;overflow:hidden}
 .rec .sem span i,.rec .semleg i{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
 .rec .sem em{font-style:normal;flex:1;overflow:hidden;text-overflow:ellipsis}
@@ -1118,7 +1118,7 @@ function secStatus(f){
   const ok=['out.c13','out.c16','out.c16p','out.prep','out.ctrl','out.sal','bk.pend'];r.out=st(cnt(ok),ok.length).concat([cnt(ok)+'/'+ok.length]);
   const ik=['in.desco','in.guard','bkin.q0','bkin.q1','whs.mov'];r.in=st(cnt(ik),ik.length).concat([cnt(ik)+'/'+ik.length]);
   r.pers=(d.persOk?['done',100]:['part',50]).concat([m.bcTot!=null?m.bcTot+'/'+m.bcPers:'']);
-  const nOk=S.cfg.mhe.filter(e=>mheOf(d,e[0])==='OK').length;
+  const nOk=S.cfg.mhe.filter(e=>['OK','MT'].includes(mheOf(d,e[0]))).length;
   r.mhe=(d.mheOk?['done',100]:['part',50]).concat([nOk+'/'+S.cfg.mhe.length]);
   r.prod=(m.lph!=null?['done',100]:['opt',0]).concat([m.lph!=null?fmt(m.lph,0)+' l/HC':'']);
   r.obs=(d.obs?['done',100]:['opt',0]).concat(['']);
@@ -1324,7 +1324,7 @@ function pageN1(){
   pt+='</table><div style="font-size:9.5px;color:#8a94a3;margin-top:1mm">S-2, S-1 y Semana: promedio diario de los días operados. Acum.: suma de la semana en curso.</div>';
   // inbound + recursos
   const x=d.bkinx||{},SL=c.stockLbl||{};
-  const lst=c.personal.filter(p=>p[0]&&!p[0].startsWith('('));const nOk=c.mhe.filter(e=>mheOf(d,e[0])==='OK').length;
+  const lst=c.personal.filter(p=>p[0]&&!p[0].startsWith('('));const nOk=c.mhe.filter(e=>['OK','MT'].includes(mheOf(d,e[0]))).length;
   
   const inb=`<div class="box"><h3><span>${ic('inbox')}Inbound</span></h3><div class="mini">
       <div data-met="desco">${ic('boxOpen')}Desconsolidadas<b>${fmt(m.desco)||'—'}</b></div>
@@ -1339,7 +1339,7 @@ function pageN1(){
     <h3 style="margin-top:3mm"><span>${ic('gear')}Recursos</span></h3><div class="rec">
       <div>${ic('users')}<span><b>${m.bcTot!=null?m.bcTot:'—'}</b> de ${m.bcPers??'—'} operarios presentes</span></div>
       <div>${ic('forklift')}<span><b>${nOk}</b> de ${c.mhe.length} equipos operativos</span></div>
-      <div class="sem">${c.mhe.map(e=>{const k=mheOf(d,e[0]);return`<span title="${esc(e[0])}"><i style="background:${MHE_SEM[k]||MHE_SEM.NU}"></i><em>${esc(e[1])}</em><small>${MHE_ST[k]||''}</small></span>`}).join('')}</div>
+      <div class="sem">${c.mhe.map(e=>{const k=mheOf(d,e[0]);return`<span title="${esc(e[0])}"><i style="background:${MHE_SEM[k]||MHE_SEM.NU}"></i><em>${esc(e[1])}</em></span>`}).join('')}</div>
       <div class="semleg"><span><i style="background:${MHE_SEM.OK}"></i>Ok</span><span><i style="background:${MHE_SEM.MT}"></i>Anomalía leve</span><span><i style="background:${MHE_SEM.FS}"></i>Fuera de servicio</span></div>
     </div></div>`;
   h+=`<div class="p1b">${crea}<div class="box"><h3><span>${ic('chart')}Promedios semanales</span> <small>semana ${isoWeek(F)}</small></h3>${pt}</div>${inb}</div>`;
