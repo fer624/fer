@@ -59,6 +59,30 @@ button{cursor:pointer}
 #guia code{background:var(--surf);border-radius:4px;padding:1px 5px;font-size:12.5px}
 @media(max-width:760px){#guia .gi{grid-template-columns:1fr}}
 
+
+/* ---------- Campos manuales vs. bloqueados (SAP) ---------- */
+.keybar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;background:#fff;border-radius:10px;padding:10px 16px;margin-bottom:14px;box-shadow:0 1px 2px rgba(15,39,68,.08);font-size:13px}
+.keybar b{color:var(--navy)}
+.kb{display:inline-flex;align-items:center;gap:7px}
+.kb i{width:22px;height:14px;border-radius:4px;display:inline-block}
+.kb.m i{background:#fff0b8;box-shadow:inset 0 0 0 1.5px #e3a21a}
+.kb.s i{background:#e1f0e7;box-shadow:inset 0 0 0 1.5px #9fd1b1}
+.fld.man{background:#fff0b8;border-color:#e3b53c}
+.fld.man:focus-within{background:#fffbe6;border-color:#c98a00}
+.fld.man input::placeholder{color:#b99a45}
+.fld.auto,.fld.lock{border-color:#cfe3d6}
+.fld.lock{background:#eef2f6}
+.fld.auto input:disabled,.fld.lock input:disabled{cursor:not-allowed;-webkit-text-fill-color:currentColor;opacity:1}
+.fld.lock input:disabled{color:#8a94a3}
+.fld.lock input::placeholder{font-size:13px;font-weight:400;color:#9aa3b0}
+.fld .tag.m{color:#9a6a00}
+.fld .tag.l{color:#5b6574}
+.sec.manual{border-left:5px solid #e3b53c;background:linear-gradient(90deg,#fff9e0,#fff 160px)}
+.bdg{font-size:11px;font-weight:700;letter-spacing:.3px;border-radius:10px;padding:2px 9px;align-self:center;text-transform:uppercase}
+.bdg.m{background:#fff0b8;color:#8a5f00;box-shadow:inset 0 0 0 1.5px #e3b53c}
+.bdg.s{background:#e1f0e7;color:#1f6b42;box-shadow:inset 0 0 0 1.5px #9fd1b1}
+textarea[data-k]{background:#fff0b8;border-color:#e3b53c}
+
 /* ---------- App shell ---------- */
 :root{--num:Bahnschrift,"DIN Alternate","Segoe UI",Calibri,sans-serif;--surf:#f3f5f8}
 body{background:var(--surf)}
@@ -512,6 +536,8 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
   </nav></aside>
 
   <div>
+   <div class="keybar"><b>Cómo completar:</b><span class="kb m"><i></i>Amarillo = dato <b>manual</b>, lo completás vos</span><span class="kb s"><i></i>Verde (SAP) = sale de las bases, <b>bloqueado</b>: se llena solo al cargar el archivo</span><span class="kb"><i style="background:#eef2f6;box-shadow:inset 0 0 0 1.5px #cfe3d6"></i>Gris = calculado o esperando archivo</span></div>
+
    <section class="sec" id="s-arch">
      <header><h2><i data-ic="xls"></i>Archivos SAP</h2><p>Exports de /SCWM/MON con el layout fijo</p></header>
      <div class="drops">
@@ -580,19 +606,19 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
      </div>
    </section>
 
-   <section class="sec" id="s-pers">
-     <header><h2><i data-ic="users"></i>Personal</h2><p id="persHint">Clic en una persona para pasar de presente a ausente y a licencia</p><span class="x row" style="gap:6px"><button class="btn sm" id="persConf">Confirmar</button><button class="btn sec2 sm" id="persAll">Todos presentes</button></span></header>
+   <section class="sec manual" id="s-pers">
+     <header><h2><i data-ic="users"></i>Personal</h2><span class="bdg m">Manual</span><p id="persHint">Clic en una persona para pasar de presente a ausente y a licencia</p><span class="x row" style="gap:6px"><button class="btn sm" id="persConf">Confirmar</button><button class="btn sec2 sm" id="persAll">Todos presentes</button></span></header>
      <div class="pers" id="persList"></div>
      <div class="legend"><span><i style="background:#dfe6ef"></i>Presente</span><span><i style="background:var(--red)"></i>Ausente</span><span><i style="background:var(--amber)"></i>Licencia</span><span id="persSum" style="margin-left:auto;color:var(--ink)"></span></div>
    </section>
 
-   <section class="sec" id="s-mhe">
-     <header><h2><i data-ic="forklift"></i>Equipos MHE</h2><p>Estado de cada equipo en el turno</p><button class="btn sec2 sm x" id="mheAll">Todos operativos</button></header>
+   <section class="sec manual" id="s-mhe">
+     <header><h2><i data-ic="forklift"></i>Equipos MHE</h2><span class="bdg m">Manual</span><p>Estado de cada equipo en el turno</p><button class="btn sec2 sm x" id="mheAll">Todos operativos</button></header>
      <table class="mhet" id="mheList"></table>
    </section>
 
-   <section class="sec" id="s-prod">
-     <header><h2><i data-ic="bolt"></i>Productividad</h2><p>Vacío = usa el valor gris, tomado de las otras secciones</p></header>
+   <section class="sec manual" id="s-prod">
+     <header><h2><i data-ic="bolt"></i>Productividad</h2><span class="bdg m">Manual · opcional</span><p>Vacío = usa el valor gris, tomado de las otras secciones</p></header>
      <div class="grid">
        <div class="fld"><label>Descargas CNTR + control</label><input data-k="prod.desc" inputmode="decimal"><div class="prev"></div></div>
        <div class="fld"><label>Desconsolidado + XD</label><input data-k="prod.desco" inputmode="decimal"><div class="prev"></div></div>
@@ -604,8 +630,8 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
      </div>
    </section>
 
-   <section class="sec" id="s-obs">
-     <header><h2><i data-ic="note"></i>Observaciones</h2><p>Aparece en el recuadro superior del informe</p></header>
+   <section class="sec manual" id="s-obs">
+     <header><h2><i data-ic="note"></i>Observaciones</h2><span class="bdg m">Manual</span><p>Aparece en el recuadro superior del informe</p></header>
      <textarea data-k="obs" rows="3" placeholder="Ej.: 1BC de franco compensatorio / 1BC exclusivo de mudanza de BO"></textarea>
    </section>
   </div>
@@ -1217,8 +1243,17 @@ function fillForm(){
   $$('[data-k]').forEach(el=>{
     const k=el.dataset.k;if(k==='out.ctot'||k==='bk.tot')return;
     const v=gp(d,k);el.value=v??'';
-    if(AUTO.includes(k)){const on=!!d.src[srcOf(k)]&&v!=null&&v!=='';el.parentElement.classList.toggle('auto',on);
-      let t=el.parentElement.querySelector('.tag');if(on&&!t){t=document.createElement('span');t.className='tag';t.textContent='SAP';el.parentElement.querySelector('label').prepend(t)}if(!on&&t)t.remove()}
+    const box=el.parentElement,lab=box.querySelector('label');
+    const setTag=(cls,txt)=>{let t=box.querySelector('.tag');if(!t){t=document.createElement('span');t.className='tag';(lab||box).prepend(t)}t.className='tag '+cls;t.textContent=txt};
+    const noTag=()=>{const t=box.querySelector('.tag');if(t)t.remove()};
+    if(AUTO.includes(k)){
+      const loaded=!!d.src[srcOf(k)],has=v!=null&&v!=='';
+      const lock=loaded||!has;           // bloqueado: viene de la base (o espera el archivo)
+      el.disabled=lock;el.placeholder=lock&&!has?(loaded?'sin dato':'cargar archivo'):'';
+      box.classList.remove('man');box.classList.toggle('auto',lock&&has);box.classList.toggle('lock',lock&&!has);
+      if(lock&&has)setTag('','🔒 SAP');else if(lock)setTag('l','🔒 SAP');else{setTag('m','MANUAL')}
+    }else if(el.tagName==='TEXTAREA'){/* observaciones: manual */}
+    else{box.classList.add('man');setTag('m','MANUAL')}
   });
   const lst=S.cfg.personal.filter(p=>p[0]&&!p[0].startsWith('('));
   $('#persList').innerHTML=lst.map(p=>{const st=d.pers[p[0]]||'P';const ini=p[0].split(/\s+/).map(w=>w[0]).join('').slice(0,2);const tk=tarUserTasks(d,p[0]);const sug=d.persAuto&&!d.persOk&&st!=='P';return`<button class="pc ${st} ${sug?'sug':''}" data-n="${esc(p[0])}" aria-label="${esc(p[0])}: ${{P:'presente',A:'ausente',L:'licencia'}[st]}" title="${tk==null?'':tk?tk+' tareas confirmadas':'Sin tareas en SAP'}"><span class="av">${st==='P'?esc(ini):st}</span>${esc(p[0])}<small>${esc(p[1])}</small>${tk!=null?`<span class="tk">${tk?tk+' t.':'sin tareas'}</span>`:''}</button>`}).join('')||'<span class="hint">Cargá la lista de personal en Configuración.</span>';
