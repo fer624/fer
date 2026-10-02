@@ -39,6 +39,26 @@ button,input,select,textarea{font-family:inherit;font-size:14px}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
 
+
+/* ---------- Guía de métricas ---------- */
+#guia{max-width:1100px}
+#guia .gsec{background:#fff;border-radius:10px;padding:18px 22px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,39,68,.08)}
+#guia h2{font-family:var(--num);font-weight:600;font-size:19px;margin:0 0 4px;color:var(--navy)}
+#guia .lead{color:var(--muted);margin:0 0 14px;font-size:13.5px}
+#guia .gi{display:grid;grid-template-columns:210px 1fr;gap:4px 18px;padding:10px 0;border-top:1px solid #e8ecf1}
+#guia .gi:first-of-type{border-top:0}
+#guia .gi h4{margin:0;font-size:14px;color:var(--ink)}
+#guia .gi h4 small{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:2px}
+#guia .gi p{margin:0 0 5px;font-size:13.5px;line-height:1.45}
+#guia .f{background:var(--surf);border-radius:6px;padding:6px 10px;font-family:var(--num);font-size:13px;color:var(--navy);margin:4px 0}
+#guia .ex{color:var(--muted);font-size:12.5px}
+#guia table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
+#guia th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:5px 8px;border-bottom:1px solid var(--line)}
+#guia td{padding:5px 8px;border-bottom:1px solid #eef1f5}
+#guia .dot{width:10px;height:10px;margin-right:6px}
+#guia code{background:var(--surf);border-radius:4px;padding:1px 5px;font-size:12.5px}
+@media(max-width:760px){#guia .gi{grid-template-columns:1fr}}
+
 /* ---------- App shell ---------- */
 :root{--num:Bahnschrift,"DIN Alternate","Segoe UI",Calibri,sans-serif;--surf:#f3f5f8}
 body{background:var(--surf)}
@@ -370,9 +390,14 @@ table.hm tr.sep td{height:1.4mm;padding:0;background:none}
 .t3g{display:grid;grid-template-columns:1.45fr 1fr;gap:3mm;flex:1;min-height:0}
 table.tm td,table.tm th{padding:.9mm .4mm;font-size:10.5px}
 table.tm td.rl b{font-weight:600}
-table.hmh{border-collapse:separate;border-spacing:1.5px;width:100%;font-size:9px}
-table.hmh th{font-weight:400;color:#8a94a3;font-size:8.5px}
-table.hmh td{text-align:center;border-radius:2px;height:4.3mm;font-family:var(--num);font-weight:600}
+table.tm td.turno{background:none;font-weight:400;font-size:10.5px;color:#5b6574;white-space:nowrap;padding-left:2mm}
+table.tm th:last-child{white-space:nowrap;padding-left:2mm}
+table.hmh{border-collapse:separate;border-spacing:1.5px;width:100%;font-size:10px}
+table.hmh th{font-weight:600;color:#5b6574;font-size:9.5px;padding-bottom:.6mm}
+table.hmh th.tt,table.hmh td.tt{background:#e9edf3!important;color:#16202e!important;font-weight:600;border-radius:2px}
+table.hmh tr.tr td{height:4.5mm}
+table.hmh tr.tr td:first-child{font-weight:600}
+table.hmh td{text-align:center;border-radius:2px;height:4.5mm;font-size:10px;font-family:var(--num);font-weight:600}
 table.hmh td:first-child{text-align:left;background:none!important;color:#16202e;font-family:var(--font);font-weight:400;white-space:nowrap;padding-right:2mm}
 .pc .tk{font-size:10.5px;color:var(--muted);margin-left:2px}
 .pc.sug{outline:2px dashed var(--red);outline-offset:1px}
@@ -462,6 +487,7 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
       <button role="tab" data-v="carga" aria-selected="true">Carga del día</button>
       <button role="tab" data-v="rep">Informe</button>
       <button role="tab" data-v="hist">Historial</button>
+      <button role="tab" data-v="guia">Guía de métricas</button>
       <button role="tab" data-v="cfg">Configuración</button>
     </nav>
     <span class="sp"></span>
@@ -618,6 +644,8 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
 </section>
 
 <!-- ================= CONFIG ================= -->
+<section class="view" id="v-guia"><main id="guia"></main></section>
+
 <section class="view" id="v-cfg">
   <div class="two">
     <div class="panel">
@@ -1444,21 +1472,25 @@ function pageN3(){
   let tb=`<table class="hm tm"><tr><th style="text-align:left">Operario</th>${cats.map(k=>`<th><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${TCOL[k]};margin-right:3px"></i>${TCAT[k].replace(' (UM)','')}</th>`).join('')}<th>Líneas eq.</th><th style="width:26%"></th><th>Turno</th></tr>`;
   ops.forEach(o=>{
     tb+=`<tr><td class="rl"><b style="font-family:var(--num)">${esc(userName(o.u))}</b> <small>${o.u.replace('FINARG','#')}</small></td>${cats.map(k=>`<td class="${o.x[k]?'':'e'}" ${o.x[k]?`data-tip="${esc('<b>'+userName(o.u)+'</b><br>'+TCAT[k]+': <b>'+o.x[k]+'</b>')}"`:''}>${o.x[k]||'·'}</td>`).join('')}
-    <td class="avg">${fmt(o.eq,0)}</td><td style="background:none;padding:0 1mm"><div style="display:flex;height:3.4mm;border-radius:2px;overflow:hidden;background:#eef1f5;width:${o.eq/mxEq*100}%">${Object.keys(CO).map(k=>o.x[k]?`<div style="flex:${o.x[k]*CO[k]};background:${TCOL[k]}"></div>`:'').join('')}</div></td><td style="background:none;font-weight:400;font-size:10px;color:#5b6574">${hh(o.x._ini)}–${hh(o.x._fin)}</td></tr>`});
+    <td class="avg">${fmt(o.eq,0)}</td><td style="background:none;padding:0 1mm"><div style="display:flex;height:3.4mm;border-radius:2px;overflow:hidden;background:#eef1f5;width:${o.eq/mxEq*100}%">${Object.keys(CO).map(k=>o.x[k]?`<div style="flex:${o.x[k]*CO[k]};background:${TCOL[k]}"></div>`:'').join('')}</div></td><td class="turno">${hh(o.x._ini)}–${hh(o.x._fin)}</td></tr>`});
   const oth=us.filter(o=>!o.op);
   tb+=`</table>${oth.length?`<div style="font-size:10px;color:#6b7686;margin-top:1.5mm">Otros usuarios (no operarios): ${oth.map(o=>esc(o.u)+' '+o.tot).join(' · ')}</div>`:''}`;
   // matriz horaria
-  let mh=`<table class="hmh"><tr><th></th>${H.map(h=>`<th>${h}</th>`).join('')}</tr>`;
-  ops.forEach(o=>{mh+=`<tr><td>${esc(userName(o.u))}</td>${H.map(h=>{const v=(o.x._h||{})[h]||0;return`<td style="background:${hm(v)};color:${v/mxC>.5?'#fff':'#16202e'}" ${v?`data-tip="${esc('<b>'+userName(o.u)+'</b> · '+h+':00 a '+h+':59<br>'+v+' tareas')}"`:''}>${v||''}</td>`}).join('')}</tr>`});
+  const hTot=h=>ops.reduce((a,o)=>a+((o.x._h||{})[h]||0),0);
+  let mh=`<table class="hmh"><tr><th></th>${H.map(h=>`<th>${h}h</th>`).join('')}<th class="tt">Total</th></tr>`;
+  ops.forEach(o=>{const rt=H.reduce((a,h)=>a+((o.x._h||{})[h]||0),0);mh+=`<tr><td>${esc(userName(o.u))}</td>${H.map(h=>{const v=(o.x._h||{})[h]||0;return`<td style="background:${hm(v)};color:${v/mxC>.5?'#fff':'#16202e'}" ${v?`data-tip="${esc('<b>'+userName(o.u)+'</b> · '+h+':00 a '+h+':59<br>'+v+' tareas')}"`:''}>${v||''}</td>`}).join('')}<td class="tt">${rt}</td></tr>`});
+  mh+=`<tr class="tr"><td>Total</td>${H.map(h=>`<td class="tt">${hTot(h)||''}</td>`).join('')}<td class="tt">${H.reduce((a,h)=>a+hTot(h),0)}</td></tr>`;
   mh+='</table>';
   // barras apiladas por hora
-  const mxH=Math.max(1,...H.map(h=>cats.reduce((a,k)=>a+((t.byH[h]||{})[k]||0),0)));
-  const W=420,Hh=140,L=26,B=14,T=6,iw=W-L-6,ih=Hh-B-T,gw=iw/H.length;
+  const sumH=h=>cats.reduce((a,k)=>a+((t.byH[h]||{})[k]||0),0);
+  const mx0=Math.max(1,...H.map(sumH)),stp=[10,20,25,50,100,200].find(v=>mx0/v<=4)||200,mxH=Math.ceil(mx0/stp)*stp;
+  const W=420,Hh=150,L=28,B=16,T=12,iw=W-L-6,ih=Hh-B-T,gw=iw/H.length;
   let sv=`<svg viewBox="0 0 ${W} ${Hh}" font-family="Calibri,Carlito,Arial">`;
-  [0,.5,1].forEach(f=>{const y=T+ih-ih*f;sv+=`<line x1="${L}" x2="${W-6}" y1="${y}" y2="${y}" stroke="#edf0f4"/><text x="${L-4}" y="${y+3}" text-anchor="end" font-size="8" fill="#8a94a3">${Math.round(mxH*f)}</text>`});
-  H.forEach((h,i)=>{let y=T+ih;const row=t.byH[h]||{};const sum=cats.reduce((a,k)=>a+(row[k]||0),0);
+  for(let v=0;v<=mxH;v+=stp){const y=T+ih-ih*v/mxH;sv+=`<line x1="${L}" x2="${W-6}" y1="${y}" y2="${y}" stroke="#edf0f4"/><text x="${L-4}" y="${y+3}" text-anchor="end" font-size="9" fill="#8a94a3">${v}</text>`}
+  H.forEach((h,i)=>{let y=T+ih;const row=t.byH[h]||{};const sum=sumH(h);
     cats.forEach(k=>{const v=row[k]||0;if(!v)return;const bh=ih*v/mxH;y-=bh;sv+=`<rect x="${L+gw*i+gw*.15}" y="${y}" width="${gw*.7}" height="${bh}" fill="${TCOL[k]}" data-tip="${esc('<b>'+h+':00 a '+h+':59</b><br>'+cats.filter(z=>row[z]).map(z=>TCAT[z]+': '+row[z]).join('<br>')+'<br>Total: <b>'+sum+'</b>')}"/>`});
-    sv+=`<text x="${L+gw*i+gw/2}" y="${Hh-3}" text-anchor="middle" font-size="8" fill="#8a94a3">${h}</text>`});
+    if(sum)sv+=`<text x="${L+gw*i+gw/2}" y="${y-2}" text-anchor="middle" font-size="9" font-weight="600" fill="#16202e">${sum}</text>`;
+    sv+=`<text x="${L+gw*i+gw/2}" y="${Hh-3}" text-anchor="middle" font-size="9.5" fill="#5b6574">${h}h</text>`});
   sv+='</svg>';
   const tops=[['prep','Picking'],['ctrl','Control'],['guard','Guardado']].map(([k,l])=>{const b=ops.filter(o=>o.x[k]).sort((a,b)=>b.x[k]-a.x[k])[0];return b?`<div>${l}<b>${esc(userName(b.u))}</b><small>${b.x[k]} tareas</small></div>`:''}).join('');
   let h=headN('El equipo');
@@ -1499,6 +1531,56 @@ $('#btnMail').onclick=()=>{
 };
 
 /* ======================= Historial ======================= */
+
+function renderGuia(){
+  const c=S.cfg,o=c.obj,k=c.coef,f=fmt;
+  const dot=(cl)=>`<i class="dot" style="background:${cl}"></i>`;
+  const G='#2e8b57',A='#e3a21a',R='#d0452b';
+  const it=(t,sub,body)=>`<div class="gi"><h4>${t}${sub?`<small>${sub}</small>`:''}</h4><div>${body}</div></div>`;
+  const sec=(t,lead,items)=>`<section class="gsec"><h2>${t}</h2><p class="lead">${lead}</p>${items}</section>`;
+  let h='';
+  h+=sec('Cómo se lee el informe','Cada número sale de los archivos de SAP que cargás y de lo que completás a mano. Los objetivos y coeficientes se cambian en Configuración; esta guía muestra los valores vigentes.',
+   it('Semáforo de indicadores','Verde · Ámbar · Rojo',`<p>El color compara el valor del día contra su objetivo:</p>
+    <table><tr><th></th><th>Indicador</th><th>Verde</th><th>Ámbar</th><th>Rojo</th></tr>
+    <tr><td>${dot(G)}</td><td>Preparadas / Controladas / Salida</td><td>≥ objetivo (${f(o.prep)})</td><td>≥ 90% del objetivo</td><td>&lt; 90%</td></tr>
+    <tr><td>${dot(G)}</td><td>Líneas creadas</td><td>≤ ${f(o.creadas)}</td><td>hasta +20% (${f(o.creadas*1.2,0)})</td><td>más de +20%</td></tr>
+    <tr><td>${dot(G)}</td><td>Desconsolidadas / Guardadas / Líneas por HC</td><td>≥ objetivo</td><td>≥ 90% del objetivo</td><td>&lt; 90%</td></tr>
+    <tr><td>${dot(G)}</td><td>Ausentismo</td><td>≤ ${f(o.ausPct)}%</td><td>hasta ${f(o.ausPct+3)}%</td><td>más de ${f(o.ausPct+3)}%</td></tr>
+    <tr><td>${dot(G)}</td><td>Backlog (en días)</td><td>≤ 2 días</td><td>hasta 3 días</td><td>más de 3 días</td></tr></table>`)+
+   it('Semáforo de equipos','Estado de cada máquina',`<p>${dot(G)}<b>Ok</b>: funciona normal. ${dot('#f2c200')}<b>Anomalía leve</b>: tiene una falla menor pero <b>sigue operativo</b>. ${dot(R)}<b>Fuera de servicio</b>: no se puede usar. Solo las máquinas fuera de servicio (y las no utilizadas) restan del contador “X de N equipos operativos”.</p>`));
+  h+=sec('Outbound (salidas)','Fuente: archivos de pedidos y de salida de mercadería (SAP).',
+   it('Líneas creadas','Demanda del día',`<p>Cantidad de líneas de pedido creadas en el día, separadas por <b>franja horaria</b> (antes de las 13 h, 13–16 h, después de las 16 h) y por <b>tipo de documento</b> (ZOBV, ZODL, ZODS, ZOTR).</p><div class="f">Creadas = &lt;13 h + 13–16 h + &gt;16 h</div><p class="ex">Se compara con el objetivo de ${f(o.creadas)} líneas, que equivale a la capacidad diaria.</p>`)+
+   it('Preparadas (picking)','Capacidad: '+f(o.prep),`<p>Líneas que se prepararon en el día. Se mide contra la <b>capacidad de preparación</b> (${f(o.prep)} líneas/día) y contra lo creado.</p><div class="f">% capacidad = preparadas ÷ ${f(o.prep)}</div>`)+
+   it('Controladas','Capacidad: '+f(o.ctrl),`<p>Líneas controladas antes del despacho. Misma lógica que preparadas, con capacidad de ${f(o.ctrl)} líneas/día.</p>`)+
+   it('Salida de mercadería','Objetivo: '+f(o.sal),`<p>Líneas despachadas (salida de mercadería confirmada). El <b>acumulado</b> suma lo despachado desde el lunes de la semana.</p><div class="f">Balance = creadas − salida</div><p class="ex">Si es positivo, se creó más de lo que se despachó y el backlog tiende a crecer.</p>`)+
+   it('Backlog OUT','Líneas pendientes',`<p>Líneas de pedido que todavía no salieron, por tipo (ZOBV, ZODL, ZODS, ZOTR), según la foto de la base al momento de bajarla. <b>Pendiente por despachar</b> es la parte ya lista para salir.</p><div class="f">Días de backlog = backlog ÷ ${f(o.creadas)} (líneas creadas por día)</div><p class="ex">Ejemplo: 858 líneas ÷ 429 = 2,0 días.</p>`));
+  h+=sec('Inbound (entradas)','Fuente: archivos de tareas de almacén e inventario (SAP EWM).',
+   it('Desconsolidadas','Objetivo: '+f(o.desco),`<p>Tareas de desconsolidación: abrir el bulto recibido y repartirlo por producto (etapa IB02, clase 1010). Un bulto genera varias tareas.</p>`)+
+   it('Guardadas','Objetivo: '+f(o.guard),`<p>Tareas de guardado: llevar la mercadería a su ubicación final (IB03, clases 1010 y 1016).</p>`)+
+   it('Cross dock (ZIXD)','Objetivo: '+f(o.zixd),`<p>Mercadería que pasa de recepción directo a despacho sin almacenarse: movimiento de la ubicación 9010 a la 8030.</p>`)+
+   it('Backlog IN','Pendiente de ingreso',`<p>Mercadería recibida y todavía no guardada, por estado de stock (0Q, 1Q y otros).</p><div class="f">Días de backlog IN = backlog IN ÷ ${f(o.guard)} (objetivo de guardadas)</div>`)+
+   it('Liberación aérea / IN marítima','Informativo',`<p>Liberación aérea: cases y m³ recibidos. IN marítima: cantidad de contenedores (CNTR) del día; objetivo de ${f(o.cntr)}.</p>`));
+  h+=sec('Recursos','Personal y equipos disponibles en el turno.',
+   it('Personal presente','Blue Collars',`<p>Personal de piso de la lista de Configuración, menos los marcados como ausentes y con licencia.</p><div class="f">Presentes = personal − ausentes − licencia</div><div class="f">Ausentismo % = (ausentes + licencia) ÷ personal × 100</div><p class="ex">Objetivo de ausentismo: ${f(o.ausPct)}%.</p>`)+
+   it('Equipos operativos','MHE',`<div class="f">Operativos = equipos Ok + equipos con anomalía leve</div><p>Los equipos fuera de servicio no cuentan.</p>`));
+  const CK=[['desc','Descargas CNTR + control'],['desco','Desconsolidado + cross dock'],['guard','Guardado'],['prep','Preparadas'],['ctrl','Control'],['mov','Movimientos internos'],['inv','Inventario']];
+  h+=sec('Productividad: líneas equivalentes y líneas por HC','Permite comparar tareas de distinto esfuerzo en una misma unidad.',
+   it('Líneas equivalentes','Actividad × coeficiente',`<p>Cada tipo de tarea tiene un coeficiente que refleja su esfuerzo relativo frente a preparar una línea (coeficiente 1,0):</p>
+    <table><tr><th>Actividad</th><th>Coeficiente</th><th>Qué se multiplica</th></tr>${CK.map(([a,l])=>`<tr><td>${l}</td><td><b>${f(k[a])}</b></td><td>${a==='desc'?'contenedores (CNTR) del día':a==='desco'?'desconsolidadas + cross dock':'tareas del día'}</td></tr>`).join('')}</table>
+    <div class="f">Líneas equivalentes = Σ (cantidad de cada actividad × su coeficiente)</div>`)+
+   it('Líneas por HC','Objetivo: '+f(o.lph),`<p>Productividad por persona: cuántas líneas equivalentes hace en promedio cada operario presente.</p><div class="f">Líneas por HC = líneas equivalentes ÷ personal presente</div><p class="ex">HC = headcount (personas). Se muestra en verde si llega al objetivo.</p>`));
+  const TR=[['Inventario','Conteos cíclicos','Archivo de inventario'],['Cross dock','9010 → 8030','Suma con el coeficiente de desconsolidación'],['Picking','PICK en OB01 (sin UM completa)','Solo usuarios CDR'],['Control','Clase 3040','Solo usuarios CDR'],['Desconsolidación','IB02 + clase 1010',''],['Guardado','IB03 + clase 1010 o 1016',''],['Mov. interno','Clase 9999 / 4011, de ubicación física a física',''],['Descarga (UM)','IB01 + clase 3065: bajar un bulto del muelle de descarga (9030) a recepción','Informativa: no suma en líneas eq.'],['Carga (UM)','OB03 + clase 3070','Informativa: no suma en líneas eq.']];
+  h+=sec('Hoja 3: producción por operario','Fuente: archivo de tareas confirmadas del día (SAP EWM). Cada fila del archivo es una tarea.',
+   it('Tareas por operario','Cómo se cuenta cada columna',`<table><tr><th>Columna</th><th>Qué es en SAP</th><th>Observación</th></tr>${TR.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</table>`)+
+   it('Líneas eq. por operario','',`<div class="f">Líneas eq. = Σ (tareas de cada columna × coeficiente)</div><p>Entran inventario, cross dock, picking, control, desconsolidación, guardado y mov. interno. La barra de color al costado muestra cuánto aporta cada actividad.</p>`)+
+   it('Turno','Primera y última tarea',`<p>Hora de la primera y de la última tarea productiva confirmada por el operario. No es el horario fichado: es el tramo en el que registró trabajo en SAP.</p>`)+
+   it('Actividad por hora y mapa horario','',`<p>El gráfico apila las tareas de todos los operarios por hora de confirmación y muestra el total sobre cada barra. El mapa horario cuenta las tareas por operario y por hora, con totales por fila y por columna. Cuanto más oscuro el casillero, más tareas.</p>`)+
+   it('Qué se excluye','',`<p>Picking y control cuentan solo usuarios CDR. Se excluye el stock tipo 5F y las filas de otra fecha. Los usuarios que no son operarios (por ejemplo DGUILLEN) aparecen aparte y no entran en el mapa.</p>`));
+  h+=sec('Promedios semanales','Tabla de la hoja 1.',
+   it('S-2, S-1, Semana, Hoy, Acum.','',`<p><b>S-2 y S-1</b>: promedio diario de las dos semanas anteriores, sobre los días operados. <b>Semana</b>: promedio de la semana en curso hasta el día elegido. <b>Hoy</b>: valor del día, con su semáforo. <b>Acum.</b>: suma de la semana desde el lunes.</p>`));
+  $('#guia').innerHTML=h;
+}
+
 function renderHist(){
   const ks=Object.keys(S.days).sort().reverse();
   $('#histT').innerHTML='<tr><th>Fecha</th><th>Semana</th><th>Creadas</th><th>Preparadas</th><th>Salida</th><th>Backlog OUT</th><th>Líneas/HC</th><th></th></tr>'+
@@ -1553,7 +1635,7 @@ $('#logoClr').onclick=()=>{S.cfg.logoL='';S.cfg.logoR='';persist();toast('Logos 
 function show(v){
   $$('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===v));
   $$('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v));
-  renderWeek();if(v==='carga')fillForm();if(v==='rep')renderReport();if(v==='hist')renderHist();if(v==='cfg')renderCfg();
+  renderWeek();if(v==='carga')fillForm();if(v==='rep')renderReport();if(v==='hist')renderHist();if(v==='guia')renderGuia();if(v==='cfg')renderCfg();
 }
 $$('.tabs button').forEach(b=>b.onclick=()=>show(b.dataset.v));
 $('#fecha').value=F;
