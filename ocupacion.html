@@ -1,0 +1,2703 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocupación de Almacén</title>
+<style>
+/* ===========================================================================
+   OCUPACIÓN DE ALMACÉN — aplicación de un solo archivo, 100% offline.
+   Sin CDNs, sin librerías: lee .xlsx con el descompresor nativo del navegador.
+   Paleta y reglas de gráficos según guía de visualización validada.
+   =========================================================================== */
+
+:root{
+  color-scheme: light;
+  --plano:#f9f9f7;
+  --sup:#fcfcfb;
+  --sup-2:#f3f3f0;
+  --tinta:#0b0b0b;
+  --tinta-2:#52514e;
+  --tinta-3:#898781;
+  --borde:rgba(11,11,11,.10);
+  --grilla:#e1e0d9;
+  --eje:#c3c2b7;
+
+  --s1:#2a78d6;  /* categórico 1 — azul */
+  --s2:#eb6834;  /* 2 — naranja */
+  --s3:#1baf7a;  /* 3 — aqua */
+  --s4:#eda100;  /* 4 — amarillo */
+  --s5:#e87ba4;  /* 5 — magenta */
+
+  /* rampa secuencial azul 100→700 */
+  --q1:#cde2fb; --q2:#b7d3f6; --q3:#9ec5f4; --q4:#86b6ef; --q5:#6da7ec;
+  --q6:#5598e7; --q7:#3987e5; --q8:#2a78d6; --q9:#256abf; --q10:#1c5cab;
+  --q11:#184f95; --q12:#104281;
+
+  --bien:#0ca30c; --aviso:#fab219; --serio:#ec835a; --critico:#d03b3b;
+  --sube-bien:#006300;
+
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --plano:#0d0d0d; --sup:#1a1a19; --sup-2:#222221;
+    --tinta:#ffffff; --tinta-2:#c3c2b7; --tinta-3:#898781;
+    --borde:rgba(255,255,255,.10); --grilla:#2c2c2a; --eje:#383835;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --q1:#0d366b; --q2:#104281; --q3:#184f95; --q4:#1c5cab; --q5:#256abf;
+    --q6:#2a78d6; --q7:#3987e5; --q8:#5598e7; --q9:#6da7ec; --q10:#86b6ef;
+    --q11:#9ec5f4; --q12:#b7d3f6;
+    --sube-bien:#0ca30c;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plano:#0d0d0d; --sup:#1a1a19; --sup-2:#222221;
+  --tinta:#ffffff; --tinta-2:#c3c2b7; --tinta-3:#898781;
+  --borde:rgba(255,255,255,.10); --grilla:#2c2c2a; --eje:#383835;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --q1:#0d366b; --q2:#104281; --q3:#184f95; --q4:#1c5cab; --q5:#256abf;
+  --q6:#2a78d6; --q7:#3987e5; --q8:#5598e7; --q9:#6da7ec; --q10:#86b6ef;
+  --q11:#9ec5f4; --q12:#b7d3f6;
+  --sube-bien:#0ca30c;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--plano); color:var(--tinta);
+  font-family:var(--fuente); font-size:14px; line-height:1.45;
+  -webkit-text-size-adjust:100%;
+}
+:focus-visible{outline:2px solid var(--s1); outline-offset:2px}
+h1,h2,h3{margin:0; font-weight:650; letter-spacing:-.01em}
+a{color:var(--s1)}
+
+/* ---------- Cabecera ---------- */
+.cab{
+  position:sticky; top:0; z-index:40;
+  background:var(--sup); border-bottom:1px solid var(--borde);
+  padding:10px 16px;
+}
+.cab-fila{display:flex; align-items:center; gap:14px; flex-wrap:wrap; max-width:1480px; margin:0 auto}
+.marca{display:flex; align-items:baseline; gap:10px; margin-right:auto}
+.marca h1{font-size:16px}
+.marca .corte{
+  font-size:12px; color:var(--tinta-2); font-variant-numeric:tabular-nums;
+  background:var(--sup-2); border:1px solid var(--borde);
+  padding:2px 8px; border-radius:99px; white-space:nowrap;
+}
+.navtabs{display:flex; gap:2px; flex-wrap:wrap}
+.navtabs button{
+  font:inherit; font-size:13px; color:var(--tinta-2);
+  background:transparent; border:1px solid transparent; border-radius:8px;
+  padding:6px 11px; cursor:pointer;
+}
+.navtabs button:hover{background:var(--sup-2); color:var(--tinta)}
+.navtabs button[aria-selected="true"]{
+  background:var(--sup-2); color:var(--tinta); font-weight:600;
+  border-color:var(--borde);
+  box-shadow:inset 0 -2px 0 var(--s1);
+}
+.icono-btn{
+  font:inherit; font-size:13px; color:var(--tinta-2); background:var(--sup-2);
+  border:1px solid var(--borde); border-radius:8px; padding:6px 10px; cursor:pointer;
+}
+.icono-btn:hover{color:var(--tinta)}
+
+main{max-width:1480px; margin:0 auto; padding:18px 16px 70px}
+.panel[hidden]{display:none}
+
+/* ---------- Tarjetas ---------- */
+.tarjeta{
+  background:var(--sup); border:1px solid var(--borde);
+  border-radius:var(--r); padding:16px; margin-bottom:16px;
+}
+.tarjeta>header{margin-bottom:12px}
+.tarjeta>header h2{font-size:14px}
+.tarjeta>header p{margin:3px 0 0; font-size:12.5px; color:var(--tinta-2)}
+.rejilla{display:grid; gap:16px; align-items:start}
+@media(min-width:900px){ .rejilla.c2{grid-template-columns:1fr 1fr} }
+@media(min-width:1100px){ .rejilla.c3{grid-template-columns:repeat(3,1fr)} }
+
+/* ---------- Fichas de indicador ---------- */
+.fichas{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.ficha{
+  background:var(--sup); border:1px solid var(--borde);
+  border-radius:var(--r); padding:14px 15px;
+}
+.ficha .rot{font-size:11.5px; color:var(--tinta-2); text-transform:uppercase; letter-spacing:.05em; font-weight:600}
+.ficha .val{font-size:27px; font-weight:680; margin-top:5px; letter-spacing:-.02em}
+.ficha .val small{font-size:15px; font-weight:600; color:var(--tinta-2); letter-spacing:0}
+.ficha .pie{font-size:12px; color:var(--tinta-2); margin-top:3px; font-variant-numeric:tabular-nums}
+.delta{font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:3px; font-variant-numeric:tabular-nums}
+.delta.sube{color:var(--sube-bien)} .delta.baja{color:var(--critico)} .delta.igual{color:var(--tinta-3)}
+
+/* medidor (ocupación) */
+.medidor{height:9px; background:var(--sup-2); border:1px solid var(--borde); border-radius:99px; overflow:hidden; margin-top:9px}
+.medidor i{display:block; height:100%; background:var(--s1); border-radius:99px 0 0 99px}
+
+/* ---------- Tablas ---------- */
+.envoltorio-tabla{overflow:auto; max-height:min(68vh,760px); border:1px solid var(--borde); border-radius:8px}
+table{border-collapse:collapse; width:100%; font-size:13px}
+thead th{
+  position:sticky; top:0; z-index:2; background:var(--sup-2); text-align:left;
+  padding:8px 10px; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--tinta-2); border-bottom:1px solid var(--borde); white-space:nowrap; cursor:pointer;
+}
+thead th.no-ord{cursor:default}
+thead th .flecha{color:var(--s1); font-size:10px}
+tbody td{padding:7px 10px; border-bottom:1px solid var(--grilla); vertical-align:top}
+tbody tr:hover td{background:var(--sup-2)}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+tfoot td{padding:8px 10px; font-weight:650; border-top:1px solid var(--eje); background:var(--sup-2); font-variant-numeric:tabular-nums}
+.chip{display:inline-block; font-size:11px; padding:1px 7px; border-radius:99px; border:1px solid var(--borde); background:var(--sup-2); color:var(--tinta-2); white-space:nowrap}
+.chip.v{border-color:color-mix(in oklab, var(--s2) 40%, transparent); color:var(--s2)}
+.barra-celda{position:relative; min-width:116px}
+.barra-celda i{position:absolute; left:0; top:50%; transform:translateY(-50%); height:14px; background:color-mix(in oklab, var(--s1) 22%, transparent); border-radius:0 4px 4px 0; z-index:0}
+.barra-celda span{position:relative; z-index:1; padding-left:4px; font-variant-numeric:tabular-nums}
+
+/* ---------- Controles ---------- */
+.controles{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px}
+.campo{display:flex; flex-direction:column; gap:4px}
+.campo label{font-size:11.5px; color:var(--tinta-2); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+select,input[type=text],input[type=date],input[type=number],textarea{
+  font:inherit; font-size:13px; color:var(--tinta); background:var(--sup);
+  border:1px solid var(--eje); border-radius:7px; padding:6px 9px; min-width:120px;
+}
+textarea{min-height:68px; resize:vertical; width:100%}
+.btn{
+  font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  background:var(--s1); color:#fff; border:1px solid transparent;
+  border-radius:8px; padding:7px 13px;
+}
+.btn:hover{filter:brightness(1.08)}
+.btn.sec{background:var(--sup-2); color:var(--tinta); border-color:var(--borde)}
+.btn.peligro{background:transparent; color:var(--critico); border-color:color-mix(in oklab,var(--critico) 45%, transparent)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.segm{display:inline-flex; border:1px solid var(--borde); border-radius:8px; overflow:hidden; background:var(--sup-2)}
+.segm button{font:inherit; font-size:12.5px; color:var(--tinta-2); background:transparent; border:0; padding:6px 11px; cursor:pointer}
+.segm button[aria-pressed="true"]{background:var(--s1); color:#fff; font-weight:600}
+
+/* ---------- Zona de carga ---------- */
+.soltar{
+  border:1.5px dashed var(--eje); border-radius:var(--r);
+  padding:16px; background:var(--sup); transition:border-color .15s, background .15s;
+}
+.soltar.encima{border-color:var(--s1); background:color-mix(in oklab,var(--s1) 6%, var(--sup))}
+.soltar h3{font-size:13.5px}
+.soltar p{margin:4px 0 10px; font-size:12.5px; color:var(--tinta-2)}
+.estado{font-size:12.5px; margin-top:9px; display:flex; align-items:flex-start; gap:6px}
+.estado.ok{color:var(--sube-bien)} .estado.mal{color:var(--critico)} .estado.trab{color:var(--tinta-2)}
+.oculto-archivo{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+
+/* ---------- Avisos ---------- */
+.aviso{
+  display:flex; gap:9px; padding:10px 12px; border-radius:8px; font-size:12.5px;
+  border:1px solid var(--borde); background:var(--sup-2); margin-bottom:12px;
+}
+.aviso .ic{flex:none; font-weight:700}
+.aviso.alerta{border-color:color-mix(in oklab,var(--aviso) 45%, transparent); background:color-mix(in oklab,var(--aviso) 9%, var(--sup))}
+.aviso.grave{border-color:color-mix(in oklab,var(--critico) 45%, transparent); background:color-mix(in oklab,var(--critico) 8%, var(--sup))}
+.aviso.info{border-color:color-mix(in oklab,var(--s1) 38%, transparent); background:color-mix(in oklab,var(--s1) 7%, var(--sup))}
+
+/* ---------- Gráficos ---------- */
+.graf{width:100%; display:block; overflow:visible}
+.graf text{font-family:var(--fuente); fill:var(--tinta-2)}
+.graf .tick{font-size:11px; fill:var(--tinta-3); font-variant-numeric:tabular-nums}
+.graf .rot-eje{font-size:11px; fill:var(--tinta-2)}
+.graf .val-dir{font-size:11px; font-weight:650; fill:var(--tinta); font-variant-numeric:tabular-nums}
+.graf .grilla{stroke:var(--grilla); stroke-width:1}
+.graf .base{stroke:var(--eje); stroke-width:1}
+.leyenda{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--tinta-2); margin-top:8px}
+.leyenda i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px}
+.vacio-graf{display:flex; align-items:center; justify-content:center; min-height:150px; color:var(--tinta-3); font-size:13px; text-align:center; padding:16px}
+
+/* globo */
+.globo{
+  position:fixed; z-index:90; pointer-events:none; opacity:0; transition:opacity .09s;
+  background:var(--sup); color:var(--tinta); border:1px solid var(--borde);
+  border-radius:8px; padding:8px 10px; font-size:12.5px; max-width:290px;
+  box-shadow:0 6px 22px rgba(0,0,0,.17);
+}
+.globo.ver{opacity:1}
+.globo b{display:block; margin-bottom:3px; font-size:12.5px}
+.globo table{font-size:12px; width:auto}
+.globo td{padding:1px 0; border:0}
+.globo td:last-child{padding-left:12px; text-align:right; font-variant-numeric:tabular-nums; font-weight:600}
+
+/* mapa de calor */
+.calor-leyenda{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--tinta-2); margin-top:9px}
+.calor-leyenda .rampa{display:flex; height:9px; width:120px; border-radius:3px; overflow:hidden; border:1px solid var(--borde)}
+.calor-leyenda .rampa i{flex:1}
+
+/* ---------- Reporte ---------- */
+.hoja{
+  background:var(--sup); color:var(--tinta); border:1px solid var(--borde);
+  border-radius:var(--r); padding:26px 30px; margin-bottom:16px;
+}
+.hoja h2{font-size:19px; letter-spacing:-.02em}
+.hoja .sub{font-size:12.5px; color:var(--tinta-2); margin-top:3px}
+.hoja section{margin-top:22px}
+.hoja section>h3{font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-2); border-bottom:1px solid var(--borde); padding-bottom:5px; margin-bottom:11px}
+.hoja .firma{margin-top:26px; padding-top:11px; border-top:1px solid var(--borde); font-size:11.5px; color:var(--tinta-3); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.rep-kpis{display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(135px,1fr))}
+.rep-kpis .k{border:1px solid var(--borde); border-radius:8px; padding:10px 12px; background:var(--sup-2)}
+.rep-kpis .k .rot{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-2); font-weight:600}
+.rep-kpis .k .val{font-size:20px; font-weight:680; margin-top:2px}
+.rep-nota{font-size:12.5px; white-space:pre-wrap; color:var(--tinta-2)}
+
+@media print{
+  @page{ size:A4 portrait; margin:13mm 12mm; }
+  html,body{background:#fff !important; color:#000 !important; font-size:10.3pt}
+  :root{
+    --plano:#fff; --sup:#fff; --sup-2:#f4f4f2; --tinta:#000; --tinta-2:#3a3a38;
+    --tinta-3:#6a6a66; --borde:#c9c9c4; --grilla:#dedede; --eje:#9a9a96;
+  }
+  .cab, .navtabs, .no-imprimir, .globo{display:none !important}
+  main{max-width:none; padding:0}
+  .panel[hidden]{display:none !important}
+  .hoja{border:0; border-radius:0; padding:0; margin:0; box-shadow:none}
+  /* Las secciones pueden partirse entre páginas: forzar lo contrario dejaba
+     media hoja en blanco antes de cada tabla larga. Lo que no se parte es el
+     título respecto de su contenido, ni una fila por la mitad. */
+  .hoja section{break-inside:auto; page-break-inside:auto}
+  .hoja section>h3{break-after:avoid; page-break-after:avoid}
+  .hoja section.salto{break-before:page; page-break-before:always}
+  table{font-size:9pt}
+  thead th{background:#f4f4f2 !important; color:#000; position:static}
+  thead{display:table-header-group}
+  .envoltorio-tabla{max-height:none; overflow:visible; border:1px solid var(--borde)}
+  tbody tr{break-inside:avoid}
+  .graf text{fill:#000}
+  .rep-kpis{grid-template-columns:repeat(5,1fr); break-inside:avoid}
+  .rep-kpis .k{background:#f7f7f5; padding:8px 9px}
+  .rep-kpis .k .val{font-size:15pt; white-space:nowrap}
+  .rep-kpis .k .rot{font-size:7.6pt}
+}
+.solo-impresion{display:none}
+@media print{ .solo-impresion{display:block} }
+</style>
+</head>
+<body>
+<header class="cab no-imprimir">
+  <div class="cab-fila">
+    <div class="marca">
+      <h1>Ocupación de Almacén</h1>
+      <span class="corte" id="rotCorte">sin datos cargados</span>
+    </div>
+    <nav class="navtabs" role="tablist" aria-label="Secciones">
+      <button role="tab" data-panel="pDatos"     aria-selected="true">Datos</button>
+      <button role="tab" data-panel="pResumen"   aria-selected="false">Resumen</button>
+      <button role="tab" data-panel="pTendencia" aria-selected="false">Tendencia</button>
+      <button role="tab" data-panel="pValor"     aria-selected="false">Valorizado</button>
+      <button role="tab" data-panel="pCalidad"   aria-selected="false">Calidad</button>
+      <button role="tab" data-panel="pDetalle"   aria-selected="false">Detalle</button>
+      <button role="tab" data-panel="pReporte"   aria-selected="false">Reporte</button>
+    </nav>
+    <button class="icono-btn" id="btnTema" title="Alternar modo claro u oscuro" aria-label="Alternar tema">◐</button>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================ DATOS ============================ -->
+<section class="panel" id="pDatos" role="tabpanel">
+
+  <div class="aviso info" id="avisoPrimerUso">
+    <span class="ic">i</span>
+    <div>
+      <b>Cómo funciona.</b> El <b>maestro de ubicaciones</b> define el universo de posiciones físicas;
+      el <b>fotostock</b> solo trae las ocupadas, y lo que falta se cuenta como vacío.
+      El maestro y el valorizado quedan guardados y no hace falta volver a cargarlos: para actualizar,
+      alcanza con cargar el fotostock nuevo. Nada sale de esta computadora.
+    </div>
+  </div>
+
+  <div class="rejilla c3">
+    <div class="tarjeta">
+      <header>
+        <h2>1 · Maestro de ubicaciones</h2>
+        <p>Base_Ubis. Define el total de posiciones por tipo de almacén. Es estático.</p>
+      </header>
+      <div class="soltar" id="soltarMaestro">
+        <h3>Arrastre el archivo acá</h3>
+        <p>o elija uno (.xlsx)</p>
+        <button class="btn sec" data-abre="archMaestro">Elegir archivo</button>
+        <input type="file" id="archMaestro" class="oculto-archivo" accept=".xlsx,.xlsm">
+        <div class="estado" id="estMaestro"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <header>
+        <h2>2 · Fotostock</h2>
+        <p>Trae solo ubicaciones ocupadas. Es el que se actualiza en cada corte.</p>
+      </header>
+      <div class="soltar" id="soltarFoto">
+        <h3>Arrastre el archivo acá</h3>
+        <p>o elija uno o varios (.xlsx)</p>
+        <button class="btn sec" data-abre="archFoto">Elegir archivo</button>
+        <input type="file" id="archFoto" class="oculto-archivo" accept=".xlsx,.xlsm" multiple>
+        <div class="estado" id="estFoto"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <header>
+        <h2>3 · Maestro valorizado</h2>
+        <p>Base_Item_Valorizados. Opcional: agrega familia de material. Es estático.</p>
+      </header>
+      <div class="soltar" id="soltarValor">
+        <h3>Arrastre el archivo acá</h3>
+        <p>o elija uno (.xlsx)</p>
+        <button class="btn sec" data-abre="archValor">Elegir archivo</button>
+        <input type="file" id="archValor" class="oculto-archivo" accept=".xlsx,.xlsm">
+        <div class="estado" id="estValor"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tarjeta" id="cajaFecha" hidden>
+    <header>
+      <h2>Fecha del corte</h2>
+      <p>La tomé del nombre del archivo. Confírmela o corríjala: de esto dependen las tendencias.
+         Ojo que <b>Fecha EM</b> del fotostock es la fecha de entrada de mercadería, no la del corte.</p>
+    </header>
+    <div class="controles">
+      <div class="campo">
+        <label for="inFecha">Fecha de la foto</label>
+        <input type="date" id="inFecha">
+      </div>
+      <button class="btn" id="btnGuardarCorte">Guardar este corte en el historial</button>
+      <span class="estado" id="estCorte"></span>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <header>
+      <h2>Historial de cortes</h2>
+      <p>Cada corte guardado alimenta las tendencias y los comparativos. Queda en este navegador;
+         el respaldo sirve para mudarlo a otra computadora o compartirlo.</p>
+    </header>
+    <div class="controles no-imprimir">
+      <button class="btn sec" id="btnExportHist">Descargar respaldo</button>
+      <button class="btn sec" data-abre="archHist">Restaurar respaldo</button>
+      <input type="file" id="archHist" class="oculto-archivo" accept=".json">
+      <button class="btn peligro" id="btnBorrarHist">Borrar historial</button>
+      <span class="estado" id="estHist"></span>
+    </div>
+    <div id="tablaHist"></div>
+  </div>
+</section>
+
+<!-- ============================ RESUMEN ============================ -->
+<section class="panel" id="pResumen" role="tabpanel" hidden>
+  <div id="resumenVacio"></div>
+  <div id="resumenCuerpo" hidden>
+    <div class="controles no-imprimir">
+      <div class="campo">
+        <label for="selComp">Comparar contra</label>
+        <select id="selComp">
+          <option value="prev">Corte anterior</option>
+          <option value="sem" selected>Misma semana anterior</option>
+          <option value="mes">Mismo mes anterior</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="selDim">Agrupar por</label>
+        <select id="selDim">
+          <option value="tipo" selected>Tipo de almacén</option>
+          <option value="area">Área de almacenamiento</option>
+          <option value="pasillo">Pasillo</option>
+          <option value="nivel">Nivel</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fichas" id="fichasResumen"></div>
+
+    <div class="rejilla c2" style="margin-top:16px">
+      <div class="tarjeta">
+        <header><h2 id="tituloOcupDim">Ocupación por tipo de almacén</h2>
+          <p>Posiciones ocupadas sobre el total del maestro. Solo ubicaciones físicas.</p></header>
+        <div id="grafDim"></div>
+      </div>
+      <div class="tarjeta">
+        <header><h2>Saturación y holgura</h2>
+          <p>Dónde no entra más y dónde sobra lugar. Ordenado por ocupación.</p></header>
+        <div id="tablaDim"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <header><h2>Ubicaciones virtuales</h2>
+        <p>Tipos de almacén que traen stock pero no tienen posiciones en el maestro: tránsito, interinas y similares.
+           No entran en el cálculo de ocupación porque no tienen capacidad definida.</p></header>
+      <div id="tablaVirt"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TENDENCIA ============================ -->
+<section class="panel" id="pTendencia" role="tabpanel" hidden>
+  <div id="tendVacio"></div>
+  <div id="tendCuerpo" hidden>
+    <div class="controles no-imprimir">
+      <div class="campo">
+        <label>Período</label>
+        <div class="segm" id="segPeriodo">
+          <button data-v="dia" aria-pressed="false">Por corte</button>
+          <button data-v="sem" aria-pressed="true">Semanal</button>
+          <button data-v="mes" aria-pressed="false">Mensual</button>
+        </div>
+      </div>
+      <div class="campo">
+        <label>Valor del período</label>
+        <div class="segm" id="segAgreg">
+          <button data-v="cierre" aria-pressed="true">Cierre</button>
+          <button data-v="prom" aria-pressed="false">Promedio</button>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="selTendTipo">Tipo de almacén</label>
+        <select id="selTendTipo"><option value="">Todos</option></select>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <header><h2>Ocupación</h2><p id="subTendOcup">Porcentaje de posiciones ocupadas al cierre de cada período.</p></header>
+      <div id="grafTendOcup"></div>
+    </div>
+    <div class="rejilla c2">
+      <div class="tarjeta">
+        <header><h2>Posiciones ocupadas</h2><p>Cantidad de posiciones con stock.</p></header>
+        <div id="grafTendOcupadas"></div>
+      </div>
+      <div class="tarjeta">
+        <header><h2>Valor del inventario</h2><p>Valorizado en USD de las ubicaciones físicas.</p></header>
+        <div id="grafTendValor"></div>
+      </div>
+    </div>
+    <div class="tarjeta">
+      <header><h2>Detalle del período</h2><p>Los mismos datos en tabla, para copiar o exportar.</p></header>
+      <div class="controles no-imprimir"><button class="btn sec" id="btnCsvTend">Exportar CSV</button></div>
+      <div id="tablaTend"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ VALORIZADO ============================ -->
+<section class="panel" id="pValor" role="tabpanel" hidden>
+  <div id="valorVacio"></div>
+  <div id="valorCuerpo" hidden>
+    <div class="fichas" id="fichasValor"></div>
+    <div class="rejilla c2" style="margin-top:16px">
+      <div class="tarjeta">
+        <header><h2>Valor por tipo de almacén</h2><p>Dónde está concentrada la plata del inventario.</p></header>
+        <div id="grafValorTipo"></div>
+      </div>
+      <div class="tarjeta">
+        <header><h2>Valor por área de almacenamiento</h2><p>Las áreas que concentran más valor.</p></header>
+        <div id="grafValorArea"></div>
+      </div>
+    </div>
+    <div class="tarjeta">
+      <header><h2>Mapa de calor: valor por área y tipo de almacén</h2>
+        <p>Cruce de las dos dimensiones. Cuanto más oscuro, más valor concentrado en esa celda.</p></header>
+      <div id="grafCalor"></div>
+    </div>
+    <div class="rejilla c2">
+      <div class="tarjeta">
+        <header><h2>Ubicaciones más caras</h2><p>Las 15 posiciones con más valor. Útiles para control y recuento.</p></header>
+        <div id="tablaTopUbi"></div>
+      </div>
+      <div class="tarjeta">
+        <header><h2>Materiales más caros</h2><p>Los 15 materiales que concentran más valor.</p></header>
+        <div id="tablaTopMat"></div>
+      </div>
+    </div>
+    <div class="tarjeta" id="cajaFamilia">
+      <header><h2>Valor por familia de material</h2><p>Según el tipo de material del maestro valorizado.</p></header>
+      <div id="tablaFamilia"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ CALIDAD ============================ -->
+<section class="panel" id="pCalidad" role="tabpanel" hidden>
+  <div id="calVacio"></div>
+  <div id="calCuerpo" hidden>
+    <div class="fichas" id="fichasCalidad"></div>
+    <div id="avisosCalidad" style="margin-top:16px"></div>
+
+    <div class="tarjeta">
+      <header><h2>Ocupadas en el fotostock, vacías en el maestro</h2>
+        <p>El maestro las marca con <b>Ind.ubicación vacía = X</b> pero el fotostock les muestra stock.
+           Es inconsistencia de SAP y conviene revisarla: puede esconder stock no disponible para asignar.</p></header>
+      <div class="controles no-imprimir"><button class="btn sec" id="btnCsvInc">Exportar CSV</button></div>
+      <div id="tablaInc"></div>
+    </div>
+
+    <div class="rejilla c2">
+      <div class="tarjeta">
+        <header><h2>Antigüedad del stock</h2>
+          <p>Según <b>Fecha EM</b>, la fecha de entrada de mercadería. Muestra dónde hay stock inmóvil.</p></header>
+        <div id="grafAntig"></div>
+      </div>
+      <div class="tarjeta">
+        <header><h2>Ubicaciones bloqueadas</h2>
+          <p>Con bloqueo de entrada o salida en el maestro. Reducen la capacidad realmente disponible.</p></header>
+        <div id="tablaBloq"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <header><h2>Stock más antiguo</h2><p>Las 20 líneas con fecha de entrada más vieja, con su valor.</p></header>
+      <div id="tablaViejo"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ DETALLE ============================ -->
+<section class="panel" id="pDetalle" role="tabpanel" hidden>
+  <div id="detVacio"></div>
+  <div id="detCuerpo" hidden>
+    <div class="tarjeta">
+      <header><h2>Detalle de ubicaciones</h2>
+        <p>Todas las posiciones del maestro con su estado. Filtre y exporte lo que necesite.</p></header>
+      <div class="controles no-imprimir">
+        <div class="campo"><label for="inBuscar">Buscar</label>
+          <input type="text" id="inBuscar" placeholder="ubicación, material o descripción" style="min-width:230px"></div>
+        <div class="campo"><label for="selFTipo">Tipo almacén</label><select id="selFTipo"><option value="">Todos</option></select></div>
+        <div class="campo"><label for="selFArea">Área</label><select id="selFArea"><option value="">Todas</option></select></div>
+        <div class="campo"><label for="selFEstado">Estado</label>
+          <select id="selFEstado">
+            <option value="">Todos</option>
+            <option value="ocu">Ocupadas</option>
+            <option value="vac">Vacías</option>
+            <option value="vir">Virtuales</option>
+            <option value="inc">Inconsistentes</option>
+          </select></div>
+        <button class="btn sec" id="btnCsvDet">Exportar CSV</button>
+      </div>
+      <p class="estado trab" id="cuentaDet"></p>
+      <div id="tablaDet"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ REPORTE ============================ -->
+<section class="panel" id="pReporte" role="tabpanel" hidden>
+  <div id="repVacio"></div>
+  <div id="repCuerpo" hidden>
+    <div class="tarjeta no-imprimir">
+      <header><h2>Armar reporte</h2>
+        <p>Complete los datos y use <b>Exportar PDF</b>. En el diálogo de impresión elija
+           <b>Guardar como PDF</b>, tamaño A4. Sale solo el reporte, sin la pantalla.</p></header>
+      <div class="controles">
+        <div class="campo"><label for="selRepPer">Período</label>
+          <select id="selRepPer"><option value="sem" selected>Semanal</option><option value="mes">Mensual</option></select></div>
+        <div class="campo"><label for="inRepEmpresa">Encabezado</label>
+          <input type="text" id="inRepEmpresa" placeholder="Nombre de la empresa o planta" style="min-width:230px"></div>
+        <div class="campo"><label for="inRepAutor">Preparado por</label>
+          <input type="text" id="inRepAutor" placeholder="Su nombre" style="min-width:170px"></div>
+        <button class="btn" id="btnPdf">Exportar PDF</button>
+      </div>
+      <div class="campo" style="margin-top:4px">
+        <label for="inRepNota">Comentarios del analista (salen en el reporte)</label>
+        <textarea id="inRepNota" placeholder="Conclusiones, acciones pedidas, contexto del período…"></textarea>
+      </div>
+    </div>
+    <div class="hoja" id="hojaReporte"></div>
+  </div>
+</section>
+
+</main>
+<div class="globo" id="globo" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+/* ===========================================================================
+   BLOQUE 1 — Lector de .xlsx sin dependencias.
+   Un .xlsx es un ZIP con XML adentro. Se abre el ZIP a mano y se descomprime
+   con DecompressionStream, que ya viene en el navegador. Así la app queda en
+   un solo archivo y sigue funcionando sin internet.
+   =========================================================================== */
+const XLSX = (() => {
+  const td = new TextDecoder('utf-8');
+  const u16 = (d, o) => d[o] | (d[o + 1] << 8);
+  const u32 = (d, o) => (d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | (d[o + 3] << 24)) >>> 0;
+
+  function leerDirectorio(buf) {
+    const d = new Uint8Array(buf);
+    let eocd = -1;
+    for (let i = d.length - 22; i >= 0 && i > d.length - 66000; i--) {
+      if (u32(d, i) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('El archivo no es un .xlsx válido. Si es .xls o .csv, guárdelo como .xlsx desde Excel.');
+    let nEnt = u16(d, eocd + 10), cdOff = u32(d, eocd + 16), cdSize = u32(d, eocd + 12);
+
+    if (cdOff === 0xffffffff || nEnt === 0xffff || cdSize === 0xffffffff) {
+      let loc = -1;
+      for (let i = eocd - 20; i >= 0; i--) { if (u32(d, i) === 0x07064b50) { loc = i; break; } }
+      if (loc < 0) throw new Error('Archivo ZIP64 sin localizador.');
+      const dv = new DataView(buf);
+      const z = Number(dv.getBigUint64(loc + 8, true));
+      if (u32(d, z) !== 0x06064b50) throw new Error('Archivo ZIP64 dañado.');
+      nEnt = Number(dv.getBigUint64(z + 32, true));
+      cdOff = Number(dv.getBigUint64(z + 48, true));
+    }
+
+    const entradas = new Map();
+    let p = cdOff;
+    for (let i = 0; i < nEnt; i++) {
+      if (u32(d, p) !== 0x02014b50) break;
+      const metodo = u16(d, p + 10);
+      let compSize = u32(d, p + 20);
+      const nLen = u16(d, p + 28), eLen = u16(d, p + 30), cLen = u16(d, p + 32);
+      let lhOff = u32(d, p + 42);
+      const nombre = td.decode(d.subarray(p + 46, p + 46 + nLen));
+      if (compSize === 0xffffffff || lhOff === 0xffffffff) {
+        let e = p + 46 + nLen; const fin = e + eLen; const dv = new DataView(buf);
+        while (e + 4 <= fin) {
+          const id = u16(d, e), sz = u16(d, e + 2); let q = e + 4;
+          if (id === 0x0001) {
+            q += 8;
+            if (compSize === 0xffffffff) { compSize = Number(dv.getBigUint64(q, true)); q += 8; }
+            if (lhOff === 0xffffffff) lhOff = Number(dv.getBigUint64(q, true));
+          }
+          e += 4 + sz;
+        }
+      }
+      entradas.set(nombre, { metodo, compSize, lhOff });
+      p += 46 + nLen + eLen + cLen;
+    }
+    return { d, entradas };
+  }
+
+  async function extraer(buf, zip, nombre) {
+    const e = zip.entradas.get(nombre);
+    if (!e) return null;
+    const d = zip.d;
+    if (u32(d, e.lhOff) !== 0x04034b50) throw new Error('Cabecera dañada en ' + nombre);
+    const nLen = u16(d, e.lhOff + 26), eLen = u16(d, e.lhOff + 28);
+    const ini = e.lhOff + 30 + nLen + eLen;
+    const crudo = d.subarray(ini, ini + e.compSize);
+    if (e.metodo === 0) return td.decode(crudo);
+    if (e.metodo !== 8) throw new Error('Compresión ZIP no soportada (método ' + e.metodo + ').');
+    if (typeof DecompressionStream !== 'function') {
+      throw new Error('Este navegador no puede abrir .xlsx. Use Chrome, Edge o Firefox actualizados.');
+    }
+    const ds = new DecompressionStream('deflate-raw');
+    const w = ds.writable.getWriter();
+    w.write(crudo); w.close();
+    const dec = new TextDecoder('utf-8'), partes = [], rd = ds.readable.getReader();
+    for (;;) {
+      const { value, done } = await rd.read();
+      if (done) break;
+      partes.push(dec.decode(value, { stream: true }));
+    }
+    partes.push(dec.decode());
+    return partes.join('');
+  }
+
+  function desescapar(s) {
+    if (s.indexOf('&') < 0) return s;
+    return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+      .replace(/&amp;/g, '&');
+  }
+
+  function parseSST(xml) {
+    if (!xml) return [];
+    const out = []; let i = 0;
+    for (;;) {
+      const si = xml.indexOf('<si', i); if (si < 0) break;
+      const cierre = xml.indexOf('</si>', si);
+      if (cierre < 0) break;
+      const cuerpo = xml.slice(si, cierre);
+      let s = '', j = 0;
+      for (;;) {
+        const t = cuerpo.indexOf('<t', j); if (t < 0) break;
+        const g = cuerpo.indexOf('>', t); if (g < 0) break;
+        if (cuerpo[g - 1] === '/') { j = g + 1; continue; }
+        const t2 = cuerpo.indexOf('</t>', g); if (t2 < 0) break;
+        s += cuerpo.slice(g + 1, t2); j = t2 + 4;
+      }
+      out.push(desescapar(s));
+      i = cierre + 5;
+    }
+    return out;
+  }
+
+  function colIdx(ref) {
+    let n = 0;
+    for (let k = 0; k < ref.length; k++) {
+      const c = ref.charCodeAt(k);
+      if (c >= 65 && c <= 90) n = n * 26 + (c - 64);
+      else if (c >= 97 && c <= 122) n = n * 26 + (c - 96);
+      else break;
+    }
+    return n - 1;
+  }
+
+  // Recorre las filas llamando cb(celdas, nro). Si cb devuelve un Set de
+  // índices, de ahí en más solo se decodifican esas columnas: con 58 columnas
+  // y 33.000 filas la diferencia de velocidad es grande.
+  function recorrerHoja(xml, sst, cb) {
+    let utiles = null, i = 0, nro = 0;
+    const largo = xml.length;
+    while (i < largo) {
+      const r = xml.indexOf('<row', i); if (r < 0) break;
+      const gt = xml.indexOf('>', r); if (gt < 0) break;
+      nro++;
+      if (xml[gt - 1] === '/') { i = gt + 1; continue; }
+      const fin = xml.indexOf('</row>', gt); if (fin < 0) break;
+      const cuerpo = xml.slice(gt + 1, fin);
+      const celdas = [];
+      let j = 0;
+      while (j < cuerpo.length) {
+        const c = cuerpo.indexOf('<c', j); if (c < 0) break;
+        const cg = cuerpo.indexOf('>', c); if (cg < 0) break;
+        const autoCierra = cuerpo[cg - 1] === '/';
+        const attrs = cuerpo.slice(c + 2, autoCierra ? cg - 1 : cg);
+        let idx = -1;
+        const mr = attrs.indexOf('r="');
+        if (mr >= 0) idx = colIdx(attrs.slice(mr + 3));
+        const mt = attrs.indexOf('t="');
+        const tipo = mt >= 0 ? attrs.slice(mt + 3, attrs.indexOf('"', mt + 3)) : '';
+        if (autoCierra) { j = cg + 1; continue; }
+        const c2 = cuerpo.indexOf('</c>', cg);
+        const interno = cuerpo.slice(cg + 1, c2 < 0 ? cuerpo.length : c2);
+        j = c2 < 0 ? cuerpo.length : c2 + 4;
+        if (idx < 0 || (utiles && !utiles.has(idx))) continue;
+        let val = null;
+        if (tipo === 'inlineStr') {
+          const t = interno.indexOf('<t');
+          if (t >= 0) {
+            const g = interno.indexOf('>', t), t2 = interno.indexOf('</t>', g);
+            val = desescapar(interno.slice(g + 1, t2 < 0 ? interno.length : t2));
+          }
+        } else {
+          const v = interno.indexOf('<v>');
+          if (v >= 0) {
+            const v2 = interno.indexOf('</v>', v);
+            const bruto = interno.slice(v + 3, v2 < 0 ? interno.length : v2);
+            if (tipo === 's') val = sst[+bruto] ?? '';
+            else if (tipo === 'str' || tipo === 'e') val = desescapar(bruto);
+            else val = bruto;
+          }
+        }
+        if (val !== null) celdas[idx] = val;
+      }
+      const res = cb(celdas, nro);
+      if (res instanceof Set) utiles = res;
+      i = fin + 6;
+    }
+  }
+
+  async function abrir(buf) {
+    const zip = leerDirectorio(buf);
+    const wb = await extraer(buf, zip, 'xl/workbook.xml');
+    if (!wb) throw new Error('El archivo no parece un Excel. Si es .xls antiguo, guárdelo como .xlsx.');
+    const rels = await extraer(buf, zip, 'xl/_rels/workbook.xml.rels');
+    const mapaRel = new Map();
+    if (rels) {
+      const re = /<Relationship\b[^>]*>/g; let m;
+      while ((m = re.exec(rels))) {
+        const id = /Id="([^"]+)"/.exec(m[0]), tg = /Target="([^"]+)"/.exec(m[0]);
+        if (id && tg) mapaRel.set(id[1], tg[1].replace(/^\/?xl\//, '').replace(/^\//, ''));
+      }
+    }
+    const hojas = [];
+    const re = /<sheet\b[^>]*>/g; let m;
+    while ((m = re.exec(wb))) {
+      const nm = /name="([^"]*)"/.exec(m[0]), rid = /r:id="([^"]+)"/.exec(m[0]);
+      let ruta = rid ? mapaRel.get(rid[1]) : null;
+      if (!ruta) ruta = 'worksheets/sheet' + (hojas.length + 1) + '.xml';
+      hojas.push({ nombre: nm ? desescapar(nm[1]) : 'Hoja' + (hojas.length + 1), ruta: 'xl/' + ruta });
+    }
+    if (!hojas.length) throw new Error('El Excel no tiene hojas.');
+    const sst = parseSST(await extraer(buf, zip, 'xl/sharedStrings.xml'));
+    return {
+      hojas: hojas.map(h => h.nombre),
+      async recorrer(nombreHoja, cb) {
+        const h = hojas.find(x => x.nombre === nombreHoja) || hojas[0];
+        const xml = await extraer(buf, zip, h.ruta);
+        if (!xml) throw new Error('No se pudo leer la hoja ' + h.nombre + '.');
+        recorrerHoja(xml, sst, cb);
+      }
+    };
+  }
+
+  // Excel guarda fechas como número de días desde 1900. 46275 -> 2026-09-10.
+  function serialAFecha(v) {
+    const n = +v;
+    if (!isFinite(n) || n < 1 || n > 2958465) return null;
+    const d = new Date(Math.round((n - 25569) * 86400000));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return { abrir, serialAFecha };
+})();
+
+/* ===========================================================================
+   BLOQUE 2 — Utilidades de formato (criterio argentino: punto de miles,
+   coma decimal) y ayudas varias.
+   =========================================================================== */
+const U = {
+  ent: n => (isFinite(n) ? Math.round(n) : 0).toLocaleString('es-AR'),
+  dec: (n, d = 1) => (isFinite(n) ? n : 0).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d }),
+  pct: (n, d = 1) => U.dec(n, d) + '%',
+  usd(n) {
+    const a = Math.abs(n || 0);
+    if (a >= 1e6) return 'USD ' + U.dec(n / 1e6, 2) + ' M';
+    if (a >= 1e3) return 'USD ' + U.dec(n / 1e3, 1) + ' k';
+    return 'USD ' + U.dec(n || 0, 0);
+  },
+  usdExacto: n => 'USD ' + (isFinite(n) ? n : 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }),
+  fecha(iso) {
+    if (!iso) return '—';
+    const p = String(iso).slice(0, 10).split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+  },
+  fechaLarga(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  },
+  hoyISO: () => new Date().toISOString().slice(0, 10),
+  // Plural correcto en lugar de "ubicación(es)", que se lee mal en un reporte.
+  pl: (n, sing, plur) => U.ent(n) + ' ' + (Math.round(n) === 1 ? sing : plur),
+  esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+  // Semana ISO: "2026-S40". El lunes manda, como en la mayoría de los informes.
+  semanaISO(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    const j = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dia = j.getUTCDay() || 7;
+    j.setUTCDate(j.getUTCDate() + 4 - dia);
+    const a = new Date(Date.UTC(j.getUTCFullYear(), 0, 1));
+    const n = Math.ceil(((j - a) / 86400000 + 1) / 7);
+    return j.getUTCFullYear() + '-S' + String(n).padStart(2, '0');
+  },
+  mesISO: iso => String(iso).slice(0, 7),
+  nombreMes(ym) {
+    const [a, m] = String(ym).split('-');
+    const nn = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+      'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    return (nn[+m] || ym) + ' ' + a;
+  },
+  diasEntre(a, b) {
+    return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  },
+  sumaDias(iso, n) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  },
+  // Descarga un archivo generado en memoria, sin servidor.
+  bajar(nombre, texto, tipo = 'text/csv;charset=utf-8') {
+    const blob = new Blob([texto], { type: tipo });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  },
+  // CSV con punto y coma y BOM: así Excel en español lo abre en columnas.
+  csv(cabeceras, filas) {
+    const q = v => {
+      const s = String(v ?? '');
+      return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    return '﻿' + [cabeceras.map(q).join(';')]
+      .concat(filas.map(f => f.map(q).join(';'))).join('\r\n');
+  }
+};
+</script>
+<script>
+"use strict";
+/* ===========================================================================
+   BLOQUE 3 — Modelo de datos.
+
+   Criterios de cálculo (importantes, acá se define todo lo que se informa):
+
+   · El MAESTRO es el universo. Toda posición física existe porque está en el
+     maestro. El fotostock nunca agrega capacidad.
+   · OCUPADA = está en el maestro y aparece en el fotostock. VACÍA = está en el
+     maestro y no aparece. Se cuentan POSICIONES DISTINTAS, nunca líneas: hay
+     ubicaciones multiproducto y contar líneas infla la ocupación.
+   · VIRTUAL = la ubicación trae stock pero no existe en el maestro. Son los
+     tipos de almacén interinos y de tránsito de SAP, que no tienen posiciones
+     fijas. Quedan fuera del % de ocupación (no hay denominador) y se informan
+     en su propio bloque, con su valor.
+   · El VALOR sale de la columna "Total" del fotostock, que ya viene valorizada.
+     El maestro valorizado solo aporta la familia de material.
+   · La FECHA DEL CORTE la define el usuario. "Fecha EM" es fecha de entrada de
+     mercadería, no del corte, y se usa solo para antigüedad.
+   =========================================================================== */
+
+const CLAVE_HIST = 'ocupacion.historial.v2';
+const CLAVE_BASES = 'ocupacion.bases.v2';
+const CLAVE_PREF = 'ocupacion.pref.v2';
+
+const E = {
+  maestro: null,       // Map ubi -> {t,a,p,n,tu,fv,be,bs}
+  totales: null,       // {tipo:Map, area:Map, pasillo:Map, nivel:Map}
+  valorizado: null,    // Map material -> {desc,fam,precio}
+  nomMaestro: '', nomValor: '', nomFoto: '',
+  fotoLineas: null,    // líneas del fotostock en memoria (para detalle y exportes)
+  fechaFoto: '',
+  corte: null,         // agregado del corte actual
+  detalle: null,       // una fila por ubicación, para la pestaña Detalle
+  historial: [],
+  pref: { tema: '', empresa: '', autor: '' }
+};
+
+/* --- Búsqueda tolerante de columnas: SAP cambia tildes, puntos y recortes --- */
+function norm(s) {
+  return String(s ?? '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+function mapaCols(hdr) {
+  const m = new Map();
+  hdr.forEach((h, i) => { const k = norm(h); if (k && !m.has(k)) m.set(k, i); });
+  return m;
+}
+function hallarCol(mapa, candidatos) {
+  for (const c of candidatos) { const i = mapa.get(norm(c)); if (i !== undefined) return i; }
+  // tolerancia: encabezado recortado por SAP (p.ej. "Denominación de tipo de stoc")
+  for (const c of candidatos) {
+    const k = norm(c);
+    for (const [kk, i] of mapa) if (kk.startsWith(k) || k.startsWith(kk)) return i;
+  }
+  return -1;
+}
+function exigir(mapa, candidatos, archivo) {
+  const i = hallarCol(mapa, candidatos);
+  if (i < 0) throw new Error(`En ${archivo} falta la columna «${candidatos[0]}». Exporte el archivo con esa columna incluida.`);
+  return i;
+}
+
+/* ------------------------------ MAESTRO ------------------------------ */
+async function cargarMaestro(buf, nombre) {
+  const lib = await XLSX.abrir(buf);
+  let ix = null, cols = null;
+  const maestro = new Map();
+  const totales = { tipo: new Map(), area: new Map(), pasillo: new Map(), nivel: new Map() };
+  let descartadas = 0;
+
+  await lib.recorrer(lib.hojas[0], (c, n) => {
+    if (n === 1) {
+      const mapa = mapaCols(c);
+      ix = {
+        ubi: exigir(mapa, ['Ubicación', 'Ubicacion'], 'el maestro de ubicaciones'),
+        tipo: exigir(mapa, ['Tipo almacén', 'Tipo almacen'], 'el maestro de ubicaciones'),
+        area: hallarCol(mapa, ['Área almacenamiento', 'Area almacenamiento']),
+        pas: hallarCol(mapa, ['Pasillo']),
+        niv: hallarCol(mapa, ['Nivel']),
+        tu: hallarCol(mapa, ['Tipo de ubicación']),
+        fv: hallarCol(mapa, ['Ind.ubicación vacía', 'Ind ubicacion vacia']),
+        be: hallarCol(mapa, ['Bloq.entrada stock']),
+        bs: hallarCol(mapa, ['Bloq.salida stock'])
+      };
+      cols = new Set(Object.values(ix).filter(v => v >= 0));
+      return cols;
+    }
+    const g = i => (i >= 0 ? String(c[i] ?? '').trim() : '');
+    const u = g(ix.ubi);
+    // Las exportaciones de SAP suelen traer una fila basura al final, sin
+    // ubicación ni tipo de almacén. Sin ubicación no hay posición que contar.
+    if (!u) { descartadas++; return; }
+    const t = g(ix.tipo) || '(sin tipo)';
+    const r = {
+      t,
+      a: g(ix.area) || '(sin área)',
+      p: g(ix.pas) || '(sin pasillo)',
+      n: g(ix.niv) || '(sin nivel)',
+      tu: g(ix.tu),
+      fv: g(ix.fv).toUpperCase() === 'X',
+      be: g(ix.be).toUpperCase() === 'X',
+      bs: g(ix.bs).toUpperCase() === 'X'
+    };
+    maestro.set(u, r);
+    totales.tipo.set(t, (totales.tipo.get(t) || 0) + 1);
+    totales.area.set(r.a, (totales.area.get(r.a) || 0) + 1);
+    totales.pasillo.set(r.p, (totales.pasillo.get(r.p) || 0) + 1);
+    totales.nivel.set(r.n, (totales.nivel.get(r.n) || 0) + 1);
+  });
+
+  if (!maestro.size) throw new Error('El maestro no tiene ninguna ubicación válida. Revise que la hoja tenga encabezados en la primera fila.');
+  E.maestro = maestro; E.totales = totales; E.nomMaestro = nombre;
+  guardarBases();
+  return { ubis: maestro.size, tipos: totales.tipo.size, descartadas };
+}
+
+/* ---------------------------- VALORIZADO ---------------------------- */
+async function cargarValorizado(buf, nombre) {
+  const lib = await XLSX.abrir(buf);
+  let ix = null;
+  const val = new Map();
+  let repetidos = 0;
+
+  await lib.recorrer(lib.hojas[0], (c, n) => {
+    if (n === 1) {
+      const mapa = mapaCols(c);
+      ix = {
+        mat: exigir(mapa, ['Material'], 'el maestro valorizado'),
+        desc: hallarCol(mapa, ['Texto breve material']),
+        fam: hallarCol(mapa, ['Tipo material']),
+        cv: hallarCol(mapa, ['Clase de valoración', 'Categoría valoración']),
+        pr: hallarCol(mapa, ['Precio interno periódico', 'Precio interno periodico']),
+        mo: hallarCol(mapa, ['Moneda'])
+      };
+      return new Set(Object.values(ix).filter(v => v >= 0));
+    }
+    const g = i => (i >= 0 ? String(c[i] ?? '').trim() : '');
+    const m = clavMat(g(ix.mat));
+    if (!m) return;
+    if (val.has(m)) { repetidos++; return; }   // el primero manda; ver nota abajo
+    val.set(m, { desc: g(ix.desc), fam: g(ix.fam) || '(sin familia)', precio: parseFloat(g(ix.pr)) || 0, mon: g(ix.mo) });
+  });
+
+  E.valorizado = val; E.nomValor = nombre;
+  guardarBases();
+  return { materiales: val.size, repetidos };
+}
+
+// SAP escribe los materiales como "1123540.000". Se normaliza para que el
+// fotostock y el valorizado matcheen aunque uno traiga los decimales y el otro no.
+function clavMat(s) {
+  let m = String(s ?? '').trim();
+  if (!m) return '';
+  if (/^\d+(\.\d+)?$/.test(m)) m = m.replace(/\.0+$/, '');
+  return m.replace(/^0+(?=\d)/, '');
+}
+
+/* ----------------------------- FOTOSTOCK ----------------------------- */
+async function cargarFotostock(buf, nombre) {
+  if (!E.maestro) throw new Error('Cargue primero el maestro de ubicaciones: sin él no se puede saber cuáles están vacías.');
+  const lib = await XLSX.abrir(buf);
+  let ix = null;
+  const lineas = [];
+
+  await lib.recorrer(lib.hojas[0], (c, n) => {
+    if (n === 1) {
+      const mapa = mapaCols(c);
+      ix = {
+        ubi: exigir(mapa, ['Ubicación', 'Ubicacion'], 'el fotostock'),
+        tipo: hallarCol(mapa, ['Tipo almacén', 'Tipo almacen']),
+        mat: exigir(mapa, ['Producto', 'Material'], 'el fotostock'),
+        desc: hallarCol(mapa, ['Descripción de producto', 'Descripcion de producto']),
+        ctd: hallarCol(mapa, ['Ctd.', 'Cantidad']),
+        um: hallarCol(mapa, ['Unidad medida base']),
+        vu: hallarCol(mapa, ['V/U']),
+        tot: hallarCol(mapa, ['Total']),
+        fem: hallarCol(mapa, ['Fecha EM']),
+        ts: hallarCol(mapa, ['Denominación de tipo de stocks', 'Denominación de tipo de stoc']),
+        lote: hallarCol(mapa, ['Lote'])
+      };
+      return new Set(Object.values(ix).filter(v => v >= 0));
+    }
+    const g = i => (i >= 0 ? String(c[i] ?? '').trim() : '');
+    const u = g(ix.ubi);
+    if (!u) return;
+    const ctd = parseFloat(g(ix.ctd)) || 0;
+    let tot = parseFloat(g(ix.tot));
+    if (!isFinite(tot)) {           // sin columna Total, se reconstruye
+      const vu = parseFloat(g(ix.vu));
+      tot = isFinite(vu) ? vu * ctd : 0;
+    }
+    const fem = XLSX.serialAFecha(g(ix.fem));
+    lineas.push({
+      u, t: g(ix.tipo), m: clavMat(g(ix.mat)), d: g(ix.desc),
+      c: ctd, um: g(ix.um), v: tot,
+      f: fem ? fem.toISOString().slice(0, 10) : '',
+      ts: g(ix.ts) || '(sin tipo de stock)'
+    });
+  });
+
+  if (!lineas.length) throw new Error('El fotostock no tiene líneas con ubicación. Revise el archivo.');
+  E.fotoLineas = lineas; E.nomFoto = nombre;
+  E.fechaFoto = fechaDesdeNombre(nombre) || U.hoyISO();
+  return { lineas: lineas.length, fecha: E.fechaFoto, detectada: !!fechaDesdeNombre(nombre) };
+}
+
+// "FotoStock_2809" -> 28/09 del año en curso. También acepta DDMMAAAA,
+// DDMMAA y fechas tipo 2026-09-28.
+function fechaDesdeNombre(nombre) {
+  const s = String(nombre || '').replace(/\.[a-z]+$/i, '');
+  let m = /(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/.exec(s);
+  if (m) return armarISO(m[3], m[2], m[1]);
+  m = /(?:^|[^\d])(\d{2})(\d{2})(20\d{2})(?:[^\d]|$)/.exec(s);
+  if (m) return armarISO(m[1], m[2], m[3]);
+  m = /(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?:[^\d]|$)/.exec(s);
+  if (m) return armarISO(m[1], m[2], '20' + m[3]);
+  m = /(?:^|[^\d])(\d{2})(\d{2})(?:[^\d]|$)/.exec(s);
+  if (m) return armarISO(m[1], m[2], String(new Date().getFullYear()));
+  return '';
+}
+function armarISO(d, m, a) {
+  const dd = +d, mm = +m, aa = +a;
+  if (!(dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && aa >= 2000 && aa <= 2100)) return '';
+  return `${aa}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+/* =========================== CÁLCULO DEL CORTE =========================== */
+function calcularCorte(fecha) {
+  const mae = E.maestro, lin = E.fotoLineas, val = E.valorizado;
+  if (!mae || !lin) return null;
+
+  // --- agregación por ubicación
+  const porUbi = new Map();        // ubi -> {lin,ctd,val,mats:Set,femMin,ts}
+  const virt = new Map();          // tipo virtual -> {ubis:Set,lin,val}
+  const porMat = new Map();        // material -> {val,ctd,lin,ubis:Set,desc}
+  const porTS = new Map();         // tipo de stock -> {lin,val}
+  let valVirt = 0, linVirt = 0;
+
+  for (const L of lin) {
+    const esFis = mae.has(L.u);
+    const reg = porUbi.get(L.u);
+    if (reg) {
+      reg.lin++; reg.ctd += L.c; reg.val += L.v; reg.mats.add(L.m);
+      if (L.f && (!reg.fem || L.f < reg.fem)) reg.fem = L.f;
+    } else {
+      porUbi.set(L.u, { lin: 1, ctd: L.c, val: L.v, mats: new Set([L.m]), fem: L.f, fis: esFis, t: L.t });
+    }
+    const ts = porTS.get(L.ts) || { lin: 0, val: 0 };
+    ts.lin++; ts.val += L.v; porTS.set(L.ts, ts);
+
+    const pm = porMat.get(L.m) || { val: 0, ctd: 0, lin: 0, ubis: new Set(), desc: L.d };
+    pm.val += L.v; pm.ctd += L.c; pm.lin++; pm.ubis.add(L.u);
+    if (!pm.desc && L.d) pm.desc = L.d;
+    porMat.set(L.m, pm);
+
+    if (!esFis) {
+      const k = L.t || '(sin tipo)';
+      const v = virt.get(k) || { ubis: new Set(), lin: 0, val: 0 };
+      v.ubis.add(L.u); v.lin++; v.val += L.v; virt.set(k, v);
+      valVirt += L.v; linVirt++;
+    }
+  }
+
+  // --- dimensiones físicas
+  const dims = {};
+  const defDim = { tipo: 't', area: 'a', pasillo: 'p', nivel: 'n' };
+  for (const [nd, campo] of Object.entries(defDim)) {
+    const acc = new Map();
+    for (const [u, r] of mae) {
+      const k = r[campo];
+      let a = acc.get(k);
+      if (!a) { a = { k, tot: 0, ocu: 0, val: 0, lin: 0, bloq: 0 }; acc.set(k, a); }
+      a.tot++;
+      if (r.be || r.bs) a.bloq++;
+      const o = porUbi.get(u);
+      if (o) { a.ocu++; a.val += o.val; a.lin += o.lin; }
+    }
+    dims[nd] = [...acc.values()].map(a => ({
+      k: a.k, tot: a.tot, ocu: a.ocu, vac: a.tot - a.ocu,
+      pct: a.tot ? a.ocu / a.tot * 100 : 0, val: a.val, lin: a.lin, bloq: a.bloq
+    })).sort((x, y) => y.tot - x.tot);
+  }
+
+  // --- totales físicos
+  let ocu = 0, valFis = 0, linFis = 0, multi = 0;
+  for (const [u, r] of mae) {
+    const o = porUbi.get(u);
+    if (o) { ocu++; valFis += o.val; linFis += o.lin; if (o.lin > 1) multi++; }
+  }
+  const tot = mae.size;
+
+  // --- mapa de calor área × tipo
+  const calorAcc = new Map();
+  for (const [u, r] of mae) {
+    const o = porUbi.get(u); if (!o) continue;
+    const k = r.a + '\u0000' + r.t;
+    const c = calorAcc.get(k) || { a: r.a, t: r.t, val: 0, ocu: 0 };
+    c.val += o.val; c.ocu++; calorAcc.set(k, c);
+  }
+
+  // --- top ubicaciones (solo físicas)
+  const topUbi = [];
+  for (const [u, r] of mae) {
+    const o = porUbi.get(u); if (!o || o.val <= 0) continue;
+    topUbi.push({ ubi: u, tipo: r.t, area: r.a, val: o.val, lin: o.lin, ctd: o.ctd });
+  }
+  topUbi.sort((a, b) => b.val - a.val);
+
+  // --- top materiales y familias
+  const topMat = [...porMat.entries()].map(([m, v]) => ({
+    mat: m, desc: v.desc || (val && val.get(m) ? val.get(m).desc : '') || '',
+    fam: val && val.get(m) ? val.get(m).fam : '(sin maestro valorizado)',
+    val: v.val, ctd: v.ctd, ubis: v.ubis.size
+  })).sort((a, b) => b.val - a.val);
+
+  const famAcc = new Map();
+  for (const m of topMat) {
+    const f = famAcc.get(m.fam) || { fam: m.fam, val: 0, mats: 0, ubis: 0 };
+    f.val += m.val; f.mats++; f.ubis += m.ubis; famAcc.set(m.fam, f);
+  }
+
+  // --- calidad
+  let incOcuVac = 0, incVacOcu = 0, bloqOcu = 0, bloqTot = 0;
+  const listaIncOV = [];
+  for (const [u, r] of mae) {
+    const o = porUbi.get(u);
+    if (r.be || r.bs) { bloqTot++; if (o) bloqOcu++; }
+    if (o && r.fv) {
+      incOcuVac++;
+      if (listaIncOV.length < 4000) listaIncOV.push({ ubi: u, tipo: r.t, area: r.a, lin: o.lin, val: o.val, mats: [...o.mats].slice(0, 3).join(', ') });
+    }
+    if (!o && !r.fv) incVacOcu++;
+  }
+  listaIncOV.sort((a, b) => b.val - a.val);
+
+  const sinCosto = val ? topMat.filter(m => !val.has(m.mat)).length : 0;
+
+  // antigüedad del stock según Fecha EM, contra la fecha del corte
+  const bandas = [
+    { b: '0 a 30 días', d: 30 }, { b: '31 a 90 días', d: 90 }, { b: '91 a 180 días', d: 180 },
+    { b: '181 a 365 días', d: 365 }, { b: '1 a 2 años', d: 730 }, { b: 'Más de 2 años', d: Infinity }
+  ].map(x => ({ ...x, lin: 0, val: 0, ubis: new Set() }));
+  let sinFecha = 0;
+  const viejas = [];
+  for (const L of lin) {
+    if (!mae.has(L.u)) continue;
+    if (!L.f) { sinFecha++; continue; }
+    const dd = U.diasEntre(L.f, fecha);
+    const bb = bandas.find(x => dd <= x.d) || bandas[bandas.length - 1];
+    bb.lin++; bb.val += L.v; bb.ubis.add(L.u);
+    viejas.push(L);
+  }
+  viejas.sort((a, b) => (a.f < b.f ? -1 : a.f > b.f ? 1 : 0));
+
+  return {
+    v: 2, fecha, archivo: E.nomFoto,
+    fis: { tot, ocu, vac: tot - ocu, pct: tot ? ocu / tot * 100 : 0, val: valFis, lin: linFis, multi },
+    vir: {
+      ubis: [...virt.values()].reduce((s, v) => s + v.ubis.size, 0), lin: linVirt, val: valVirt,
+      tipos: [...virt.entries()].map(([t, v]) => ({ tipo: t, ubis: v.ubis.size, lin: v.lin, val: v.val }))
+        .sort((a, b) => b.val - a.val)
+    },
+    dims,
+    calor: [...calorAcc.values()],
+    topUbi: topUbi.slice(0, 15),
+    topMat: topMat.slice(0, 15),
+    fam: [...famAcc.values()].sort((a, b) => b.val - a.val),
+    cal: {
+      incOcuVac, incVacOcu, bloqTot, bloqOcu, sinCosto, sinFecha,
+      maeFlagVac: [...mae.values()].filter(r => r.fv).length,
+      antig: bandas.map(b => ({ b: b.b, lin: b.lin, val: b.val, ubis: b.ubis.size })),
+      tipoStock: [...porTS.entries()].map(([k, v]) => ({ k, lin: v.lin, val: v.val })).sort((a, b) => b.val - a.val)
+    },
+    // detalle no persistido (se recalcula al cargar el fotostock)
+    _incOV: listaIncOV,
+    _viejas: viejas.slice(0, 20),
+    _porUbi: porUbi
+  };
+}
+
+/* --- Una fila por ubicación, para la pestaña Detalle y los exportes --- */
+function armarDetalle(corte) {
+  const mae = E.maestro, porUbi = corte._porUbi;
+  const filas = [];
+  for (const [u, r] of mae) {
+    const o = porUbi.get(u);
+    filas.push({
+      ubi: u, tipo: r.t, area: r.a, pas: r.p, niv: r.n,
+      est: o ? 'Ocupada' : 'Vacía',
+      clase: 'Física',
+      lin: o ? o.lin : 0, ctd: o ? o.ctd : 0, val: o ? o.val : 0,
+      mats: o ? [...o.mats].slice(0, 3).join(', ') : '',
+      fem: o ? (o.fem || '') : '',
+      inc: (o && r.fv) ? 'Ocupada pero marcada vacía' : (!o && !r.fv) ? 'Vacía pero no marcada vacía' : '',
+      bloq: [r.be ? 'entrada' : '', r.bs ? 'salida' : ''].filter(Boolean).join(' y ')
+    });
+  }
+  for (const [u, o] of porUbi) {
+    if (mae.has(u)) continue;
+    filas.push({
+      ubi: u, tipo: o.t || '(sin tipo)', area: '—', pas: '—', niv: '—',
+      est: 'Ocupada', clase: 'Virtual',
+      lin: o.lin, ctd: o.ctd, val: o.val,
+      mats: [...o.mats].slice(0, 3).join(', '), fem: o.fem || '',
+      inc: 'Sin ubicación en el maestro', bloq: ''
+    });
+  }
+  return filas;
+}
+
+/* ============================ PERSISTENCIA ============================ */
+function limpioParaGuardar(c) {
+  const { _incOV, _viejas, _porUbi, ...resto } = c;
+  return resto;
+}
+function cargarHistorial() {
+  try {
+    const s = localStorage.getItem(CLAVE_HIST);
+    E.historial = s ? JSON.parse(s) : [];
+  } catch (e) { E.historial = []; }
+  if (!Array.isArray(E.historial)) E.historial = [];
+  E.historial.sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+}
+function guardarHistorial() {
+  E.historial.sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+  try {
+    localStorage.setItem(CLAVE_HIST, JSON.stringify(E.historial));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, msg: 'No hay más espacio en el navegador. Descargue el respaldo y borre cortes antiguos.' };
+  }
+}
+function guardarCorteEnHistorial(corte) {
+  const limpio = limpioParaGuardar(corte);
+  const i = E.historial.findIndex(h => h.fecha === limpio.fecha);
+  let reemplazado = false;
+  if (i >= 0) { E.historial[i] = limpio; reemplazado = true; }
+  else E.historial.push(limpio);
+  const r = guardarHistorial();
+  return { ...r, reemplazado };
+}
+// Las bases estáticas se guardan para no recargarlas en cada sesión.
+function guardarBases() {
+  try {
+    const paq = {
+      nomMaestro: E.nomMaestro, nomValor: E.nomValor,
+      maestro: E.maestro ? [...E.maestro.entries()].map(([u, r]) => [u, r.t, r.a, r.p, r.n, r.tu, (r.fv ? 1 : 0) | (r.be ? 2 : 0) | (r.bs ? 4 : 0)]) : null,
+      valorizado: E.valorizado ? [...E.valorizado.entries()].map(([m, v]) => [m, v.desc, v.fam, v.precio]) : null
+    };
+    localStorage.setItem(CLAVE_BASES, JSON.stringify(paq));
+    return true;
+  } catch (e) { return false; }   // el maestro puede no entrar; no es grave
+}
+function restaurarBases() {
+  try {
+    const s = localStorage.getItem(CLAVE_BASES); if (!s) return false;
+    const p = JSON.parse(s);
+    if (p.maestro) {
+      const mae = new Map();
+      const tot = { tipo: new Map(), area: new Map(), pasillo: new Map(), nivel: new Map() };
+      for (const [u, t, a, pa, n, tu, fl] of p.maestro) {
+        const r = { t, a, p: pa, n, tu, fv: !!(fl & 1), be: !!(fl & 2), bs: !!(fl & 4) };
+        mae.set(u, r);
+        tot.tipo.set(t, (tot.tipo.get(t) || 0) + 1);
+        tot.area.set(a, (tot.area.get(a) || 0) + 1);
+        tot.pasillo.set(pa, (tot.pasillo.get(pa) || 0) + 1);
+        tot.nivel.set(n, (tot.nivel.get(n) || 0) + 1);
+      }
+      E.maestro = mae; E.totales = tot; E.nomMaestro = p.nomMaestro || '(guardado)';
+    }
+    if (p.valorizado) {
+      const v = new Map();
+      for (const [m, desc, fam, precio] of p.valorizado) v.set(m, { desc, fam, precio });
+      E.valorizado = v; E.nomValor = p.nomValor || '(guardado)';
+    }
+    return true;
+  } catch (e) { return false; }
+}
+function cargarPref() {
+  try { Object.assign(E.pref, JSON.parse(localStorage.getItem(CLAVE_PREF) || '{}')); } catch (e) {}
+}
+function guardarPref() {
+  try { localStorage.setItem(CLAVE_PREF, JSON.stringify(E.pref)); } catch (e) {}
+}
+
+/* ------- Comparativos: busca el corte de referencia según el criterio ------- */
+function corteReferencia(actual, modo) {
+  const prev = E.historial.filter(h => h.fecha < actual.fecha);
+  if (!prev.length) return null;
+  if (modo === 'prev') return prev[prev.length - 1];
+  const objetivo = modo === 'mes'
+    ? restarMeses(actual.fecha, 1)
+    : U.sumaDias(actual.fecha, -7);
+  // el corte más cercano a la fecha objetivo
+  let mejor = null, dif = Infinity;
+  for (const h of prev) {
+    const d = Math.abs(U.diasEntre(h.fecha, objetivo));
+    if (d < dif) { dif = d; mejor = h; }
+  }
+  const tolerancia = modo === 'mes' ? 10 : 4;
+  return dif <= tolerancia ? mejor : prev[prev.length - 1];
+}
+function restarMeses(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  const dia = d.getDate();
+  d.setDate(1); d.setMonth(d.getMonth() - n);
+  const ult = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ult));
+  return d.toISOString().slice(0, 10);
+}
+
+/* ---- Series para tendencia: agrupa el historial por corte, semana o mes ---- */
+function serieTendencia(periodo, agreg, tipoFiltro) {
+  const puntos = E.historial.map(h => {
+    let tot, ocu, val, lin;
+    if (tipoFiltro) {
+      const d = (h.dims && h.dims.tipo || []).find(x => x.k === tipoFiltro);
+      if (!d) return null;
+      tot = d.tot; ocu = d.ocu; val = d.val; lin = d.lin;
+    } else {
+      tot = h.fis.tot; ocu = h.fis.ocu; val = h.fis.val; lin = h.fis.lin;
+    }
+    return { fecha: h.fecha, tot, ocu, vac: tot - ocu, pct: tot ? ocu / tot * 100 : 0, val, lin };
+  }).filter(Boolean);
+
+  if (periodo === 'dia') return puntos.map(p => ({ ...p, et: U.fecha(p.fecha), clave: p.fecha }));
+
+  const grupos = new Map();
+  for (const p of puntos) {
+    const k = periodo === 'sem' ? U.semanaISO(p.fecha) : U.mesISO(p.fecha);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(p);
+  }
+  return [...grupos.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([k, arr]) => {
+    const base = agreg === 'prom'
+      ? {
+        tot: prom(arr, 'tot'), ocu: prom(arr, 'ocu'), vac: prom(arr, 'vac'),
+        pct: prom(arr, 'pct'), val: prom(arr, 'val'), lin: prom(arr, 'lin')
+      }
+      : arr[arr.length - 1];
+    return {
+      clave: k, et: periodo === 'sem' ? k.replace('-S', ' S') : U.nombreMes(k).replace(/ (\d{4})$/, " '$1".slice(0, 3)),
+      etLarga: periodo === 'sem' ? 'Semana ' + k.split('-S')[1] + ' de ' + k.split('-')[0] : U.nombreMes(k),
+      fecha: arr[arr.length - 1].fecha, cortes: arr.length,
+      tot: base.tot, ocu: base.ocu, vac: base.vac, pct: base.pct, val: base.val, lin: base.lin
+    };
+  });
+}
+const prom = (arr, k) => arr.reduce((s, x) => s + x[k], 0) / arr.length;
+</script>
+<script>
+"use strict";
+/* ===========================================================================
+   BLOQUE 4 — Gráficos en SVG, escritos a mano.
+   Reglas aplicadas: marcas finas, extremos redondeados de 4px sobre la línea
+   base, grilla y ejes como hairlines sólidos (nunca punteados), etiquetas
+   directas selectivas en lugar de un número en cada punto, un solo eje por
+   gráfico, color por entidad y nunca por ranking, y globo informativo al pasar
+   el mouse. Toda serie tiene además su vista de tabla al lado.
+   =========================================================================== */
+const G = (() => {
+  const globo = () => document.getElementById('globo');
+
+  function mostrarGlobo(ev, html) {
+    const g = globo();
+    g.innerHTML = html;
+    g.classList.add('ver');
+    const r = g.getBoundingClientRect();
+    let x = ev.clientX + 14, y = ev.clientY - 10;
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+    if (y + r.height > innerHeight - 8) y = innerHeight - r.height - 8;
+    if (y < 8) y = 8;
+    g.style.left = x + 'px'; g.style.top = y + 'px';
+  }
+  function ocultarGlobo() { globo().classList.remove('ver'); }
+
+  // Rectángulo con sólo el extremo final redondeado: el arranque queda
+  // pegado a la línea base, como corresponde.
+  function barra(x, y, w, h, r, horiz) {
+    r = Math.max(0, Math.min(r, horiz ? w : h, h / 2, w / 2));
+    if (r <= 0.5) return `M${x} ${y}h${w}v${h}h${-w}Z`;
+    if (horiz) {
+      return `M${x} ${y}h${w - r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - r)}Z`;
+    }
+    return `M${x} ${y + r}a${r} ${r} 0 0 1 ${r} ${-r}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - r}h${-w}Z`;
+  }
+
+  function escalaLinda(max) {
+    if (!(max > 0)) return { max: 1, paso: 1 };
+    const e = Math.pow(10, Math.floor(Math.log10(max)));
+    for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10]) {
+      if (max <= m * e) return { max: m * e, paso: m * e / (m === 1.5 || m === 2.5 || m === 7.5 ? 3 : 4) };
+    }
+    return { max: 10 * e, paso: 2.5 * e };
+  }
+
+  function vacio(cont, msg) {
+    cont.innerHTML = `<div class="vacio-graf">${U.esc(msg)}</div>`;
+  }
+
+  // El SVG se dibuja con el ancho real del contenedor, en píxeles. Si se
+  // dibujara siempre a 700 y se estirara, los textos se agrandarían junto con
+  // el gráfico y un panel ancho tendría letra enorme al lado de uno angosto.
+  let anchoImpresion = null;
+  const anchoCaja = cont => {
+    if (anchoImpresion) return anchoImpresion;
+    const w = cont.clientWidth || cont.parentElement?.clientWidth || 700;
+    return Math.round(Math.max(340, Math.min(1180, w)));
+  };
+  const fijarAnchoImpresion = v => { anchoImpresion = v; };
+
+  /* ---------------- Barras horizontales (una sola serie) ---------------- */
+  // datos: [{k, v, globo}]  ·  opciones: {fmt, suf, max, dur}
+  function barrasH(cont, datos, op = {}) {
+    if (!datos || !datos.length) return vacio(cont, op.msgVacio || 'Sin datos para mostrar.');
+    const fmt = op.fmt || (v => U.dec(v, 1));
+    const n = datos.length;
+    const altoFila = 25, bh = 15;
+    const mIzq = op.mIzq || 124, mDer = 74, mTop = 22, mBot = 24;
+    const W = anchoCaja(cont), ancho = W - mIzq - mDer;
+    const H = mTop + n * altoFila + mBot;
+    const esc = escalaLinda(op.max != null ? op.max : Math.max(...datos.map(d => d.v)));
+    const x = v => mIzq + (v / esc.max) * ancho;
+
+    let g = '';
+    // grilla vertical + ticks
+    for (let t = 0; t <= esc.max + 1e-9; t += esc.paso) {
+      g += `<line class="grilla" x1="${x(t).toFixed(1)}" y1="${mTop}" x2="${x(t).toFixed(1)}" y2="${mTop + n * altoFila}"/>`;
+      g += `<text class="tick" x="${x(t).toFixed(1)}" y="${mTop - 7}" text-anchor="middle">${fmt(t)}</text>`;
+    }
+    datos.forEach((d, i) => {
+      const y = mTop + i * altoFila + (altoFila - bh) / 2;
+      const w = Math.max(0, x(d.v) - mIzq);
+      g += `<text class="rot-eje" x="${mIzq - 9}" y="${y + bh / 2 + 4}" text-anchor="end">${U.esc(d.k)}</text>`;
+      // pista de fondo, para leer la holgura
+      g += `<rect x="${mIzq}" y="${y}" width="${ancho}" height="${bh}" fill="var(--sup-2)" rx="3"/>`;
+      g += `<path d="${barra(mIzq, y, w, bh, 4, true)}" fill="${d.color || 'var(--s1)'}"
+              data-i="${i}" class="mk" style="cursor:default"/>`;
+      // etiqueta directa: siempre visible, porque en modo claro el relleno
+      // no alcanza el contraste mínimo por sí solo
+      g += `<text class="val-dir" x="${(mIzq + w + 7).toFixed(1)}" y="${y + bh / 2 + 4}">${fmt(d.v)}${op.suf || ''}</text>`;
+    });
+    g += `<line class="base" x1="${mIzq}" y1="${mTop}" x2="${mIzq}" y2="${mTop + n * altoFila}"/>`;
+
+    cont.innerHTML = `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="${U.esc(op.aria || 'Gráfico de barras')}">${g}</svg>`;
+    cont.querySelectorAll('.mk').forEach(el => {
+      const d = datos[+el.dataset.i];
+      el.addEventListener('mousemove', ev => mostrarGlobo(ev, d.globo || `<b>${U.esc(d.k)}</b>${fmt(d.v)}${op.suf || ''}`));
+      el.addEventListener('mouseleave', ocultarGlobo);
+    });
+  }
+
+  /* -------- Barras horizontales con rampa ordinal (bandas ordenadas) -------- */
+  function barrasOrdinal(cont, datos, op = {}) {
+    // Rampa ordinal: el paso más claro debe seguir despegado de la superficie.
+    const pasos = ['var(--q4)', 'var(--q5)', 'var(--q7)', 'var(--q8)', 'var(--q10)', 'var(--q12)'];
+    const d2 = datos.map((d, i) => ({ ...d, color: pasos[Math.min(i, pasos.length - 1)] }));
+    barrasH(cont, d2, op);
+  }
+
+  /* ------------------------------ Línea ------------------------------ */
+  // datos: [{et, etLarga, v, globo}]
+  function linea(cont, datos, op = {}) {
+    if (!datos || !datos.length) return vacio(cont, op.msgVacio || 'Sin datos para mostrar.');
+    if (datos.length === 1) {
+      const d = datos[0];
+      return cont.innerHTML = `<div class="vacio-graf">Hay un solo corte cargado
+        (${U.esc(d.etLarga || d.et)}: <b style="color:var(--tinta)">${U.esc((op.fmt || (v => U.dec(v)))(d.v))}${op.suf || ''}</b>).
+        Con el próximo corte empieza la tendencia.</div>`;
+    }
+    const fmt = op.fmt || (v => U.dec(v, 1));
+    const mIzq = op.mIzq || 62, mDer = 56, mTop = 18, mBot = 36;
+    const W = anchoCaja(cont), H = op.H || 236;
+    const ancho = W - mIzq - mDer, alto = H - mTop - mBot;
+    const vals = datos.map(d => d.v);
+    let vMax = Math.max(...vals), vMin = Math.min(...vals);
+    let piso = 0;
+    if (op.cero === false) {   // para % conviene no arrancar en cero si el rango es chico
+      const margen = (vMax - vMin) * .25 || Math.max(1, vMax * .02);
+      piso = Math.max(0, vMin - margen);
+    }
+    const esc = escalaLinda(vMax - piso);
+    const tope = piso + esc.max;
+    const x = i => mIzq + (datos.length === 1 ? ancho / 2 : (i / (datos.length - 1)) * ancho);
+    const y = v => mTop + alto - ((v - piso) / (tope - piso)) * alto;
+
+    let g = '';
+    for (let t = 0; t <= esc.max + 1e-9; t += esc.paso) {
+      const vv = piso + t;
+      g += `<line class="grilla" x1="${mIzq}" y1="${y(vv).toFixed(1)}" x2="${mIzq + ancho}" y2="${y(vv).toFixed(1)}"/>`;
+      g += `<text class="tick" x="${mIzq - 8}" y="${(y(vv) + 4).toFixed(1)}" text-anchor="end">${fmt(vv)}</text>`;
+    }
+    // Etiquetas del eje x. Se eligen de derecha a izquierda: la última siempre
+    // va, y hacia atrás sólo entra la que no se pise con la ya puesta. Así
+    // nunca quedan dos etiquetas encimadas en el extremo.
+    const anchoEt = d => String(d.et).length * 5.9;
+    const salto = Math.max(1, Math.ceil(datos.length / 10));
+    const candidatas = datos.map((d, i) => i).filter(i => i === datos.length - 1 || i % salto === 0);
+    const elegidas = [];
+    let ocupadoHasta = Infinity;
+    for (let k = candidatas.length - 1; k >= 0; k--) {
+      const i = candidatas[k], d = datos[i], mitad = anchoEt(d) / 2;
+      if (x(i) + mitad + 10 > ocupadoHasta) continue;
+      elegidas.push(i); ocupadoHasta = x(i) - mitad;
+    }
+    for (const i of elegidas) {
+      g += `<text class="tick" x="${x(i).toFixed(1)}" y="${mTop + alto + 16}" text-anchor="middle">${U.esc(datos[i].et)}</text>`;
+    }
+    g += `<line class="base" x1="${mIzq}" y1="${mTop + alto}" x2="${mIzq + ancho}" y2="${mTop + alto}"/>`;
+
+    // área tenue + línea de 2px
+    const pts = datos.map((d, i) => `${x(i).toFixed(1)} ${y(d.v).toFixed(1)}`);
+    g += `<path d="M${mIzq} ${mTop + alto} L${pts.join(' L')} L${mIzq + ancho} ${mTop + alto}Z"
+            fill="var(--s1)" opacity=".07"/>`;
+    g += `<path d="M${pts.join(' L')}" fill="none" stroke="var(--s1)" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"/>`;
+    // marcadores con anillo del color de la superficie
+    datos.forEach((d, i) => {
+      g += `<circle cx="${x(i).toFixed(1)}" cy="${y(d.v).toFixed(1)}" r="4.5"
+              fill="var(--s1)" stroke="var(--sup)" stroke-width="2"/>`;
+    });
+    // etiqueta directa sólo en el último punto y en el máximo, y el máximo
+    // únicamente si queda lejos del último para que no se pisen
+    const iMax = vals.indexOf(Math.max(...vals));
+    const marcar = new Set([datos.length - 1]);
+    if (iMax !== datos.length - 1 && datos.length > 3 && (x(datos.length - 1) - x(iMax)) > 70) marcar.add(iMax);
+    for (const i of marcar) {
+      const d = datos[i];
+      const der = i === datos.length - 1;
+      g += `<text class="val-dir" x="${(x(i) + (der ? 9 : 0)).toFixed(1)}"
+              y="${(y(d.v) - (der ? 0 : 11)).toFixed(1)}"
+              text-anchor="${der ? 'start' : 'middle'}"
+              dominant-baseline="${der ? 'middle' : 'auto'}">${fmt(d.v)}${op.suf || ''}</text>`;
+    }
+    // capa de captura para la cruz de referencia
+    g += `<rect id="capa" x="${mIzq}" y="${mTop}" width="${ancho}" height="${alto}" fill="transparent"/>`;
+    g += `<line id="cruz" x1="0" y1="${mTop}" x2="0" y2="${mTop + alto}" stroke="var(--eje)" stroke-width="1" opacity="0"/>`;
+    g += `<circle id="foco" r="6" fill="none" stroke="var(--s1)" stroke-width="2" opacity="0"/>`;
+
+    cont.innerHTML = `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="${U.esc(op.aria || 'Gráfico de línea')}">${g}</svg>`;
+
+    const svg = cont.querySelector('svg');
+    const capa = svg.querySelector('#capa'), cruz = svg.querySelector('#cruz'), foco = svg.querySelector('#foco');
+    capa.addEventListener('mousemove', ev => {
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * W;
+      let i = Math.round((px - mIzq) / (ancho / Math.max(1, datos.length - 1)));
+      i = Math.max(0, Math.min(datos.length - 1, i));
+      const d = datos[i];
+      cruz.setAttribute('x1', x(i)); cruz.setAttribute('x2', x(i)); cruz.setAttribute('opacity', '1');
+      foco.setAttribute('cx', x(i)); foco.setAttribute('cy', y(d.v)); foco.setAttribute('opacity', '1');
+      mostrarGlobo(ev, d.globo || `<b>${U.esc(d.etLarga || d.et)}</b>${fmt(d.v)}${op.suf || ''}`);
+    });
+    capa.addEventListener('mouseleave', () => {
+      cruz.setAttribute('opacity', '0'); foco.setAttribute('opacity', '0'); ocultarGlobo();
+    });
+  }
+
+  /* --------------------------- Mapa de calor --------------------------- */
+  // celdas: [{f, c, v, globo}]  (f = fila, c = columna)
+  function calor(cont, celdas, op = {}) {
+    if (!celdas || !celdas.length) return vacio(cont, op.msgVacio || 'Sin datos para cruzar.');
+    const fmt = op.fmt || (v => U.usd(v));
+    const filas = op.filas || [...new Set(celdas.map(c => c.f))];
+    const cols = op.cols || [...new Set(celdas.map(c => c.c))];
+    const mapa = new Map(celdas.map(c => [c.f + '\u0000' + c.c, c]));
+    const vMax = Math.max(...celdas.map(c => c.v));
+
+    const disp = anchoCaja(cont);
+    const mIzq = 108, mTop = 30, cw = Math.max(54, Math.min(96, (disp - mIzq - 8) / cols.length)), ch = 27;
+    const W = mIzq + cols.length * cw + 8, H = mTop + filas.length * ch + 8;
+    // rampa secuencial de un solo tono, claro a oscuro
+    const pasos = ['--q1', '--q2', '--q3', '--q4', '--q5', '--q6', '--q7', '--q8', '--q9', '--q10', '--q11', '--q12'];
+    const paso = v => {
+      if (!(v > 0)) return null;
+      const r = Math.sqrt(v / vMax);              // raíz: los valores chicos no desaparecen
+      return Math.min(pasos.length - 1, Math.floor(r * pasos.length));
+    };
+
+    let g = '';
+    cols.forEach((c, j) => {
+      g += `<text class="tick" x="${mIzq + j * cw + cw / 2}" y="${mTop - 9}" text-anchor="middle">${U.esc(c)}</text>`;
+    });
+    filas.forEach((f, i) => {
+      g += `<text class="rot-eje" x="${mIzq - 9}" y="${mTop + i * ch + ch / 2 + 4}" text-anchor="end">${U.esc(f)}</text>`;
+      cols.forEach((c, j) => {
+        const d = mapa.get(f + '\u0000' + c);
+        const x = mIzq + j * cw, y = mTop + i * ch;
+        const p = d ? paso(d.v) : null;
+        if (p === null) {
+          g += `<rect x="${x + 1}" y="${y + 1}" width="${cw - 2}" height="${ch - 2}" rx="3"
+                  fill="var(--sup-2)" opacity=".55"/>`;
+          return;
+        }
+        // separación de 2px entre celdas, con el color de la superficie
+        g += `<rect x="${x + 1}" y="${y + 1}" width="${cw - 2}" height="${ch - 2}" rx="3"
+                fill="var(${pasos[p]})" class="mk" data-k="${U.esc(f + '\u0000' + c)}"/>`;
+        const claro = p >= 7;
+        g += `<text x="${x + cw / 2}" y="${y + ch / 2 + 4}" text-anchor="middle" pointer-events="none"
+                style="font-size:10.5px;font-variant-numeric:tabular-nums;font-weight:600;
+                fill:${claro ? '#fff' : 'var(--tinta)'}">${fmt(d.v)}</text>`;
+      });
+    });
+
+    cont.innerHTML = `<div style="overflow-x:auto"><svg class="graf" viewBox="0 0 ${W} ${H}"
+        style="width:${W}px;max-width:none" role="img"
+        aria-label="${U.esc(op.aria || 'Mapa de calor')}">${g}</svg></div>
+      <div class="calor-leyenda"><span>menos</span>
+        <span class="rampa">${pasos.map(p => `<i style="background:var(${p})"></i>`).join('')}</span>
+        <span>más · ${U.esc(op.leyenda || 'valor')}</span></div>`;
+    cont.querySelectorAll('.mk').forEach(el => {
+      const d = mapa.get(el.dataset.k.replace('&#0;', '\u0000')) || mapa.get(el.dataset.k);
+      if (!d) return;
+      el.addEventListener('mousemove', ev => mostrarGlobo(ev, d.globo || `<b>${U.esc(d.f + ' · ' + d.c)}</b>${fmt(d.v)}`));
+      el.addEventListener('mouseleave', ocultarGlobo);
+    });
+  }
+
+  return { barrasH, barrasOrdinal, linea, calor, ocultarGlobo, fijarAnchoImpresion };
+})();
+
+/* ===========================================================================
+   BLOQUE 5 — Tablas reutilizables, ordenables por columna.
+   =========================================================================== */
+function tabla(cont, cols, filas, op = {}) {
+  if (!filas.length) { cont.innerHTML = `<div class="vacio-graf">${U.esc(op.msgVacio || 'Sin filas para mostrar.')}</div>`; return; }
+  const est = op.est || (cont._est = cont._est || { col: op.ordenar ?? -1, dir: op.dir || -1 });
+  if (est.col >= 0 && cols[est.col] && cols[est.col].v) {
+    const f = cols[est.col].v;
+    filas = filas.slice().sort((a, b) => {
+      const va = f(a), vb = f(b);
+      const n = (typeof va === 'number' && typeof vb === 'number')
+        ? va - vb : String(va).localeCompare(String(vb), 'es');
+      return n * est.dir;
+    });
+  }
+  const lim = op.limite || filas.length;
+  const vis = filas.slice(0, lim);
+  const th = cols.map((c, i) => {
+    const act = est.col === i;
+    return `<th class="${c.num ? 'num ' : ''}${c.v ? '' : 'no-ord'}" ${c.v ? `data-c="${i}"` : ''}
+      ${c.t ? `title="${U.esc(c.t)}"` : ''}>${U.esc(c.n)}${act ? ` <span class="flecha">${est.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
+  }).join('');
+  const tb = vis.map(f => '<tr>' + cols.map(c =>
+    `<td class="${c.num ? 'num' : ''}">${c.h ? c.h(f) : U.esc(c.v ? c.v(f) : '')}</td>`).join('') + '</tr>').join('');
+  const tf = op.pie ? `<tfoot><tr>${op.pie.map(c => `<td class="${c.num ? 'num' : ''}">${c.h || ''}</td>`).join('')}</tr></tfoot>` : '';
+  cont.innerHTML = `<div class="envoltorio-tabla"><table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody>${tf}</table></div>`
+    + (filas.length > lim ? `<p class="estado trab">Se muestran ${U.ent(lim)} de ${U.ent(filas.length)} filas. El exporte a CSV incluye todas.</p>` : '');
+  cont.querySelectorAll('th[data-c]').forEach(th => th.addEventListener('click', () => {
+    const i = +th.dataset.c;
+    if (est.col === i) est.dir *= -1; else { est.col = i; est.dir = -1; }
+    tabla(cont, cols, filas, { ...op, est });
+  }));
+}
+</script>
+<script>
+"use strict";
+/* ===========================================================================
+   BLOQUE 6 — Interfaz: pestañas, carga de archivos, tableros y reporte.
+   =========================================================================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* ------------------------------ Pestañas ------------------------------ */
+const PANELES = ['pDatos', 'pResumen', 'pTendencia', 'pValor', 'pCalidad', 'pDetalle', 'pReporte'];
+function irA(id) {
+  PANELES.forEach(p => { const el = $('#' + p); if (el) el.hidden = (p !== id); });
+  $$('.navtabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.panel === id)));
+  G.ocultarGlobo();
+  if (id === 'pResumen') pintarResumen();
+  if (id === 'pTendencia') pintarTendencia();
+  if (id === 'pValor') pintarValor();
+  if (id === 'pCalidad') pintarCalidad();
+  if (id === 'pDetalle') pintarDetalle();
+  if (id === 'pReporte') pintarReporte();
+  window.scrollTo({ top: 0 });
+}
+$$('.navtabs button').forEach(b => b.addEventListener('click', () => irA(b.dataset.panel)));
+
+/* -------------------------------- Tema -------------------------------- */
+function aplicarTema(t) {
+  if (t) document.documentElement.setAttribute('data-theme', t);
+  else document.documentElement.removeAttribute('data-theme');
+  E.pref.tema = t || ''; guardarPref();
+}
+$('#btnTema').addEventListener('click', () => {
+  const oscuroAhora = document.documentElement.getAttribute('data-theme') === 'dark'
+    || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  aplicarTema(oscuroAhora ? 'light' : 'dark');
+  repintarTodo();
+});
+
+/* --------------------------- Carga de archivos --------------------------- */
+$$('[data-abre]').forEach(b => b.addEventListener('click', () => $('#' + b.dataset.abre).click()));
+
+function estado(sel, clase, html) {
+  const el = $(sel);
+  el.className = 'estado ' + clase;
+  el.innerHTML = html;
+}
+function leerArchivo(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('No se pudo leer el archivo ' + f.name + '.'));
+    r.readAsArrayBuffer(f);
+  });
+}
+function conectarSoltar(idZona, idInput, manejar) {
+  const z = $('#' + idZona), inp = $('#' + idInput);
+  inp.addEventListener('change', () => { if (inp.files.length) manejar([...inp.files]); inp.value = ''; });
+  ['dragenter', 'dragover'].forEach(e => z.addEventListener(e, ev => {
+    ev.preventDefault(); z.classList.add('encima');
+  }));
+  ['dragleave', 'drop'].forEach(e => z.addEventListener(e, ev => {
+    ev.preventDefault(); if (e === 'dragleave' && z.contains(ev.relatedTarget)) return;
+    z.classList.remove('encima');
+  }));
+  z.addEventListener('drop', ev => {
+    const fs = [...(ev.dataTransfer.files || [])].filter(f => /\.xls[xm]?$/i.test(f.name));
+    if (!fs.length) { manejar([]); return; }
+    manejar(fs);
+  });
+}
+
+conectarSoltar('soltarMaestro', 'archMaestro', async fs => {
+  if (!fs.length) return estado('#estMaestro', 'mal', 'Ese archivo no es un .xlsx.');
+  const f = fs[0];
+  estado('#estMaestro', 'trab', `Leyendo ${U.esc(f.name)}…`);
+  try {
+    const r = await cargarMaestro(await leerArchivo(f), f.name);
+    estado('#estMaestro', 'ok', `✓ ${U.ent(r.ubis)} ubicaciones en ${r.tipos} tipos de almacén.`
+      + (r.descartadas ? ` Descarté ${U.pl(r.descartadas,'fila','filas')} sin ubicación.` : ''));
+    llenarSelectores();
+    if (E.fotoLineas) recalcular();
+    repintarTodo();
+  } catch (e) { estado('#estMaestro', 'mal', '✗ ' + U.esc(e.message)); }
+});
+
+conectarSoltar('soltarValor', 'archValor', async fs => {
+  if (!fs.length) return estado('#estValor', 'mal', 'Ese archivo no es un .xlsx.');
+  const f = fs[0];
+  estado('#estValor', 'trab', `Leyendo ${U.esc(f.name)}…`);
+  try {
+    const r = await cargarValorizado(await leerArchivo(f), f.name);
+    estado('#estValor', 'ok', `✓ ${U.ent(r.materiales)} materiales.`
+      + (r.repetidos ? ` Hay ${U.pl(r.repetidos,'fila repetida','filas repetidas')} por material: me quedo con la primera y no sumo, para no duplicar valores.` : ''));
+    if (E.fotoLineas) recalcular();
+    repintarTodo();
+  } catch (e) { estado('#estValor', 'mal', '✗ ' + U.esc(e.message)); }
+});
+
+conectarSoltar('soltarFoto', 'archFoto', async fs => {
+  if (!fs.length) return estado('#estFoto', 'mal', 'Ese archivo no es un .xlsx.');
+  if (!E.maestro) return estado('#estFoto', 'mal', '✗ Cargue primero el maestro de ubicaciones: sin él no se sabe cuáles están vacías.');
+
+  if (fs.length === 1) {
+    const f = fs[0];
+    estado('#estFoto', 'trab', `Leyendo ${U.esc(f.name)}…`);
+    try {
+      const r = await cargarFotostock(await leerArchivo(f), f.name);
+      recalcular();
+      $('#cajaFecha').hidden = false;
+      $('#inFecha').value = E.fechaFoto;
+      estado('#estFoto', 'ok', `✓ ${U.ent(r.lineas)} líneas. `
+        + (r.detectada ? `Fecha detectada del nombre: <b>${U.fecha(r.fecha)}</b>.` : `<b>No pude detectar la fecha del nombre</b>: indíquela abajo.`));
+      estado('#estCorte', 'trab', 'Confirme la fecha y guarde el corte para que entre en las tendencias.');
+      repintarTodo();
+      llenarSelectores();
+    } catch (e) { estado('#estFoto', 'mal', '✗ ' + U.esc(e.message)); }
+    return;
+  }
+
+  // Varios fotostock de una vez: sirve para cargar historial viejo.
+  let ok = 0; const fallas = [], sinFecha = [];
+  for (const f of fs) {
+    estado('#estFoto', 'trab', `Procesando ${U.esc(f.name)} (${ok + fallas.length + 1} de ${fs.length})…`);
+    try {
+      const r = await cargarFotostock(await leerArchivo(f), f.name);
+      if (!r.detectada) sinFecha.push(f.name);
+      recalcular();
+      guardarCorteEnHistorial(E.corte);
+      ok++;
+    } catch (e) { fallas.push(f.name + ': ' + e.message); }
+  }
+  let msg = `✓ ${ok} de ${U.pl(fs.length,'archivo cargado','archivos cargados')} al historial.`;
+  if (sinFecha.length) msg += ` <b>Ojo:</b> no pude detectar la fecha en ${U.pl(sinFecha.length,'archivo','archivos')} y le puse la de hoy. Corríjalo en el historial.`;
+  if (fallas.length) msg += `<br>✗ ${U.esc(fallas.join(' · '))}`;
+  estado('#estFoto', fallas.length ? 'mal' : 'ok', msg);
+  $('#cajaFecha').hidden = false;
+  $('#inFecha').value = E.fechaFoto;
+  llenarSelectores();
+  repintarTodo();
+});
+
+/* ------------------------- Fecha del corte ------------------------- */
+$('#inFecha').addEventListener('change', () => {
+  const v = $('#inFecha').value;
+  if (!v) return;
+  E.fechaFoto = v;
+  recalcular();
+  estado('#estCorte', 'trab', 'Fecha cambiada. Guarde el corte para que entre en las tendencias.');
+  repintarTodo();
+});
+$('#btnGuardarCorte').addEventListener('click', () => {
+  if (!E.corte) return;
+  const r = guardarCorteEnHistorial(E.corte);
+  if (!r.ok) return estado('#estCorte', 'mal', '✗ ' + U.esc(r.msg));
+  estado('#estCorte', 'ok', r.reemplazado
+    ? `✓ Ya había un corte del ${U.fecha(E.corte.fecha)}: lo reemplacé.`
+    : `✓ Corte del ${U.fecha(E.corte.fecha)} guardado. Hay ${U.pl(E.historial.length,'corte','cortes')} en el historial.`);
+  repintarTodo();
+});
+
+/* --------------------------- Historial --------------------------- */
+$('#btnExportHist').addEventListener('click', () => {
+  const paq = {
+    app: 'ocupacion-almacen', version: 2, generado: new Date().toISOString(),
+    historial: E.historial,
+    bases: {
+      nomMaestro: E.nomMaestro, nomValor: E.nomValor,
+      maestro: E.maestro ? [...E.maestro.entries()].map(([u, r]) => [u, r.t, r.a, r.p, r.n, r.tu, (r.fv ? 1 : 0) | (r.be ? 2 : 0) | (r.bs ? 4 : 0)]) : null,
+      valorizado: E.valorizado ? [...E.valorizado.entries()].map(([m, v]) => [m, v.desc, v.fam, v.precio]) : null
+    }
+  };
+  U.bajar(`respaldo_ocupacion_${U.hoyISO()}.json`, JSON.stringify(paq), 'application/json');
+  estado('#estHist', 'ok', '✓ Respaldo descargado. Incluye el historial y las bases.');
+});
+conectarSoltar('tablaHist', 'archHist', async fs => {
+  if (!fs.length) return;
+  try {
+    const txt = await fs[0].text();
+    const p = JSON.parse(txt);
+    if (!p || !Array.isArray(p.historial)) throw new Error('El archivo no es un respaldo de esta aplicación.');
+    const previos = E.historial.length;
+    const porFecha = new Map(E.historial.map(h => [h.fecha, h]));
+    for (const h of p.historial) if (h && h.fecha) porFecha.set(h.fecha, h);
+    E.historial = [...porFecha.values()];
+    const r = guardarHistorial();
+    if (p.bases) {
+      try {
+        localStorage.setItem(CLAVE_BASES, JSON.stringify(p.bases));
+        restaurarBases();
+      } catch (e) {}
+    }
+    estado('#estHist', r.ok ? 'ok' : 'mal', r.ok
+      ? `✓ Respaldo restaurado: el historial pasó de ${previos} a ${U.pl(E.historial.length,'corte','cortes')}.`
+      : '✗ ' + U.esc(r.msg));
+    llenarSelectores(); repintarTodo();
+  } catch (e) { estado('#estHist', 'mal', '✗ ' + U.esc(e.message)); }
+});
+$('#btnBorrarHist').addEventListener('click', () => {
+  if (!E.historial.length) return estado('#estHist', 'trab', 'El historial ya está vacío.');
+  if (!confirm(`Se van a borrar ${U.pl(E.historial.length,'corte','cortes')} del historial y se pierden las tendencias.\n\n`
+    + `Si no descargó el respaldo, cancele y descárguelo primero.\n\n¿Borrar igual?`)) return;
+  E.historial = []; guardarHistorial();
+  estado('#estHist', 'ok', '✓ Historial borrado.');
+  repintarTodo();
+});
+
+function pintarHistorial() {
+  const cont = $('#tablaHist');
+  const filas = E.historial.slice().reverse();
+  tabla(cont, [
+    { n: 'Fecha', v: f => f.fecha, h: f => `<b>${U.fecha(f.fecha)}</b>` },
+    { n: 'Semana', v: f => U.semanaISO(f.fecha) },
+    { n: 'Ocupación', num: true, v: f => f.fis.pct, h: f => U.pct(f.fis.pct) },
+    { n: 'Ocupadas', num: true, v: f => f.fis.ocu, h: f => U.ent(f.fis.ocu) },
+    { n: 'Vacías', num: true, v: f => f.fis.vac, h: f => U.ent(f.fis.vac) },
+    { n: 'Valor', num: true, v: f => f.fis.val, h: f => U.usd(f.fis.val) },
+    { n: 'Virtuales', num: true, v: f => f.vir.ubis, h: f => U.ent(f.vir.ubis) },
+    { n: 'Archivo', v: f => f.archivo || '', h: f => `<span style="color:var(--tinta-3);font-size:12px">${U.esc(f.archivo || '—')}</span>` },
+    {
+      n: '', h: f => `<button class="btn sec no-imprimir" style="padding:3px 8px;font-size:12px"
+      data-borra="${U.esc(f.fecha)}">Quitar</button>`
+    }
+  ], filas, { ordenar: 0, dir: -1, msgVacio: 'Todavía no hay cortes guardados. Cargue un fotostock y guárdelo.' });
+  cont.querySelectorAll('[data-borra]').forEach(b => b.addEventListener('click', () => {
+    const f = b.dataset.borra;
+    if (!confirm(`¿Quitar el corte del ${U.fecha(f)} del historial?`)) return;
+    E.historial = E.historial.filter(h => h.fecha !== f);
+    guardarHistorial(); repintarTodo();
+  }));
+}
+
+/* ------------------------- Recalcular y repintar ------------------------- */
+function recalcular() {
+  E.corte = calcularCorte(E.fechaFoto);
+  E.detalle = E.corte ? armarDetalle(E.corte) : null;
+}
+function repintarTodo() {
+  pintarHistorial();
+  $('#rotCorte').textContent = E.corte
+    ? `corte ${U.fecha(E.corte.fecha)} · ${U.pct(E.corte.fis.pct)} de ocupación`
+    : (E.maestro ? 'maestro cargado · falta el fotostock' : 'sin datos cargados');
+  const vis = PANELES.find(p => !$('#' + p).hidden);
+  if (vis === 'pResumen') pintarResumen();
+  else if (vis === 'pTendencia') pintarTendencia();
+  else if (vis === 'pValor') pintarValor();
+  else if (vis === 'pCalidad') pintarCalidad();
+  else if (vis === 'pDetalle') pintarDetalle();
+  else if (vis === 'pReporte') pintarReporte();
+}
+function llenarSelectores() {
+  const tipos = E.corte ? E.corte.dims.tipo.map(d => d.k) : (E.totales ? [...E.totales.tipo.keys()] : []);
+  const areas = E.corte ? E.corte.dims.area.map(d => d.k) : (E.totales ? [...E.totales.area.keys()] : []);
+  const poner = (sel, vals, todos) => {
+    const el = $(sel); if (!el) return;
+    const ant = el.value;
+    el.innerHTML = `<option value="">${todos}</option>` + vals.sort().map(v => `<option>${U.esc(v)}</option>`).join('');
+    if (vals.includes(ant)) el.value = ant;
+  };
+  poner('#selTendTipo', tipos.slice(), 'Todos');
+  poner('#selFTipo', tipos.slice(), 'Todos');
+  poner('#selFArea', areas.slice(), 'Todas');
+}
+
+/* --------------------- Carteles de "falta cargar algo" --------------------- */
+function requiereDatos(idVacio, idCuerpo) {
+  const falta = !E.corte;
+  $('#' + idCuerpo).hidden = falta;
+  const v = $('#' + idVacio);
+  v.innerHTML = falta ? `<div class="aviso info"><span class="ic">i</span><div>
+    <b>Faltan datos.</b> Cargue el maestro de ubicaciones y un fotostock en la pestaña
+    <b>Datos</b> y esta sección se arma sola.
+    <div style="margin-top:8px"><button class="btn sec" onclick="irA('pDatos')">Ir a Datos</button></div>
+    </div></div>` : '';
+  return !falta;
+}
+
+/* ============================== RESUMEN ============================== */
+function marcaSaturacion(pct) {
+  if (pct >= 95) return { cls: 'grave', ic: '●', rot: 'Sin lugar', col: 'var(--critico)' };
+  if (pct >= 90) return { cls: 'alerta', ic: '▲', rot: 'Al límite', col: 'var(--serio)' };
+  if (pct >= 75) return { cls: '', ic: '■', rot: 'Alta', col: 'var(--aviso)' };
+  return { cls: '', ic: '○', rot: 'Holgada', col: 'var(--bien)' };
+}
+// Los deltas de ocupación van en tinta neutra a propósito: que la ocupación
+// suba no es bueno ni malo en sí, depende de si acerca a la saturación.
+function pintarDelta(act, prev, op = {}) {
+  if (prev == null || !isFinite(prev)) return `<span class="delta igual">sin referencia</span>`;
+  const d = act - prev;
+  const fmt = op.fmt || (v => U.dec(v, 1));
+  if (Math.abs(d) < (op.epsilon ?? 0.05)) return `<span class="delta igual">sin cambios</span>`;
+  const flecha = d > 0 ? '▲' : '▼';
+  let cls = 'igual';
+  if (op.modo === 'subeMal') cls = d > 0 ? 'baja' : 'sube';
+  else if (op.modo === 'subeBien') cls = d > 0 ? 'sube' : 'baja';
+  const rel = (op.rel && prev) ? ` (${d > 0 ? '+' : '−'}${U.dec(Math.abs(d / prev * 100), 1)}%)` : '';
+  return `<span class="delta ${cls}">${flecha} ${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}${op.suf || ''}${rel}</span>`;
+}
+
+function pintarResumen() {
+  if (!requiereDatos('resumenVacio', 'resumenCuerpo')) return;
+  const c = E.corte;
+  const ref = corteReferencia(c, $('#selComp').value);
+  const m = marcaSaturacion(c.fis.pct);
+
+  $('#fichasResumen').innerHTML = `
+    <div class="ficha">
+      <div class="rot">Ocupación física</div>
+      <div class="val">${U.pct(c.fis.pct)}</div>
+      <div class="medidor"><i style="width:${Math.min(100, c.fis.pct).toFixed(1)}%"></i></div>
+      <div class="pie" style="margin-top:7px">
+        <span style="color:${m.col};font-weight:650">${m.ic} ${m.rot}</span> ·
+        ${pintarDelta(c.fis.pct, ref && ref.fis.pct, { suf: ' p.p.' })}
+      </div>
+    </div>
+    <div class="ficha">
+      <div class="rot">Posiciones ocupadas</div>
+      <div class="val">${U.ent(c.fis.ocu)}</div>
+      <div class="pie">de ${U.ent(c.fis.tot)} del maestro · ${pintarDelta(c.fis.ocu, ref && ref.fis.ocu, { fmt: U.ent, epsilon: .5, rel: true })}</div>
+    </div>
+    <div class="ficha">
+      <div class="rot">Posiciones vacías</div>
+      <div class="val">${U.ent(c.fis.vac)}</div>
+      <div class="pie">lugar disponible · ${pintarDelta(c.fis.vac, ref && ref.fis.vac, { fmt: U.ent, epsilon: .5, rel: true })}</div>
+    </div>
+    <div class="ficha">
+      <div class="rot">Valor del inventario</div>
+      <div class="val">${U.usd(c.fis.val)}</div>
+      <div class="pie">en ubicaciones físicas · ${pintarDelta(c.fis.val, ref && ref.fis.val, { fmt: v => U.usd(v).replace('USD ', ''), epsilon: 1, rel: true })}</div>
+    </div>
+    <div class="ficha">
+      <div class="rot">Líneas de stock</div>
+      <div class="val">${U.ent(c.fis.lin)}</div>
+      <div class="pie">${U.pl(c.fis.multi,'ubicación','ubicaciones')} con más de un material</div>
+    </div>
+    <div class="ficha">
+      <div class="rot">En tránsito y virtuales</div>
+      <div class="val">${U.usd(c.vir.val)}</div>
+      <div class="pie">${U.pl(c.vir.ubis,'ubicación','ubicaciones')} fuera del maestro · no suma a la ocupación</div>
+    </div>`;
+
+  const nd = $('#selDim').value;
+  const rot = { tipo: 'tipo de almacén', area: 'área de almacenamiento', pasillo: 'pasillo', nivel: 'nivel' }[nd];
+  $('#tituloOcupDim').textContent = 'Ocupación por ' + rot;
+
+  const dd = c.dims[nd].slice().sort((a, b) => b.pct - a.pct);
+  const refD = ref ? new Map((ref.dims[nd] || []).map(x => [x.k, x])) : null;
+
+  G.barrasH($('#grafDim'), dd.map(d => ({
+    k: d.k, v: d.pct,
+    globo: `<b>${U.esc(d.k)}</b><table>
+      <tr><td>Ocupación</td><td>${U.pct(d.pct)}</td></tr>
+      <tr><td>Ocupadas</td><td>${U.ent(d.ocu)}</td></tr>
+      <tr><td>Vacías</td><td>${U.ent(d.vac)}</td></tr>
+      <tr><td>Total maestro</td><td>${U.ent(d.tot)}</td></tr>
+      <tr><td>Valor</td><td>${U.usd(d.val)}</td></tr></table>`
+  })), { fmt: v => U.dec(v, 0), suf: '%', max: 100, aria: 'Ocupación porcentual por ' + rot });
+
+  tabla($('#tablaDim'), [
+    { n: rot === 'tipo de almacén' ? 'Tipo' : rot.split(' ')[0], v: f => f.k, h: f => `<b>${U.esc(f.k)}</b>` },
+    {
+      n: 'Ocupación', num: true, v: f => f.pct,
+      h: f => `<div class="barra-celda"><i style="width:${Math.min(100, f.pct).toFixed(0)}%"></i><span>${U.pct(f.pct)}</span></div>`
+    },
+    { n: 'Estado', v: f => f.pct, h: f => { const s = marcaSaturacion(f.pct); return `<span class="chip" style="color:${s.col}">${s.ic} ${s.rot}</span>`; } },
+    { n: 'Ocupadas', num: true, v: f => f.ocu, h: f => U.ent(f.ocu) },
+    { n: 'Vacías', num: true, v: f => f.vac, h: f => U.ent(f.vac) },
+    { n: 'Total', num: true, v: f => f.tot, h: f => U.ent(f.tot) },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usd(f.val) },
+    {
+      n: 'Variación', num: true, t: 'Puntos porcentuales contra el corte de referencia',
+      v: f => { const r = refD && refD.get(f.k); return r ? f.pct - r.pct : -1e9; },
+      h: f => { const r = refD && refD.get(f.k); return r ? pintarDelta(f.pct, r.pct, { suf: ' p.p.' }) : '<span class="delta igual">—</span>'; }
+    }
+  ], dd, {
+    ordenar: 1, dir: -1,
+    pie: [{ h: 'Total' }, { h: U.pct(c.fis.pct), num: true }, { h: '' },
+    { h: U.ent(c.fis.ocu), num: true }, { h: U.ent(c.fis.vac), num: true },
+    { h: U.ent(c.fis.tot), num: true }, { h: U.usd(c.fis.val), num: true }, { h: '' }]
+  });
+
+  tabla($('#tablaVirt'), [
+    { n: 'Tipo de almacén', v: f => f.tipo, h: f => `<b>${U.esc(f.tipo)}</b> <span class="chip v">virtual</span>` },
+    { n: 'Ubicaciones', num: true, v: f => f.ubis, h: f => U.ent(f.ubis) },
+    { n: 'Líneas', num: true, v: f => f.lin, h: f => U.ent(f.lin) },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) },
+    { n: '% del valor total', num: true, v: f => f.val, h: f => U.pct(c.fis.val + c.vir.val ? f.val / (c.fis.val + c.vir.val) * 100 : 0) }
+  ], c.vir.tipos, {
+    ordenar: 3, dir: -1,
+    msgVacio: 'No hay ubicaciones virtuales en este corte: todo el stock cae en posiciones del maestro.',
+    pie: [{ h: 'Total' }, { h: U.ent(c.vir.ubis), num: true }, { h: U.ent(c.vir.lin), num: true },
+    { h: U.usdExacto(c.vir.val), num: true }, { h: '' }]
+  });
+}
+$('#selComp').addEventListener('change', pintarResumen);
+$('#selDim').addEventListener('change', pintarResumen);
+
+/* ============================= TENDENCIA ============================= */
+let tendPeriodo = 'sem', tendAgreg = 'cierre';
+function conectarSegmento(id, inicial, cb) {
+  const cont = $('#' + id);
+  cont.addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    [...cont.children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    cb(b.dataset.v);
+  });
+}
+conectarSegmento('segPeriodo', tendPeriodo, v => { tendPeriodo = v; pintarTendencia(); });
+conectarSegmento('segAgreg', tendAgreg, v => { tendAgreg = v; pintarTendencia(); });
+$('#selTendTipo').addEventListener('change', pintarTendencia);
+
+function pintarTendencia() {
+  const hay = E.historial.length > 0;
+  $('#tendCuerpo').hidden = !hay;
+  $('#tendVacio').innerHTML = hay ? '' : `<div class="aviso info"><span class="ic">i</span><div>
+    <b>Todavía no hay historial.</b> Las tendencias se arman con los cortes guardados.
+    Cargue un fotostock en <b>Datos</b>, confirme la fecha y pulse
+    <b>Guardar este corte en el historial</b>. Si tiene fotostock de semanas anteriores,
+    puede seleccionarlos todos juntos y se cargan de una vez.
+    <div style="margin-top:8px"><button class="btn sec" onclick="irA('pDatos')">Ir a Datos</button></div></div></div>`;
+  if (!hay) return;
+
+  const tipo = $('#selTendTipo').value;
+  const s = serieTendencia(tendPeriodo, tendAgreg, tipo);
+  const comoVal = tendPeriodo === 'dia' ? 'de cada corte'
+    : (tendAgreg === 'prom' ? 'promedio del período' : 'al cierre del período');
+  $('#subTendOcup').textContent = `Porcentaje de posiciones ocupadas, ${comoVal}.`
+    + (tipo ? ` Solo tipo de almacén ${tipo}.` : '');
+
+  const glob = d => `<b>${U.esc(d.etLarga || d.et)}</b><table>
+    <tr><td>Ocupación</td><td>${U.pct(d.pct)}</td></tr>
+    <tr><td>Ocupadas</td><td>${U.ent(d.ocu)}</td></tr>
+    <tr><td>Vacías</td><td>${U.ent(d.vac)}</td></tr>
+    <tr><td>Valor</td><td>${U.usd(d.val)}</td></tr>
+    ${d.cortes > 1 ? `<tr><td>Cortes</td><td>${d.cortes}</td></tr>` : ''}</table>`;
+
+  G.linea($('#grafTendOcup'), s.map(d => ({ ...d, v: d.pct, globo: glob(d) })),
+    { fmt: v => U.dec(v, 1), suf: '%', cero: false, aria: 'Tendencia de la ocupación', H: 250 });
+  G.linea($('#grafTendOcupadas'), s.map(d => ({ ...d, v: d.ocu, globo: glob(d) })),
+    { fmt: v => U.ent(v), mIzq: 74, aria: 'Tendencia de posiciones ocupadas' });
+  G.linea($('#grafTendValor'), s.map(d => ({ ...d, v: d.val, globo: glob(d) })),
+    { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 66, aria: 'Tendencia del valor del inventario' });
+
+  tabla($('#tablaTend'), [
+    { n: tendPeriodo === 'dia' ? 'Corte' : (tendPeriodo === 'sem' ? 'Semana' : 'Mes'), v: f => f.clave, h: f => `<b>${U.esc(f.etLarga || f.et)}</b>` },
+    { n: 'Ocupación', num: true, v: f => f.pct, h: f => U.pct(f.pct) },
+    { n: 'Ocupadas', num: true, v: f => f.ocu, h: f => U.ent(f.ocu) },
+    { n: 'Vacías', num: true, v: f => f.vac, h: f => U.ent(f.vac) },
+    { n: 'Total', num: true, v: f => f.tot, h: f => U.ent(f.tot) },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) },
+    { n: 'Líneas', num: true, v: f => f.lin, h: f => U.ent(f.lin) },
+    ...(tendPeriodo === 'dia' ? [] : [{ n: 'Cortes', num: true, v: f => f.cortes, h: f => U.ent(f.cortes) }])
+  ], s.slice().reverse(), { ordenar: 0, dir: -1 });
+}
+$('#btnCsvTend').addEventListener('click', () => {
+  const s = serieTendencia(tendPeriodo, tendAgreg, $('#selTendTipo').value);
+  U.bajar(`tendencia_${tendPeriodo}_${U.hoyISO()}.csv`, U.csv(
+    ['Período', 'Fecha del corte', 'Ocupación %', 'Ocupadas', 'Vacías', 'Total maestro', 'Valor USD', 'Líneas', 'Cortes'],
+    s.map(d => [d.etLarga || d.et, d.fecha, U.dec(d.pct, 2), Math.round(d.ocu), Math.round(d.vac),
+      Math.round(d.tot), Math.round(d.val), Math.round(d.lin), d.cortes || 1])));
+});
+
+/* ============================= VALORIZADO ============================= */
+function pintarValor() {
+  if (!requiereDatos('valorVacio', 'valorCuerpo')) return;
+  const c = E.corte;
+  const totVal = c.fis.val + c.vir.val;
+  const valPorUbi = c.fis.ocu ? c.fis.val / c.fis.ocu : 0;
+  const top15 = c.topUbi.reduce((s, u) => s + u.val, 0);
+
+  $('#fichasValor').innerHTML = `
+    <div class="ficha"><div class="rot">Valor total del stock</div>
+      <div class="val">${U.usd(totVal)}</div>
+      <div class="pie">${U.usdExacto(totVal)}</div></div>
+    <div class="ficha"><div class="rot">En ubicaciones físicas</div>
+      <div class="val">${U.usd(c.fis.val)}</div>
+      <div class="pie">${U.pct(totVal ? c.fis.val / totVal * 100 : 0)} del total</div></div>
+    <div class="ficha"><div class="rot">Valor promedio por posición</div>
+      <div class="val">${U.usd(valPorUbi)}</div>
+      <div class="pie">sobre ${U.ent(c.fis.ocu)} posiciones ocupadas</div></div>
+    <div class="ficha"><div class="rot">Concentración</div>
+      <div class="val">${U.pct(c.fis.val ? top15 / c.fis.val * 100 : 0)}</div>
+      <div class="pie">del valor está en las 15 ubicaciones más caras</div></div>`;
+
+  const porTipo = c.dims.tipo.slice().sort((a, b) => b.val - a.val).slice(0, 12);
+  G.barrasH($('#grafValorTipo'), porTipo.map(d => ({
+    k: d.k, v: d.val,
+    globo: `<b>Tipo ${U.esc(d.k)}</b><table>
+      <tr><td>Valor</td><td>${U.usdExacto(d.val)}</td></tr>
+      <tr><td>Ocupadas</td><td>${U.ent(d.ocu)}</td></tr>
+      <tr><td>Valor por posición</td><td>${U.usd(d.ocu ? d.val / d.ocu : 0)}</td></tr></table>`
+  })), { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 78, aria: 'Valor por tipo de almacén' });
+
+  const porArea = c.dims.area.slice().sort((a, b) => b.val - a.val).slice(0, 12);
+  G.barrasH($('#grafValorArea'), porArea.map(d => ({
+    k: d.k, v: d.val,
+    globo: `<b>Área ${U.esc(d.k)}</b><table>
+      <tr><td>Valor</td><td>${U.usdExacto(d.val)}</td></tr>
+      <tr><td>Ocupadas</td><td>${U.ent(d.ocu)}</td></tr>
+      <tr><td>Ocupación</td><td>${U.pct(d.pct)}</td></tr></table>`
+  })), { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 92, aria: 'Valor por área de almacenamiento' });
+
+  // mapa de calor: se recortan filas y columnas a las de mayor valor para que
+  // la cuadrícula se pueda leer
+  const valArea = new Map(), valTipo = new Map();
+  for (const x of c.calor) {
+    valArea.set(x.a, (valArea.get(x.a) || 0) + x.val);
+    valTipo.set(x.t, (valTipo.get(x.t) || 0) + x.val);
+  }
+  let topA = [...valArea.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(x => x[0]);
+  let topT = [...valTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(x => x[0]);
+  // Un área puede entrar por valor pero no cruzarse con ninguno de los tipos
+  // elegidos: esa fila quedaría toda vacía. Se descartan filas y columnas sin
+  // ninguna celda en el cruce.
+  let celdas = c.calor.filter(x => topA.includes(x.a) && topT.includes(x.t));
+  const conA = new Set(celdas.map(x => x.a)), conT = new Set(celdas.map(x => x.t));
+  topA = topA.filter(a => conA.has(a)); topT = topT.filter(t => conT.has(t));
+  G.calor($('#grafCalor'), celdas.map(x => ({
+    f: x.a, c: x.t, v: x.val,
+    globo: `<b>${U.esc(x.a)} · tipo ${U.esc(x.t)}</b><table>
+      <tr><td>Valor</td><td>${U.usdExacto(x.val)}</td></tr>
+      <tr><td>Posiciones ocupadas</td><td>${U.ent(x.ocu)}</td></tr>
+      <tr><td>Valor por posición</td><td>${U.usd(x.ocu ? x.val / x.ocu : 0)}</td></tr></table>`
+  })), {
+    filas: topA, cols: topT, fmt: v => U.usd(v).replace('USD ', ''),
+    leyenda: 'valor en USD', aria: 'Mapa de calor de valor por área y tipo de almacén'
+  });
+
+  tabla($('#tablaTopUbi'), [
+    { n: 'Ubicación', v: f => f.ubi, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.ubi)}</b>` },
+    { n: 'Tipo', v: f => f.tipo },
+    { n: 'Área', v: f => f.area },
+    { n: 'Líneas', num: true, v: f => f.lin, h: f => U.ent(f.lin) },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) }
+  ], c.topUbi, { ordenar: 4, dir: -1 });
+
+  tabla($('#tablaTopMat'), [
+    { n: 'Material', v: f => f.mat, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.mat)}</b>` },
+    { n: 'Descripción', v: f => f.desc, h: f => `<span title="${U.esc(f.desc)}">${U.esc((f.desc || '').slice(0, 34))}</span>` },
+    { n: 'Ubic.', num: true, v: f => f.ubis, h: f => U.ent(f.ubis) },
+    { n: 'Cantidad', num: true, v: f => f.ctd, h: f => U.ent(f.ctd) },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) }
+  ], c.topMat, { ordenar: 4, dir: -1 });
+
+  const sinVal = !E.valorizado;
+  $('#cajaFamilia').hidden = false;
+  if (sinVal) {
+    $('#tablaFamilia').innerHTML = `<div class="aviso info"><span class="ic">i</span><div>
+      Cargue el <b>maestro valorizado</b> en la pestaña Datos y acá aparece el corte por familia de material.</div></div>`;
+  } else {
+    const tot = c.fam.reduce((s, f) => s + f.val, 0);
+    tabla($('#tablaFamilia'), [
+      { n: 'Familia', v: f => f.fam, h: f => `<b>${U.esc(f.fam)}</b>` },
+      { n: 'Materiales', num: true, v: f => f.mats, h: f => U.ent(f.mats) },
+      { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) },
+      {
+        n: 'Participación', num: true, v: f => f.val,
+        h: f => `<div class="barra-celda"><i style="width:${(tot ? f.val / tot * 100 : 0).toFixed(0)}%"></i><span>${U.pct(tot ? f.val / tot * 100 : 0)}</span></div>`
+      }
+    ], c.fam, { ordenar: 2, dir: -1 });
+  }
+}
+
+/* ============================== CALIDAD ============================== */
+function pintarCalidad() {
+  if (!requiereDatos('calVacio', 'calCuerpo')) return;
+  const c = E.corte, q = c.cal;
+
+  $('#fichasCalidad').innerHTML = `
+    <div class="ficha"><div class="rot">Ocupadas marcadas vacías</div>
+      <div class="val" style="color:${q.incOcuVac ? 'var(--critico)' : 'inherit'}">${U.ent(q.incOcuVac)}</div>
+      <div class="pie">el fotostock les ve stock, el maestro las marca vacías</div></div>
+    <div class="ficha"><div class="rot">Vacías no marcadas</div>
+      <div class="val">${U.ent(q.incVacOcu)}</div>
+      <div class="pie">sin stock en el fotostock, pero el maestro no las marca vacías</div></div>
+    <div class="ficha"><div class="rot">Ubicaciones sin maestro</div>
+      <div class="val" style="color:${c.vir.ubis ? 'var(--serio)' : 'inherit'}">${U.ent(c.vir.ubis)}</div>
+      <div class="pie">con stock y sin posición definida: son las virtuales</div></div>
+    <div class="ficha"><div class="rot">Posiciones bloqueadas</div>
+      <div class="val">${U.ent(q.bloqTot)}</div>
+      <div class="pie">${U.ent(q.bloqOcu)} con stock · reducen la capacidad real</div></div>
+    <div class="ficha"><div class="rot">Líneas sin fecha de entrada</div>
+      <div class="val">${U.ent(q.sinFecha)}</div>
+      <div class="pie">no se les puede calcular antigüedad</div></div>
+    <div class="ficha"><div class="rot">Materiales sin costo</div>
+      <div class="val">${E.valorizado ? U.ent(q.sinCosto) : '—'}</div>
+      <div class="pie">${E.valorizado ? 'de los 15 más caros, sin ficha en el valorizado' : 'cargue el maestro valorizado'}</div></div>`;
+
+  const av = [];
+  if (q.incOcuVac) av.push(`<div class="aviso grave"><span class="ic">●</span><div>
+    <b>${U.pl(q.incOcuVac,'ubicación con stock está marcada','ubicaciones con stock están marcadas')} como vacías en el maestro.</b>
+    SAP puede estar ofreciéndolas para almacenar cuando en realidad hay mercadería.
+    La lista completa está abajo y se puede exportar.</div></div>`);
+  if (c.vir.ubis) av.push(`<div class="aviso alerta"><span class="ic">▲</span><div>
+    <b>${U.pl(c.vir.ubis,'ubicación con stock no existe','ubicaciones con stock no existen')} en el maestro</b>
+    (${U.usdExacto(c.vir.val)}). Son tipos de almacén de tránsito o interinos
+    (${U.esc(c.vir.tipos.slice(0, 5).map(t => t.tipo).join(', '))}${c.vir.tipos.length > 5 ? '…' : ''}).
+    Quedan fuera del cálculo de ocupación porque no tienen capacidad definida. Si alguna debería
+    ser física, falta en el maestro.</div></div>`);
+  const vieja = q.antig[q.antig.length - 1];
+  if (vieja && vieja.lin) av.push(`<div class="aviso alerta"><span class="ic">▲</span><div>
+    <b>${U.pl(vieja.lin,'línea tiene','líneas tienen')} más de 2 años sin movimiento de entrada</b>
+    (${U.usdExacto(vieja.val)} en ${U.pl(vieja.ubis,'posición','posiciones')}). Candidatas a revisión
+    de obsolescencia y a liberar lugar.</div></div>`);
+  if (!av.length) av.push(`<div class="aviso info"><span class="ic">✓</span><div>
+    No encontré inconsistencias relevantes en este corte.</div></div>`);
+  $('#avisosCalidad').innerHTML = av.join('');
+
+  tabla($('#tablaInc'), [
+    { n: 'Ubicación', v: f => f.ubi, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.ubi)}</b>` },
+    { n: 'Tipo', v: f => f.tipo },
+    { n: 'Área', v: f => f.area },
+    { n: 'Líneas', num: true, v: f => f.lin, h: f => U.ent(f.lin) },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) },
+    { n: 'Materiales', v: f => f.mats, h: f => `<span style="font-size:12px;color:var(--tinta-2)">${U.esc(f.mats)}</span>` }
+  ], c._incOV, {
+    ordenar: 4, dir: -1, limite: 300,
+    msgVacio: 'No hay inconsistencias de este tipo en el corte. Buena señal.'
+  });
+
+  G.barrasOrdinal($('#grafAntig'), q.antig.map(b => ({
+    k: b.b, v: b.val,
+    globo: `<b>${U.esc(b.b)}</b><table>
+      <tr><td>Valor</td><td>${U.usdExacto(b.val)}</td></tr>
+      <tr><td>Líneas</td><td>${U.ent(b.lin)}</td></tr>
+      <tr><td>Posiciones</td><td>${U.ent(b.ubis)}</td></tr></table>`
+  })), { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 108, aria: 'Valor del stock por antigüedad de entrada' });
+
+  const bloq = (E.detalle || []).filter(f => f.bloq);
+  tabla($('#tablaBloq'), [
+    { n: 'Ubicación', v: f => f.ubi, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.ubi)}</span>` },
+    { n: 'Tipo', v: f => f.tipo },
+    { n: 'Bloqueo', v: f => f.bloq, h: f => `<span class="chip">${U.esc(f.bloq)}</span>` },
+    { n: 'Estado', v: f => f.est },
+    { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) }
+  ], bloq, { ordenar: 4, dir: -1, limite: 200, msgVacio: 'No hay ubicaciones bloqueadas en el maestro.' });
+
+  tabla($('#tablaViejo'), [
+    { n: 'Fecha entrada', v: f => f.f, h: f => `<b>${U.fecha(f.f)}</b>` },
+    { n: 'Antigüedad', num: true, v: f => f.f, h: f => U.ent(U.diasEntre(f.f, c.fecha)) + ' días' },
+    { n: 'Ubicación', v: f => f.u, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.u)}</span>` },
+    { n: 'Material', v: f => f.m },
+    { n: 'Descripción', v: f => f.d, h: f => `<span title="${U.esc(f.d)}">${U.esc((f.d || '').slice(0, 30))}</span>` },
+    { n: 'Cantidad', num: true, v: f => f.c, h: f => U.ent(f.c) },
+    { n: 'Valor', num: true, v: f => f.v, h: f => U.usdExacto(f.v) }
+  ], c._viejas, { ordenar: 0, dir: 1, msgVacio: 'Sin fechas de entrada para evaluar.' });
+}
+$('#btnCsvInc').addEventListener('click', () => {
+  if (!E.corte) return;
+  U.bajar(`inconsistencias_${E.corte.fecha}.csv`, U.csv(
+    ['Ubicación', 'Tipo almacén', 'Área', 'Líneas', 'Valor USD', 'Materiales'],
+    E.corte._incOV.map(f => [f.ubi, f.tipo, f.area, f.lin, Math.round(f.val), f.mats])));
+});
+
+/* ============================== DETALLE ============================== */
+function filtrarDetalle() {
+  const q = ($('#inBuscar').value || '').trim().toLowerCase();
+  const t = $('#selFTipo').value, a = $('#selFArea').value, es = $('#selFEstado').value;
+  return (E.detalle || []).filter(f => {
+    if (t && f.tipo !== t) return false;
+    if (a && f.area !== a) return false;
+    if (es === 'ocu' && (f.est !== 'Ocupada' || f.clase !== 'Física')) return false;
+    if (es === 'vac' && f.est !== 'Vacía') return false;
+    if (es === 'vir' && f.clase !== 'Virtual') return false;
+    if (es === 'inc' && !f.inc) return false;
+    if (q && !(f.ubi.toLowerCase().includes(q) || (f.mats || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function pintarDetalle() {
+  if (!requiereDatos('detVacio', 'detCuerpo')) return;
+  const filas = filtrarDetalle();
+  const val = filas.reduce((s, f) => s + f.val, 0);
+  const ocu = filas.filter(f => f.est === 'Ocupada').length;
+  $('#cuentaDet').innerHTML = `${U.pl(filas.length,'ubicación','ubicaciones')} · ${U.pl(ocu,'ocupada','ocupadas')} · ${U.usdExacto(val)}`;
+  tabla($('#tablaDet'), [
+    { n: 'Ubicación', v: f => f.ubi, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.ubi)}</span>` },
+    { n: 'Tipo', v: f => f.tipo },
+    { n: 'Área', v: f => f.area },
+    { n: 'Pasillo', v: f => f.pas },
+    { n: 'Nivel', v: f => f.niv },
+    {
+      n: 'Estado', v: f => f.est, h: f => f.clase === 'Virtual'
+        ? `<span class="chip v">virtual</span>` : (f.est === 'Ocupada'
+          ? `<span class="chip" style="color:var(--s1)">ocupada</span>` : `<span class="chip">vacía</span>`)
+    },
+    { n: 'Líneas', num: true, v: f => f.lin, h: f => f.lin ? U.ent(f.lin) : '' },
+    { n: 'Cantidad', num: true, v: f => f.ctd, h: f => f.ctd ? U.ent(f.ctd) : '' },
+    { n: 'Valor', num: true, v: f => f.val, h: f => f.val ? U.usdExacto(f.val) : '' },
+    { n: 'Materiales', v: f => f.mats, h: f => `<span style="font-size:12px;color:var(--tinta-2)">${U.esc((f.mats || '').slice(0, 28))}</span>` },
+    { n: 'Observación', v: f => f.inc, h: f => f.inc ? `<span class="chip" style="color:var(--serio)">${U.esc(f.inc)}</span>` : '' }
+  ], filas, { ordenar: 8, dir: -1, limite: 400 });
+}
+['#inBuscar', '#selFTipo', '#selFArea', '#selFEstado'].forEach(s => {
+  const el = $(s);
+  el.addEventListener(s === '#inBuscar' ? 'input' : 'change', () => {
+    clearTimeout(el._t); el._t = setTimeout(pintarDetalle, s === '#inBuscar' ? 220 : 0);
+  });
+});
+$('#btnCsvDet').addEventListener('click', () => {
+  const filas = filtrarDetalle();
+  U.bajar(`detalle_ubicaciones_${E.corte.fecha}.csv`, U.csv(
+    ['Ubicación', 'Tipo almacén', 'Área', 'Pasillo', 'Nivel', 'Clase', 'Estado', 'Líneas',
+      'Cantidad', 'Valor USD', 'Materiales', 'Entrada más antigua', 'Bloqueo', 'Observación'],
+    filas.map(f => [f.ubi, f.tipo, f.area, f.pas, f.niv, f.clase, f.est, f.lin,
+      f.ctd, Math.round(f.val), f.mats, f.fem, f.bloq, f.inc])));
+});
+
+/* ============================== REPORTE ============================== */
+$('#inRepEmpresa').addEventListener('input', () => { E.pref.empresa = $('#inRepEmpresa').value; guardarPref(); pintarReporte(); });
+$('#inRepAutor').addEventListener('input', () => { E.pref.autor = $('#inRepAutor').value; guardarPref(); pintarReporte(); });
+$('#inRepNota').addEventListener('input', pintarReporte);
+$('#selRepPer').addEventListener('change', pintarReporte);
+// Para imprimir se redibujan los gráficos a un ancho fijo de hoja A4: si se
+// usara el ancho de pantalla, al achicarse para entrar en la página la letra
+// quedaría ilegible.
+function prepararImpresion() { G.fijarAnchoImpresion(700); if (E.corte) pintarReporte(); }
+function soltarImpresion() { G.fijarAnchoImpresion(null); if (E.corte) pintarReporte(); }
+addEventListener('beforeprint', prepararImpresion);
+addEventListener('afterprint', soltarImpresion);
+$('#btnPdf').addEventListener('click', () => {
+  G.ocultarGlobo();
+  prepararImpresion();
+  print();
+  setTimeout(soltarImpresion, 600);   // por si el navegador no dispara afterprint
+});
+
+// Al cambiar el ancho de la ventana los gráficos se vuelven a dibujar para
+// mantener la proporción de los textos.
+let temporizadorAncho;
+addEventListener('resize', () => {
+  clearTimeout(temporizadorAncho);
+  temporizadorAncho = setTimeout(() => { if (E.corte || E.historial.length) repintarTodo(); }, 220);
+});
+
+function pintarReporte() {
+  if (!requiereDatos('repVacio', 'repCuerpo')) return;
+  const c = E.corte;
+  const per = $('#selRepPer').value;
+  const ref = corteReferencia(c, per === 'mes' ? 'mes' : 'sem');
+  const s = serieTendencia(per, 'cierre', '');
+  const m = marcaSaturacion(c.fis.pct);
+  const emp = ($('#inRepEmpresa').value || '').trim();
+  const autor = ($('#inRepAutor').value || '').trim();
+  const nota = ($('#inRepNota').value || '').trim();
+  const titulo = per === 'mes' ? 'Reporte mensual de ocupación' : 'Reporte semanal de ocupación';
+  const periodoRot = per === 'mes' ? U.nombreMes(U.mesISO(c.fecha)) : 'semana ' + U.semanaISO(c.fecha).split('-S')[1] + ' de ' + c.fecha.slice(0, 4);
+
+  const dTipo = c.dims.tipo.slice().sort((a, b) => b.pct - a.pct);
+  const refT = ref ? new Map(ref.dims.tipo.map(x => [x.k, x])) : null;
+  const criticas = dTipo.filter(d => d.pct >= 90 && d.tot >= 10);
+  const holgadas = dTipo.slice().sort((a, b) => a.pct - b.pct).filter(d => d.tot >= 10).slice(0, 5);
+
+  const fila = (k, v) => `<tr><td>${k}</td><td class="num">${v}</td></tr>`;
+  const dRef = (a, b, op) => ref ? pintarDelta(a, b, op) : '<span class="delta igual">sin referencia</span>';
+
+  $('#hojaReporte').innerHTML = `
+    <div>
+      ${emp ? `<div class="sub" style="font-weight:650;color:var(--tinta);font-size:13px">${U.esc(emp)}</div>` : ''}
+      <h2>${titulo}</h2>
+      <div class="sub">Corte al <b>${U.fechaLarga(c.fecha)}</b> · ${periodoRot}
+        ${ref ? ` · comparado contra el corte del ${U.fecha(ref.fecha)}` : ' · sin corte anterior para comparar'}</div>
+    </div>
+
+    <section>
+      <h3>Resumen ejecutivo</h3>
+      <div class="rep-kpis">
+        <div class="k"><div class="rot">Ocupación</div><div class="val">${U.pct(c.fis.pct)}</div>
+          <div style="font-size:11px;color:var(--tinta-2)">${m.ic} ${m.rot} · ${dRef(c.fis.pct, ref && ref.fis.pct, { suf: ' p.p.' })}</div></div>
+        <div class="k"><div class="rot">Ocupadas</div><div class="val">${U.ent(c.fis.ocu)}</div>
+          <div style="font-size:11px;color:var(--tinta-2)">${dRef(c.fis.ocu, ref && ref.fis.ocu, { fmt: U.ent, epsilon: .5 })}</div></div>
+        <div class="k"><div class="rot">Vacías</div><div class="val">${U.ent(c.fis.vac)}</div>
+          <div style="font-size:11px;color:var(--tinta-2)">${dRef(c.fis.vac, ref && ref.fis.vac, { fmt: U.ent, epsilon: .5 })}</div></div>
+        <div class="k"><div class="rot">Total posiciones</div><div class="val">${U.ent(c.fis.tot)}</div>
+          <div style="font-size:11px;color:var(--tinta-2)">según maestro</div></div>
+        <div class="k"><div class="rot">Valor inventario</div><div class="val">${U.usd(c.fis.val)}</div>
+          <div style="font-size:11px;color:var(--tinta-2)">${dRef(c.fis.val, ref && ref.fis.val, { fmt: v => U.usd(v).replace('USD ', ''), epsilon: 1 })}</div></div>
+      </div>
+      <p style="font-size:12.5px;color:var(--tinta-2);margin:12px 0 0">
+        El almacén cerró el período con <b>${U.pct(c.fis.pct)}</b> de ocupación:
+        ${U.ent(c.fis.ocu)} de ${U.ent(c.fis.tot)} posiciones del maestro con stock y
+        <b>${U.ent(c.fis.vac)}</b> posiciones libres.
+        ${criticas.length
+      ? `Hay <b>${U.pl(criticas.length, 'tipo de almacén', 'tipos de almacén')} por encima del 90%</b> (${U.esc(criticas.map(d => d.k).join(', '))}), con riesgo de no poder recibir mercadería.`
+      : 'Ningún tipo de almacén superó el 90% de ocupación.'}
+        El inventario valorizado en posiciones físicas es de ${U.usdExacto(c.fis.val)}${c.vir.val ? `, más ${U.usdExacto(c.vir.val)} en tránsito y ubicaciones virtuales` : ''}.
+      </p>
+      ${nota ? `<div style="margin-top:12px;padding:10px 12px;border-left:3px solid var(--s1);background:var(--sup-2);border-radius:0 6px 6px 0">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta-2);font-weight:650;margin-bottom:4px">Comentarios del analista</div>
+        <div class="rep-nota">${U.esc(nota)}</div></div>` : ''}
+    </section>
+
+    <section>
+      <h3>Ocupación por tipo de almacén</h3>
+      <div class="envoltorio-tabla"><table><thead><tr>
+        <th>Tipo</th><th class="num">Total</th><th class="num">Ocupadas</th><th class="num">Vacías</th>
+        <th class="num">Ocupación</th><th>Estado</th><th class="num">Variación</th><th class="num">Valor USD</th>
+      </tr></thead><tbody>
+      ${dTipo.map(d => {
+      const sm = marcaSaturacion(d.pct), r = refT && refT.get(d.k);
+      return `<tr><td><b>${U.esc(d.k)}</b></td><td class="num">${U.ent(d.tot)}</td>
+          <td class="num">${U.ent(d.ocu)}</td><td class="num">${U.ent(d.vac)}</td>
+          <td class="num"><b>${U.pct(d.pct)}</b></td>
+          <td><span style="color:${sm.col};font-weight:600;white-space:nowrap">${sm.ic} ${sm.rot}</span></td>
+          <td class="num">${r ? pintarDelta(d.pct, r.pct, { suf: ' p.p.' }) : '—'}</td>
+          <td class="num">${U.usdExacto(d.val)}</td></tr>`;
+    }).join('')}
+      </tbody><tfoot><tr><td>Total</td><td class="num">${U.ent(c.fis.tot)}</td>
+        <td class="num">${U.ent(c.fis.ocu)}</td><td class="num">${U.ent(c.fis.vac)}</td>
+        <td class="num">${U.pct(c.fis.pct)}</td><td></td><td></td>
+        <td class="num">${U.usdExacto(c.fis.val)}</td></tr></tfoot></table></div>
+    </section>
+
+    <section class="salto">
+      <h3>Tendencia de la ocupación</h3>
+      <div id="repGrafTend"></div>
+      ${s.length > 1 ? `<div class="envoltorio-tabla" style="margin-top:12px"><table><thead><tr>
+        <th>${per === 'mes' ? 'Mes' : 'Semana'}</th><th class="num">Ocupación</th><th class="num">Ocupadas</th>
+        <th class="num">Vacías</th><th class="num">Valor USD</th></tr></thead><tbody>
+        ${s.slice(-10).reverse().map(d => `<tr><td>${U.esc(d.etLarga || d.et)}</td>
+          <td class="num">${U.pct(d.pct)}</td><td class="num">${U.ent(d.ocu)}</td>
+          <td class="num">${U.ent(d.vac)}</td><td class="num">${U.usdExacto(d.val)}</td></tr>`).join('')}
+        </tbody></table></div>` : ''}
+    </section>
+
+    <section>
+      <h3>Zonas a vigilar</h3>
+      <div style="display:grid;gap:14px;grid-template-columns:1fr 1fr">
+        <div>
+          <div style="font-size:12px;font-weight:650;margin-bottom:6px">Mayor saturación</div>
+          <div class="envoltorio-tabla"><table><thead><tr><th>Tipo</th><th class="num">Ocup.</th><th class="num">Libres</th></tr></thead>
+          <tbody>${dTipo.slice(0, 6).map(d => `<tr><td>${U.esc(d.k)}</td>
+            <td class="num"><b>${U.pct(d.pct)}</b></td><td class="num">${U.ent(d.vac)}</td></tr>`).join('')}</tbody></table></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:650;margin-bottom:6px">Mayor holgura</div>
+          <div class="envoltorio-tabla"><table><thead><tr><th>Tipo</th><th class="num">Ocup.</th><th class="num">Libres</th></tr></thead>
+          <tbody>${holgadas.map(d => `<tr><td>${U.esc(d.k)}</td>
+            <td class="num">${U.pct(d.pct)}</td><td class="num"><b>${U.ent(d.vac)}</b></td></tr>`).join('')}</tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="salto">
+      <h3>Concentración de valor</h3>
+      <div style="display:grid;gap:14px;grid-template-columns:1fr 1fr">
+        <div>
+          <div style="font-size:12px;font-weight:650;margin-bottom:6px">Ubicaciones más caras</div>
+          <div class="envoltorio-tabla"><table><thead><tr><th>Ubicación</th><th>Tipo</th><th class="num">Valor USD</th></tr></thead>
+          <tbody>${c.topUbi.slice(0, 10).map(u => `<tr><td style="font-variant-numeric:tabular-nums">${U.esc(u.ubi)}</td>
+            <td>${U.esc(u.tipo)}</td><td class="num">${U.usdExacto(u.val)}</td></tr>`).join('')}</tbody></table></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:650;margin-bottom:6px">Materiales más caros</div>
+          <div class="envoltorio-tabla"><table><thead><tr><th>Material</th><th>Descripción</th><th class="num">Valor USD</th></tr></thead>
+          <tbody>${c.topMat.slice(0, 10).map(u => `<tr><td style="font-variant-numeric:tabular-nums">${U.esc(u.mat)}</td>
+            <td>${U.esc((u.desc || '').slice(0, 30))}</td><td class="num">${U.usdExacto(u.val)}</td></tr>`).join('')}</tbody></table></div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--tinta-2);margin:10px 0 0">
+        Las 15 ubicaciones más caras concentran
+        <b>${U.pct(c.fis.val ? c.topUbi.reduce((a, b) => a + b.val, 0) / c.fis.val * 100 : 0)}</b>
+        del valor del inventario físico.</p>
+    </section>
+
+    <section>
+      <h3>Calidad de datos y alertas</h3>
+      <div class="envoltorio-tabla"><table><thead><tr><th>Control</th><th class="num">Casos</th><th>Qué significa</th></tr></thead>
+      <tbody>
+        <tr><td>Ocupadas marcadas vacías</td><td class="num"><b>${U.ent(c.cal.incOcuVac)}</b></td>
+          <td>El fotostock les ve stock pero el maestro las marca vacías. SAP puede ofrecerlas para almacenar.</td></tr>
+        <tr><td>Vacías no marcadas</td><td class="num">${U.ent(c.cal.incVacOcu)}</td>
+          <td>Sin stock en el fotostock, pero el maestro no las marca vacías.</td></tr>
+        <tr><td>Ubicaciones sin maestro</td><td class="num">${U.ent(c.vir.ubis)}</td>
+          <td>Con stock y sin posición definida (${U.usdExacto(c.vir.val)}). Tránsito e interinas.</td></tr>
+        <tr><td>Posiciones bloqueadas</td><td class="num">${U.ent(c.cal.bloqTot)}</td>
+          <td>Con bloqueo de entrada o salida; ${U.ent(c.cal.bloqOcu)} tienen stock. Reducen la capacidad real.</td></tr>
+        <tr><td>Stock de más de 2 años</td><td class="num">${U.ent(c.cal.antig[5].lin)}</td>
+          <td>${U.usdExacto(c.cal.antig[5].val)} sin movimiento de entrada. Revisión de obsolescencia.</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <div class="firma">
+      <span>${autor ? 'Preparado por ' + U.esc(autor) + ' · ' : ''}Generado el ${U.fechaLarga(U.hoyISO())}</span>
+      <span>Fuente: maestro de ubicaciones${E.nomMaestro ? ' (' + U.esc(E.nomMaestro) + ')' : ''}
+        y fotostock${c.archivo ? ' (' + U.esc(c.archivo) + ')' : ''}. Ocupación medida por posiciones del maestro.</span>
+    </div>`;
+
+  const cont = $('#repGrafTend');
+  if (cont) {
+    G.linea(cont, s.map(d => ({ ...d, v: d.pct })),
+      { fmt: v => U.dec(v, 1), suf: '%', cero: false, aria: 'Tendencia de ocupación', H: 220 });
+  }
+}
+
+/* =============================== ARRANQUE =============================== */
+(function arrancar() {
+  cargarPref();
+  if (E.pref.tema) aplicarTema(E.pref.tema);
+  $('#inRepEmpresa').value = E.pref.empresa || '';
+  $('#inRepAutor').value = E.pref.autor || '';
+  cargarHistorial();
+  const hubo = restaurarBases();
+  if (hubo && E.maestro) {
+    estado('#estMaestro', 'ok', `✓ ${U.ent(E.maestro.size)} ubicaciones guardadas de la sesión anterior`
+      + (E.nomMaestro ? ` (${U.esc(E.nomMaestro)})` : '') + '. Cargue solo el fotostock nuevo.');
+  }
+  if (hubo && E.valorizado) {
+    estado('#estValor', 'ok', `✓ ${U.ent(E.valorizado.size)} materiales guardados de la sesión anterior.`);
+  }
+  if (E.historial.length) {
+    estado('#estHist', 'trab', `${U.pl(E.historial.length,'corte','cortes')} en el historial, del ${U.fecha(E.historial[0].fecha)} al ${U.fecha(E.historial[E.historial.length - 1].fecha)}.`);
+  }
+  llenarSelectores();
+  repintarTodo();
+  if (E.historial.length && !E.corte) irA('pTendencia');
+})();
+</script>
+</body>
+</html>
