@@ -76,6 +76,8 @@ button{cursor:pointer}
 .fld.lock input:disabled{color:#8a94a3}
 .fld.lock input::placeholder{font-size:13px;font-weight:400;color:#9aa3b0}
 .fld .tag.m{color:#9a6a00}
+.fld.edit input{background:none}
+.fld.edit{background:#e1f0e7;border-color:#9fd1b1;border-style:dashed}
 .fld .tag.l{color:#5b6574}
 .sec.manual{border-left:5px solid #e3b53c;background:linear-gradient(90deg,#fff9e0,#fff 160px)}
 .bdg{font-size:11px;font-weight:700;letter-spacing:.3px;border-radius:10px;padding:2px 9px;align-self:center;text-transform:uppercase}
@@ -542,7 +544,7 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
   </nav></aside>
 
   <div>
-   <div class="keybar"><b>Cómo completar:</b><span class="kb m"><i></i>Amarillo = dato <b>manual</b>, lo completás vos</span><span class="kb s"><i></i>Verde (SAP) = sale de las bases, <b>bloqueado</b>: se llena solo al cargar el archivo</span><span class="kb"><i style="background:#eef2f6;box-shadow:inset 0 0 0 1.5px #cfe3d6"></i>Gris = calculado o esperando archivo</span></div>
+   <div class="keybar"><b>Cómo completar:</b><span class="kb m"><i></i>Amarillo = dato <b>manual</b>, lo completás vos</span><span class="kb s"><i></i>Verde (SAP) = sale de las bases, <b>bloqueado</b>: se llena solo al cargar el archivo</span><span class="kb"><i style="background:#e1f0e7;box-shadow:inset 0 0 0 1.5px #9fd1b1;border:1.5px dashed #9fd1b1"></i>Verde con borde punteado = viene de SAP pero <b>se puede corregir</b></span><span class="kb"><i style="background:#eef2f6;box-shadow:inset 0 0 0 1.5px #cfe3d6"></i>Gris = calculado o esperando archivo</span></div>
 
    <section class="sec" id="s-arch">
      <header><h2><i data-ic="xls"></i>Archivos SAP</h2><p>Exports de /SCWM/MON con el layout fijo</p></header>
@@ -732,8 +734,9 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
         <div class="sub">Tipos de almacén para movimientos internos</div>
         <div class="fld"><label>Físicos (ubicación de almacenamiento), separados por coma</label><input id="cfgPhys"></div>
         <div class="fld" style="margin-top:6px"><label>Áreas de proceso / intermedias (no cuentan)</label><input id="cfgProc"></div>
-        <div class="sub">Referencia de inventario cíclico</div>
-        <div class="fld"><label>Documento de inventario que cuenta como conteo del plan</label><input id="cfgInvRef"></div>
+        <div class="sub">Referencias de inventario cíclico</div>
+        <div class="fld"><label>Conteos del plan: una referencia por línea (o separadas por ;)</label><textarea id="cfgInvRef" rows="3"></textarea></div>
+        <div class="fld" style="margin-top:6px"><label>Auditoría de ubicaciones: referencias que se suman aparte (misma base de conteos)</label><textarea id="cfgInvAud" rows="2" placeholder="Ej.: AUDITORIA UBICACIONES 2026"></textarea></div>
       </div>
       <div>
         <div class="sub">Usuarios que cuentan para CDR en picking y control</div>
@@ -952,9 +955,13 @@ function exclMsg(obj,label){const e=Object.entries(obj).filter(([,v])=>v);return
 /* ======================= Inventario cíclico ======================= */
 const INV_OKST=['COUN','POST'];
 function colByValues(rows,h,test,lim=400){let best=null,bn=0;h.forEach(c=>{let n=0;for(let i=0;i<Math.min(rows.length,lim);i++){if(test(String(rows[i][c]??'')))n++}if(n>bn){bn=n;best=c}});return bn?best:null}
+const refList0=t=>String(t||'').split(/[;|]+/).map(x=>x.trim()).filter(Boolean).join('\n').replace(/\n+/g,'\n');
+const refList=t=>String(t||'').split(/[\n;|]+/).map(x=>norm(x)).filter(Boolean);
 function procInv(rows,map){
-  const h=Object.keys(rows[0]||{});const has=c=>c&&h.includes(c);const ref=norm(S.cfg.invRef||'');
-  let cRef=map&&has(map.ref)?map.ref:colByValues(rows,h,v=>ref&&norm(v).includes(ref));
+  const h=Object.keys(rows[0]||{});const has=c=>c&&h.includes(c);
+  const refs=refList(S.cfg.invRef),audR=refList(S.cfg.invAud),allR=refs.concat(audR);
+  const isAud=v=>{const x=norm(v);return audR.some(r=>x.includes(r))},isCnt=v=>{const x=norm(v);return refs.some(r=>x.includes(r))};
+  let cRef=map&&has(map.ref)?map.ref:colByValues(rows,h,v=>{const x=norm(v);return allR.some(r=>x.includes(r))});
   let cSt=map&&has(map.st)?map.st:colByValues(rows,h,v=>INV_OKST.includes(v.trim().toUpperCase()));
   let cF=map&&has(map.fecha)?map.fecha:(h.find(x=>/fecha/.test(norm(x))&&/(cont|recuent)/.test(norm(x)))||null);
   let cU=map&&has(map.user)?map.user:(h.find(x=>/(contado por|recontado por|usuario|contador)/.test(norm(x)))||colByValues(rows,h,v=>/^FINARG\d+$/i.test(v.trim())));
@@ -963,11 +970,14 @@ function procInv(rows,map){
   if(!cRef||!cSt||!cF)return{need:true,h,guess:{ref:cRef,st:cSt,fecha:cF,user:cU,ubic:cUb}};
   const per={};let noRef=0,noSt=0,noF=0,exS={};
   rows.forEach(r=>{
-    if(!norm(r[cRef]).includes(ref)){noRef++;return}
+    const aud=isAud(r[cRef]);
+    if(!aud&&!isCnt(r[cRef])){noRef++;return}
     if(!INV_OKST.includes(String(r[cSt]||'').trim().toUpperCase())){noSt++;return}
     const f=xDate(r[cF]);if(!f){noF++;return}
     if(cTs){stockSeen(r[cTs],cTd?r[cTd]:'');if(!stockOk(r[cTs])){const t=String(r[cTs]).trim().toUpperCase();exS[t]=(exS[t]||0)+1;return}}
-    const p=(per[f]=per[f]||{n:0,ub:new Set(),u:{}});p.n++;if(cUb&&r[cUb])p.ub.add(String(r[cUb]).trim());
+    const p=(per[f]=per[f]||{n:0,aud:0,ub:new Set(),u:{}});
+    if(aud){p.aud++;return}   // auditoría de ubicaciones: se suma aparte, no es inventario
+    p.n++;if(cUb&&r[cUb])p.ub.add(String(r[cUb]).trim());
     if(cU){const u=String(r[cU]||'?').trim().toUpperCase();p.u[u]=(p.u[u]||0)+1}
   });
   const w=[];if(noSt)w.push(noSt+' posiciones de la referencia sin contar todavía (estado distinto de COUN/POST)');
@@ -985,7 +995,7 @@ function invPicker(h,guess,file){
 }
 function applyInv(r,file){
   const ds=Object.keys(r.per).sort();
-  ds.forEach(f=>{const d=day(f),p=r.per[f];d.whs.inv=p.n;d.whs.invUb=p.ub.size||null;d.invU=p.u;d.src.inv={file:file.name,at:new Date().toISOString(),w:r.w,stats:{dias:ds.length,desde:ds[0],hasta:ds.at(-1)}}});
+  ds.forEach(f=>{const d=day(f),p=r.per[f];d.whs.inv=p.n;d.whs.invUb=p.ub.size||null;d.invU=p.u;if(!d.audMan)d.whs.aud=p.aud||null;d.src.inv={file:file.name,at:new Date().toISOString(),w:r.w,stats:{dias:ds.length,desde:ds[0],hasta:ds.at(-1)}}});
   return ds;
 }
 
@@ -1128,7 +1138,7 @@ function setupDrop(id,kind){
       }else if(kind==='inv'){
         const r=procInv(rows,S.cfg.invMap);if(r.need){invPicker(r.h,r.guess,file);return}
         S.cfg.invMap=r.map;const ds=applyInv(r,file);
-        if(!ds.length){$('#resInv').innerHTML='<span class="er">No hay posiciones contadas (COUN/POST) de la referencia “'+esc(S.cfg.invRef)+'”.</span>';return}
+        if(!ds.length){$('#resInv').innerHTML='<span class="er">No hay posiciones contadas (COUN/POST) de las referencias configuradas: “'+esc(refList(S.cfg.invRef).concat(refList(S.cfg.invAud)).join('”, “'))+'”.</span>';return}
       }else if(kind==='sal'){
         const r=procSal(rows,S.cfg.salMap);if(r.need){salPicker(r.h,file);lastFile.sal=file;return}
         const ds=applySal(r,file);S.cfg.salMap={fecha:r.fc,lin:r.lc};
@@ -1239,11 +1249,18 @@ function refresh(){
 function srcHTML(s,kind){
   if(!s)return'';
   const st=s.stats||{};
-  if(kind==='inv'){const dd=S.days[F]||{whs:{}};return`<span class="rok">✓ ${esc(s.file)}</span><div class="chips"><b>${st.dias} día(s): ${dshort(st.desde)} a ${dshort(st.hasta)}</b><b>Hoy ${dd.whs.inv!=null?fmt(dd.whs.inv)+' líneas':'sin conteos'}</b>${dd.whs.invUb?`<b>${dd.whs.invUb} ubicaciones</b>`:''}</div>`+(s.w||[]).map(x=>'<div class="wa">⚠ '+esc(x)+'</div>').join('')}
+  if(kind==='inv'){const dd=S.days[F]||{whs:{}};return`<span class="rok">✓ ${esc(s.file)}</span><div class="chips"><b>${st.dias} día(s): ${dshort(st.desde)} a ${dshort(st.hasta)}</b><b>Hoy ${dd.whs.inv!=null?fmt(dd.whs.inv)+' líneas':'sin conteos'}</b>${dd.whs.invUb?`<b>${dd.whs.invUb} ubicaciones</b>`:''}${dd.whs.aud?`<b>${dd.whs.aud} auditorías de ubic.</b>`:''}</div>`+(s.w||[]).map(x=>'<div class="wa">⚠ '+esc(x)+'</div>').join('')}
   if(kind==='sal'){const ac=wSum(monday(F),'sal');return`<span class="rok">✓ ${esc(s.file)}</span><div class="chips"><b>${st.dias} días: ${dshort(st.desde)} a ${dshort(st.hasta)}</b><b>Hoy ${st.hoy!=null?fmt(st.hoy):'sin salidas'}</b><b>Acum. semana ${fmt(ac)||'—'}</b></div>`+(s.w||[]).map(x=>'<div class="wa">⚠ '+esc(x)+'</div>').join('')}
   if(kind==='tar'){const t=(S.days[F]||{}).tar;return`<span class="rok">✓ ${esc(s.file)}</span><div class="chips"><b>${st.n} tareas productivas</b><b>${st.ops} operarios</b>${t?Object.keys(TCAT).map(k=>`<b>${TCAT[k]} ${t.tot[k]}</b>`).join(''):''}</div>`+(s.w||[]).map(x=>'<div class="wa">⚠ '+esc(x)+'</div>').join('')}
   const chips=kind==='gen'?[`${st.n??'—'} órdenes`,`${st.tot??'—'} líneas`]:kind==='inb'?[`${st.tot??'—'} líneas`,`0Q ${st.q0??'—'}`,`1Q ${st.q1??'—'}`,`${st.viejos??0} con +7 días`]:[`${st.n??'—'} órdenes`,`${st.tot??'—'} líneas`,`${st.pend??'—'} por despachar`].concat(st.last?[`última orden ${dshort(st.last.slice(0,10))} ${st.last.slice(11)}`]:[]);
   return`<span class="rok">✓ ${esc(s.file)}</span><div class="chips">${chips.map(c=>`<b>${c}</b>`).join('')}</div>`+(s.w||[]).map(x=>'<div class="wa">⚠ '+esc(x)+'</div>').join('');
+}
+function styleAud(d){
+  const el=$('[data-k="whs.aud"]');if(!el)return;const box=el.parentElement,lab=box.querySelector('label');
+  const v=gp(d,'whs.aud'),sap=!!d.src.inv&&!d.audMan&&v!=null&&v!=='';
+  box.classList.toggle('auto',sap);box.classList.toggle('man',!sap);box.classList.toggle('edit',sap);
+  let t=box.querySelector('.tag');if(!t){t=document.createElement('span');lab.prepend(t)}
+  t.className='tag '+(sap?'':'m');t.textContent=sap?'SAP · editable':(d.audMan?'MANUAL (editado)':'MANUAL');
 }
 function fillForm(){
   const d=day();
@@ -1252,6 +1269,7 @@ function fillForm(){
     if(k.startsWith('prod.')){el.disabled=true;el.parentElement.classList.add('lock');return}
     const v=gp(d,k);el.value=v??'';
     const box=el.parentElement,lab=box.querySelector('label');
+    if(k==='whs.aud'){styleAud(d);return}
     const setTag=(cls,txt)=>{let t=box.querySelector('.tag');if(!t){t=document.createElement('span');t.className='tag';(lab||box).prepend(t)}t.className='tag '+cls;t.textContent=txt};
     const noTag=()=>{const t=box.querySelector('.tag');if(t)t.remove()};
     if(AUTO.includes(k)){
@@ -1279,6 +1297,7 @@ function fillForm(){
 document.addEventListener('input',e=>{
   const k=e.target.dataset&&e.target.dataset.k;if(!k)return;
   sp(day(),k,e.target.value);
+  if(k==='whs.aud'){const d=day();d.audMan=String(e.target.value).trim()!=='';styleAud(d)}
   if(AUTO.includes(k)){e.target.parentElement.classList.remove('auto');const t=e.target.parentElement.querySelector('.tag');if(t)t.remove()}
   persist();refresh();
 });
@@ -1602,6 +1621,7 @@ function renderGuia(){
    it('Guardadas','Objetivo: '+f(o.guard),`<p>Tareas de guardado: llevar la mercadería a su ubicación final (IB03, clases 1010 y 1016).</p>`)+
    it('Cross dock (ZIXD)','Objetivo: '+f(o.zixd),`<p>Mercadería que pasa de recepción directo a despacho sin almacenarse: movimiento de la ubicación 9010 a la 8030.</p>`)+
    it('Backlog IN','Pendiente de ingreso',`<p>Mercadería recibida y todavía no guardada, por estado de stock (0Q, 1Q y otros).</p><div class="f">Días de backlog IN = backlog IN ÷ ${f(o.guard)} (objetivo de guardadas)</div>`)+
+   it('Inventario y auditoría de ubicaciones','Misma base de conteos',`<p>El archivo de inventario cíclico trae dos tipos de filas, separadas por la <b>referencia</b> que se define en Configuración:</p><p><b>Conteos del plan</b>: cada posición contada (COUN/POST) suma 1 a <i>Inventario (líneas)</i>, y las ubicaciones distintas a <i>Ubicaciones contadas</i>.</p><p><b>Auditoría de ubicaciones</b>: cada posición contada con una de esas referencias suma 1 a <i>Auditorías ubic.</i> y no entra en inventario. Si una fila coincide con las dos listas, cuenta como auditoría.</p><p class="ex">Auditorías ubic. se completa sola al cargar el archivo, pero se puede corregir a mano: si lo editás, una nueva carga del archivo no lo pisa.</p>`)+
    it('Liberación aérea / IN marítima','Informativo',`<p>Liberación aérea: cases y m³ recibidos. IN marítima: cantidad de contenedores (CNTR) del día; objetivo de ${f(o.cntr)}.</p>`));
   h+=sec('Recursos','Personal y equipos disponibles en el turno.',
    it('Personal presente','Blue Collars',`<p>Personal de piso de la lista de Configuración, menos los marcados como ausentes y con licencia.</p><div class="f">Presentes = personal − ausentes − licencia</div><div class="f">Ausentismo % = (ausentes + licencia) ÷ personal × 100</div><p class="ex">Objetivo de ausentismo: ${f(o.ausPct)}%.</p>`)+
@@ -1648,7 +1668,7 @@ function renderCfg(){
   $('#cfgExcl').checked=!!c.excl;$('#cfgExclOut').checked=!!c.exclOut;
   $('#cfgPers').value=c.personal.map(p=>p.join(';')).join('\n');$('#cfgMhe').value=c.mhe.map(p=>p.join(';')).join('\n');
   $('#cfgTo').value=c.to||'';$('#cfgCc').value=c.cc||'';
-  $('#cfgOrig').value=c.origExcl||'';$('#cfgPhys').value=c.physTypes||'';$('#cfgProc').value=c.procTypes||'';$('#cfgInvRef').value=c.invRef||'';
+  $('#cfgOrig').value=c.origExcl||'';$('#cfgPhys').value=c.physTypes||'';$('#cfgProc').value=c.procTypes||'';$('#cfgInvRef').value=refList0(c.invRef);$('#cfgInvAud').value=refList0(c.invAud);
   const types=Object.assign({},c.stockSeen||{});(c.stockExcl||[]).forEach(t=>{if(!(t in types))types[t]=''});
   $('#cfgStock').innerHTML=Object.keys(types).sort().map(t=>`<label class="${(c.stockExcl||[]).includes(t)?'on':''}"><input type="checkbox" data-stk="${esc(t)}" ${(c.stockExcl||[]).includes(t)?'checked':''}><b>${esc(t)}</b> ${esc(types[t]||'')}</label>`).join('')||'<span class="hint">Se completa al cargar archivos.</span>';
   const ro=rosterIds(),us=Object.keys(Object.assign({},c.usersSeen||{})).concat([...ro]).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>(ro.has(b)-ro.has(a))||a.localeCompare(b));
@@ -1667,7 +1687,7 @@ $('#cfgSave').onclick=()=>{
   const lines=t=>t.split('\n').map(l=>l.split(';').map(s=>s.trim())).filter(p=>p[0]).map(p=>[p[0],p[1]||'']);
   c.personal=lines($('#cfgPers').value);c.mhe=lines($('#cfgMhe').value);
   c.to=$('#cfgTo').value.trim();c.cc=$('#cfgCc').value.trim();
-  c.origExcl=$('#cfgOrig').value.trim();c.physTypes=$('#cfgPhys').value.trim();c.procTypes=$('#cfgProc').value.trim();c.invRef=$('#cfgInvRef').value.trim()||DEF_CFG.invRef;
+  c.origExcl=$('#cfgOrig').value.trim();c.physTypes=$('#cfgPhys').value.trim();c.procTypes=$('#cfgProc').value.trim();c.invRef=$('#cfgInvRef').value.trim()||DEF_CFG.invRef;c.invAud=$('#cfgInvAud').value.trim();
   persist();toast('Configuración guardada');renderCfg();
 };
 function logoIn(id,key){$(id).onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{S.cfg[key]=r.result;persist();toast('Logo cargado')};r.readAsDataURL(f)}}
