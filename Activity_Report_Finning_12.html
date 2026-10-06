@@ -1337,6 +1337,7 @@ const MET={
   guard:{ic:'shelves',l:'Guardadas',o:()=>S.cfg.obj.guard,st:v=>geS(v,S.cfg.obj.guard),dir:1,agg:'sum'},
   bkinS:{ic:'inbox',l:'Backlog IN',o:()=>null,st:v=>dS(v==null?null:v/S.cfg.obj.guard),dir:-1,agg:'avg'},
   bkinDias:{ic:'inbox',l:'Backlog IN',u:' días',o:()=>null,st:dS,dir:-1,dec:1,agg:'avg'},
+  aud:{ic:'check',l:'Auditorías ubic.',o:()=>null,st:()=>'',dir:1,agg:'sum'},
   inv:{ic:'barcode',l:'Inventario (líneas)',o:()=>null,st:()=>'',dir:1,agg:'sum'},invUb:{ic:'barcode',l:'Ubicaciones contadas',o:()=>null,st:()=>'',dir:1,agg:'sum'},
   mov:{ic:'move',l:'Movimientos internos',o:()=>null,st:()=>'',dir:0,agg:'sum'},
   lph:{ic:'bolt',l:'Líneas por HC',o:()=>S.cfg.obj.lph,st:v=>geS(v,S.cfg.obj.lph),dir:1,dec:0,agg:'avg'},
@@ -1456,7 +1457,7 @@ function groupBars(labels,series,obj,o={}){
 function pageN2(){
   const c=S.cfg,mon=monday(F),wd=weekDays(mon),w1=addD(mon,-7),w2=addD(mon,-14),m=M(F)||{};
   let h=headN('La semana');
-  const rows=[['ctot'],['prep'],['ctrl'],['sal'],['bkPend'],['bkTot'],['bkDias'],null,['desco'],['zixd'],['guard'],['bkinS'],['bkinDias'],['mov'],['inv'],null,['lph'],['ausPct'],['bcTot']];
+  const rows=[['ctot'],['prep'],['ctrl'],['sal'],['bkPend'],['bkTot'],['bkDias'],null,['desco'],['zixd'],['guard'],['bkinS'],['bkinDias'],['mov'],['inv'],['aud'],null,['lph'],['ausPct'],['bcTot']];
   let t=`<table class="hm"><tr><th style="text-align:left">Métrica</th><th>S-2</th><th>S-1</th>${wd.map((f,i)=>`<th class="day ${f===F?'cur':''}" data-day="${f}" data-tip="${esc('Ver '+dlong(f))}">${DIA[i]}<br>${pd(f).getDate()}</th>`).join('')}<th>Semana</th></tr>`;
   rows.forEach(r=>{
     if(!r){t+='<tr class="sep"><td colspan="11"></td></tr>';return}
