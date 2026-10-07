@@ -13,6 +13,8 @@ lee los `.xlsx` de SAP con el descompresor que ya trae el navegador.
 2. **Fotostock**: trae solo las ubicaciones ocupadas. Es el que se actualiza en cada corte.
    La fecha se detecta del nombre del archivo (`FotoStock_2809` → 28/09) y se puede corregir.
 3. **Maestro valorizado** (opcional): agrega la familia de material. También queda guardado.
+4. **Diccionario de ubicaciones** (`Info_ubicaciones`, muy recomendable): traduce los códigos de SAP
+   y define qué ubicaciones son de tránsito. También queda guardado.
 
 Para actualizar alcanza con cargar el fotostock nuevo y guardar el corte. Se pueden
 seleccionar varios fotostock juntos para cargar historial de semanas anteriores.
@@ -26,8 +28,9 @@ seleccionar varios fotostock juntos para cargar historial de semanas anteriores.
   **clasificación ABC** y corte por familia de material.
 - **Consolidación**: materiales repartidos en varias posiciones, con el detalle de dónde está cada uno
   y cuántas posiciones se liberarían unificando.
-- **Tránsito**: ubicaciones que tienen stock pero no existen en el maestro. Se entra a cada una y se
-  ve su contenido con el valor de cada línea.
+- **Tránsito**: ubicaciones que tienen stock sin ser capacidad de almacenamiento. Se entra a cada una
+  y se ve su contenido con el valor de cada línea, y el valor agrupado según para qué se usa
+  (exportación a sucursal, pickeado pendiente de control, garantías, mermas, etc.).
 - **Calidad**: inconsistencias del maestro, bloqueos y antigüedad del stock.
 - **Detalle**: todas las posiciones, filtrables y exportables.
 - **Reporte**: filmina de una hoja apaisada con los indicadores principales.
@@ -37,9 +40,11 @@ seleccionar varios fotostock juntos para cargar historial de semanas anteriores.
 - **Ocupada**: está en el maestro y aparece en el fotostock. **Vacía**: está en el maestro
   y no aparece. Se cuentan posiciones distintas, nunca líneas, porque hay ubicaciones
   multiproducto.
-- **Virtual**: la ubicación trae stock pero no existe en el maestro. Son los tipos de
-  almacén de tránsito e interinos de SAP. Quedan fuera del porcentaje de ocupación porque
-  no tienen capacidad definida, y se informan aparte con su valor.
+- **Tránsito (virtual)**: la ubicación tiene stock pero no es capacidad de almacenamiento. Queda fuera
+  del porcentaje de ocupación y se informa aparte con su valor. Con el **diccionario** cargado, la
+  clasificación la define ese archivo, que es la fuente con autoridad; sin él, se deduce por ausencia
+  en el maestro, y eso deja contando como capacidad algunas ubicaciones que en realidad son playas de
+  exportación, back order o control de picking.
 - **Valor total**: es todo lo que está dentro del depósito, posiciones físicas más tránsito. La
   ocupación en cambio sólo puede medirse sobre lo físico, porque el tránsito no tiene capacidad
   definida contra la cual calcular un porcentaje. Sale de la columna `Total` del fotostock, que ya

@@ -130,6 +130,8 @@ main{max-width:1480px; margin:0 auto; padding:18px 16px 70px}
 .rejilla{display:grid; gap:16px; align-items:start}
 @media(min-width:900px){ .rejilla.c2{grid-template-columns:1fr 1fr} }
 @media(min-width:1100px){ .rejilla.c3{grid-template-columns:repeat(3,1fr)} }
+@media(min-width:900px){ .rejilla.c4{grid-template-columns:repeat(2,1fr)} }
+@media(min-width:1250px){ .rejilla.c4{grid-template-columns:repeat(4,1fr)} }
 
 /* ---------- Fichas de indicador ---------- */
 .fichas{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
@@ -439,7 +441,7 @@ textarea{min-height:68px; resize:vertical; width:100%}
     </div>
   </div>
 
-  <div class="rejilla c3">
+  <div class="rejilla c4">
     <div class="tarjeta">
       <header>
         <h2>1 · Maestro de ubicaciones</h2>
@@ -479,6 +481,21 @@ textarea{min-height:68px; resize:vertical; width:100%}
         <button class="btn sec" data-abre="archValor">Elegir archivo</button>
         <input type="file" id="archValor" class="oculto-archivo" accept=".xlsx,.xlsm">
         <div class="estado" id="estValor"></div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <header>
+        <h2>4 · Diccionario de ubicaciones</h2>
+        <p>Info_ubicaciones. Traduce los códigos de SAP y define qué ubicaciones son
+           de tránsito. Muy recomendable: corrige la clasificación. Es estático.</p>
+      </header>
+      <div class="soltar" id="soltarDicc">
+        <h3>Arrastre el archivo acá</h3>
+        <p>o elija uno (.xlsx)</p>
+        <button class="btn sec" data-abre="archDicc">Elegir archivo</button>
+        <input type="file" id="archDicc" class="oculto-archivo" accept=".xlsx,.xlsm">
+        <div class="estado" id="estDicc"></div>
       </div>
     </div>
   </div>
@@ -735,6 +752,14 @@ textarea{min-height:68px; resize:vertical; width:100%}
           <p>Según la fecha de entrada. Lo viejo en tránsito suele ser stock trabado.</p></header>
         <div id="grafTranAntig"></div>
       </div>
+    </div>
+
+    <div class="tarjeta" id="cajaProp">
+      <header><h2>Para qué se usa el stock en tránsito</h2>
+        <p>Valor agrupado según el destino de cada ubicación, tomado del diccionario.
+           Es la vista que dice si lo que está fuera de posición es trabajo en curso o stock trabado.</p></header>
+      <div id="grafTranProp"></div>
+      <div id="tablaTranProp" style="margin-top:12px"></div>
     </div>
 
     <div class="tarjeta">
@@ -1181,7 +1206,8 @@ const E = {
   maestro: null,       // Map ubi -> {t,a,p,n,tu,fv,be,bs}
   totales: null,       // {tipo:Map, area:Map, pasillo:Map, nivel:Map}
   valorizado: null,    // Map material -> {desc,fam,precio}
-  nomMaestro: '', nomValor: '', nomFoto: '',
+  dicc: null,          // {tipos:Map, ubis:Map} traduccion de codigos de SAP
+  nomMaestro: '', nomValor: '', nomFoto: '', nomDicc: '',
   fotoLineas: null,    // líneas del fotostock en memoria (para detalle y exportes)
   fechaFoto: '',
   corte: null,         // agregado del corte actual
@@ -1311,6 +1337,66 @@ function clavMat(s) {
   return m.replace(/^0+(?=\d)/, '');
 }
 
+
+/* ---------------------------- DICCIONARIO ----------------------------
+   Info_ubicaciones: traduce los códigos de SAP. Trae, por un lado, qué es cada
+   tipo de almacén (Stock, Back Order, Bahía de Guardado) y si es mono o
+   multiproducto; por otro, el catálogo de ubicaciones con su clase (física o
+   virtual) y para qué se usa cada una.
+
+   Es la fuente con autoridad para decidir qué es virtual. Hasta ahora la app lo
+   deducía por ausencia en el maestro, y eso dejaba afuera las ubicaciones que
+   están en el maestro pero operativamente son de tránsito (playas de
+   exportación, back order, control). Con el diccionario cargado esas pasan a
+   tránsito y dejan de contar como posiciones de almacenamiento.
+
+   El archivo no trae encabezados en todas las columnas, así que se lee por
+   posición: código, clase, comentario, empresa, mono/multiproducto. */
+async function cargarDiccionario(buf, nombre) {
+  const lib = await XLSX.abrir(buf);
+  const tipos = new Map(), ubis = new Map();
+  let descartadas = 0;
+
+  await lib.recorrer(lib.hojas[0], (c, n) => {
+    const g = i => String(c[i] ?? '').trim();
+    const cod = g(0), clase = norm(g(1));
+    // La primera fila es encabezado: no trae código y rotula "Comentario".
+    if (n === 1 && (!cod || norm(g(2)).startsWith('comentario'))) return;
+    if (!cod) { descartadas++; return; }
+    const reg = { com: g(2), emp: g(3), mm: g(4) };
+    if (clase.startsWith('tipodealmacen')) tipos.set(cod, reg);
+    else if (clase) ubis.set(cod, { ...reg, virtual: clase.startsWith('ubicacionvirtual') });
+    else descartadas++;
+  });
+
+  if (!tipos.size && !ubis.size) {
+    throw new Error('El diccionario no tiene filas reconocibles. Se esperan las columnas: '
+      + 'código, clase (Tipo de Almacen / Ubicación Virtual / Ubicación Fisica), comentario, empresa y mono/multiproducto.');
+  }
+  E.dicc = { tipos, ubis };
+  E.nomDicc = nombre;
+  guardarBases();
+  return {
+    tipos: tipos.size,
+    ubis: ubis.size,
+    virtuales: [...ubis.values()].filter(u => u.virtual).length,
+    descartadas
+  };
+}
+
+// Rótulo de un tipo de almacén: "0210 · Back Order (BO)" si el diccionario lo
+// describe, o el código solo si no está cargado.
+function rotTipo(t) {
+  const d = E.dicc && E.dicc.tipos.get(t);
+  return d && d.com ? `${t} · ${d.com}` : t;
+}
+// Para qué se usa una ubicación, según el diccionario.
+function propUbi(u) {
+  const d = E.dicc && E.dicc.ubis.get(u);
+  if (!d) return '';
+  return d.com || '';
+}
+
 /* ----------------------------- FOTOSTOCK ----------------------------- */
 async function cargarFotostock(buf, nombre) {
   if (!E.maestro) throw new Error('Cargue primero el maestro de ubicaciones: sin él no se puede saber cuáles están vacías.');
@@ -1382,8 +1468,24 @@ function armarISO(d, m, a) {
 
 /* =========================== CÁLCULO DEL CORTE =========================== */
 function calcularCorte(fecha) {
-  const mae = E.maestro, lin = E.fotoLineas, val = E.valorizado;
-  if (!mae || !lin) return null;
+  const maeTodo = E.maestro, lin = E.fotoLineas, val = E.valorizado;
+  if (!maeTodo || !lin) return null;
+
+  // El diccionario manda sobre qué es tránsito. Una ubicación puede estar en el
+  // maestro y aun así ser operativamente virtual (playa de exportación, back
+  // order, control de picking). Esas se sacan del universo de posiciones de
+  // almacenamiento: no son capacidad, y contarlas desvirtúa la ocupación y
+  // ensucia el ranking de ubicaciones más caras.
+  const reclas = new Set();
+  if (E.dicc) {
+    for (const u of maeTodo.keys()) {
+      const d = E.dicc.ubis.get(u);
+      if (d && d.virtual) reclas.add(u);
+    }
+  }
+  const mae = reclas.size
+    ? new Map([...maeTodo].filter(([u]) => !reclas.has(u)))
+    : maeTodo;
 
   // --- agregación por ubicación
   const porUbi = new Map();        // ubi -> {lin,ctd,val,mats:Set,femMin,ts}
@@ -1629,7 +1731,25 @@ function calcularCorte(fecha) {
     },
     vd: {
       ubis: virDet.length, antig: bandasVir.map(b => ({ b: b.b, lin: b.lin, val: b.val })),
-      mats: new Set([].concat(...virDet.map(v => v.lineas.map(l => l.mat)))).size
+      mats: new Set([].concat(...virDet.map(v => v.lineas.map(l => l.mat)))).size,
+      reclas: reclas.size,
+      // ubicaciones con stock que el diccionario no cataloga
+      sinCatalogo: E.dicc ? virDet.filter(v => !E.dicc.ubis.has(v.ubi)).length : 0,
+      // catalogadas como virtuales pero sin stock en este corte
+      catalogoVacio: E.dicc
+        ? [...E.dicc.ubis.entries()].filter(([u, d]) => d.virtual && !porUbi.has(u)).length : 0,
+      // valor agrupado por para qué sirve la ubicación
+      porProp: (() => {
+        if (!E.dicc) return [];
+        const acc = new Map();
+        for (const v of virDet) {
+          const d = E.dicc.ubis.get(v.ubi);
+          const k = d ? (d.com || '(sin descripción en el diccionario)') : '(no está en el diccionario)';
+          const a = acc.get(k) || { prop: k, ubis: 0, lin: 0, val: 0 };
+          a.ubis++; a.lin += v.lin; a.val += v.val; acc.set(k, a);
+        }
+        return [...acc.values()].sort((a, b) => b.val - a.val);
+      })()
     },
     cal: {
       incOcuVac, incVacOcu, bloqTot, bloqOcu, sinCosto, sinFecha,
@@ -1638,6 +1758,8 @@ function calcularCorte(fecha) {
       tipoStock: [...porTS.entries()].map(([k, v]) => ({ k, lin: v.lin, val: v.val })).sort((a, b) => b.val - a.val)
     },
     // detalle no persistido (se recalcula al cargar el fotostock)
+    _maeFis: mae,
+    _reclas: [...reclas],
     _cons: listaCons,
     _virDet: virDet,
     _clase: claseDe,
@@ -1649,7 +1771,7 @@ function calcularCorte(fecha) {
 
 /* --- Una fila por ubicación, para la pestaña Detalle y los exportes --- */
 function armarDetalle(corte) {
-  const mae = E.maestro, porUbi = corte._porUbi;
+  const mae = corte._maeFis || E.maestro, porUbi = corte._porUbi;
   const filas = [];
   for (const [u, r] of mae) {
     const o = porUbi.get(u);
@@ -1716,9 +1838,13 @@ function guardarCorteEnHistorial(corte) {
 function guardarBases() {
   try {
     const paq = {
-      nomMaestro: E.nomMaestro, nomValor: E.nomValor,
+      nomMaestro: E.nomMaestro, nomValor: E.nomValor, nomDicc: E.nomDicc,
       maestro: E.maestro ? [...E.maestro.entries()].map(([u, r]) => [u, r.t, r.a, r.p, r.n, r.tu, (r.fv ? 1 : 0) | (r.be ? 2 : 0) | (r.bs ? 4 : 0)]) : null,
-      valorizado: E.valorizado ? [...E.valorizado.entries()].map(([m, v]) => [m, v.desc, v.fam, v.precio]) : null
+      valorizado: E.valorizado ? [...E.valorizado.entries()].map(([m, v]) => [m, v.desc, v.fam, v.precio]) : null,
+      dicc: E.dicc ? {
+        tipos: [...E.dicc.tipos.entries()].map(([k, v]) => [k, v.com, v.emp, v.mm]),
+        ubis: [...E.dicc.ubis.entries()].map(([k, v]) => [k, v.com, v.emp, v.mm, v.virtual ? 1 : 0])
+      } : null
     };
     localStorage.setItem(CLAVE_BASES, JSON.stringify(paq));
     return true;
@@ -1745,6 +1871,12 @@ function restaurarBases() {
       const v = new Map();
       for (const [m, desc, fam, precio] of p.valorizado) v.set(m, { desc, fam, precio });
       E.valorizado = v; E.nomValor = p.nomValor || '(guardado)';
+    }
+    if (p.dicc) {
+      const t = new Map(), u = new Map();
+      for (const [k, com, emp, mm] of (p.dicc.tipos || [])) t.set(k, { com, emp, mm });
+      for (const [k, com, emp, mm, vi] of (p.dicc.ubis || [])) u.set(k, { com, emp, mm, virtual: !!vi });
+      E.dicc = { tipos: t, ubis: u }; E.nomDicc = p.nomDicc || '(guardado)';
     }
     return true;
   } catch (e) { return false; }
@@ -2234,6 +2366,26 @@ conectarSoltar('soltarValor', 'archValor', async fs => {
   } catch (e) { estado('#estValor', 'mal', '✗ ' + U.esc(e.message)); }
 });
 
+conectarSoltar('soltarDicc', 'archDicc', async fs => {
+  if (!fs.length) return estado('#estDicc', 'mal', 'Ese archivo no es un .xlsx.');
+  const f = fs[0];
+  estado('#estDicc', 'trab', `Leyendo ${U.esc(f.name)}…`);
+  try {
+    const r = await cargarDiccionario(await leerArchivo(f), f.name);
+    let msg = `✓ ${U.pl(r.tipos, 'tipo de almacén', 'tipos de almacén')} y `
+      + `${U.pl(r.ubis, 'ubicación catalogada', 'ubicaciones catalogadas')} (${U.ent(r.virtuales)} virtuales).`;
+    if (E.maestro) {
+      const recl = [...E.maestro.keys()].filter(u => { const d = E.dicc.ubis.get(u); return d && d.virtual; }).length;
+      if (recl) msg += ` <b>Reclasifiqué ${U.pl(recl, 'ubicación', 'ubicaciones')}</b> que estaban en el maestro `
+        + `pero el diccionario declara de tránsito: dejan de contar como posiciones de almacenamiento.`;
+    }
+    estado('#estDicc', 'ok', msg);
+    if (E.fotoLineas) recalcular();
+    llenarSelectores();
+    repintarTodo();
+  } catch (e) { estado('#estDicc', 'mal', '✗ ' + U.esc(e.message)); }
+});
+
 conectarSoltar('soltarFoto', 'archFoto', async fs => {
   if (!fs.length) return estado('#estFoto', 'mal', 'Ese archivo no es un .xlsx.');
   if (!E.maestro) return estado('#estFoto', 'mal', '✗ Cargue primero el maestro de ubicaciones: sin él no se sabe cuáles están vacías.');
@@ -2302,9 +2454,13 @@ $('#btnExportHist').addEventListener('click', () => {
     app: 'ocupacion-almacen', version: 2, generado: new Date().toISOString(),
     historial: E.historial,
     bases: {
-      nomMaestro: E.nomMaestro, nomValor: E.nomValor,
+      nomMaestro: E.nomMaestro, nomValor: E.nomValor, nomDicc: E.nomDicc,
       maestro: E.maestro ? [...E.maestro.entries()].map(([u, r]) => [u, r.t, r.a, r.p, r.n, r.tu, (r.fv ? 1 : 0) | (r.be ? 2 : 0) | (r.bs ? 4 : 0)]) : null,
-      valorizado: E.valorizado ? [...E.valorizado.entries()].map(([m, v]) => [m, v.desc, v.fam, v.precio]) : null
+      valorizado: E.valorizado ? [...E.valorizado.entries()].map(([m, v]) => [m, v.desc, v.fam, v.precio]) : null,
+      dicc: E.dicc ? {
+        tipos: [...E.dicc.tipos.entries()].map(([k, v]) => [k, v.com, v.emp, v.mm]),
+        ubis: [...E.dicc.ubis.entries()].map(([k, v]) => [k, v.com, v.emp, v.mm, v.virtual ? 1 : 0])
+      } : null
     }
   };
   U.bajar(`respaldo_ocupacion_${U.hoyISO()}.json`, JSON.stringify(paq), 'application/json');
@@ -2577,7 +2733,7 @@ function pintarResumen() {
 
   G.barrasH($('#grafDim'), dd.map(d => ({
     k: d.k, v: d.pct, color: colorSem(SEM.ocupacion(d.pct).n),
-    globo: `<b>${U.esc(d.k)}</b><table>
+    globo: `<b>${U.esc(nd === 'tipo' ? rotTipo(d.k) : d.k)}</b><table>
       <tr><td>Ocupación</td><td>${U.pct(d.pct)}</td></tr>
       <tr><td>Ocupadas</td><td>${U.ent(d.ocu)}</td></tr>
       <tr><td>Vacías</td><td>${U.ent(d.vac)}</td></tr>
@@ -2591,7 +2747,12 @@ function pintarResumen() {
     <span><i style="background:var(--critico)"></i>Sin lugar, 95% o más</span></div>`);
 
   tabla($('#tablaDim'), [
-    { n: rot === 'tipo de almacén' ? 'Tipo' : rot.split(' ')[0], v: f => f.k, h: f => `<b>${U.esc(f.k)}</b>` },
+    {
+      n: rot === 'tipo de almacén' ? 'Tipo' : rot.split(' ')[0], v: f => f.k,
+      h: f => nd === 'tipo' && E.dicc && E.dicc.tipos.get(f.k) && E.dicc.tipos.get(f.k).com
+        ? `<b>${U.esc(f.k)}</b> <span class="chip">${U.esc(E.dicc.tipos.get(f.k).com)}</span>`
+        : `<b>${U.esc(f.k)}</b>`
+    },
     {
       n: 'Ocupación', num: true, v: f => f.pct,
       h: f => `<div class="barra-celda"><i style="width:${Math.min(100, f.pct).toFixed(0)}%"></i><span>${U.pct(f.pct)}</span></div>`
@@ -2614,7 +2775,7 @@ function pintarResumen() {
   });
 
   tabla($('#tablaVirt'), [
-    { n: 'Tipo de almacén', v: f => f.tipo, h: f => `<b>${U.esc(f.tipo)}</b> <span class="chip v">virtual</span>` },
+    { n: 'Tipo de almacén', v: f => f.tipo, h: f => `<b>${U.esc(rotTipo(f.tipo))}</b> <span class="chip v">tránsito</span>` },
     { n: 'Ubicaciones', num: true, v: f => f.ubis, h: f => U.ent(f.ubis) },
     { n: 'Líneas', num: true, v: f => f.lin, h: f => U.ent(f.lin) },
     { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) },
@@ -2719,7 +2880,7 @@ function pintarValor() {
   const porTipo = c.dims.tipo.slice().sort((a, b) => b.val - a.val).slice(0, 12);
   G.barrasH($('#grafValorTipo'), porTipo.map(d => ({
     k: d.k, v: d.val,
-    globo: `<b>Tipo ${U.esc(d.k)}</b><table>
+    globo: `<b>${U.esc(rotTipo(d.k))}</b><table>
       <tr><td>Valor</td><td>${U.usdExacto(d.val)}</td></tr>
       <tr><td>Ocupadas</td><td>${U.ent(d.ocu)}</td></tr>
       <tr><td>Valor por posición</td><td>${U.usd(d.ocu ? d.val / d.ocu : 0)}</td></tr></table>`
@@ -2895,7 +3056,7 @@ function pintarConsolidacion() {
 
   G.barrasH($('#grafConsolTipo'), k.porTipo.slice(0, 12).map(d => ({
     k: d.t, v: d.ahorro,
-    globo: `<b>Tipo ${U.esc(d.t)}</b><table>
+    globo: `<b>${U.esc(rotTipo(d.t))}</b><table>
       <tr><td>Posiciones liberables</td><td>${U.ent(d.ahorro)}</td></tr>
       <tr><td>Materiales repetidos</td><td>${U.ent(d.mats)}</td></tr></table>`
   })), { fmt: v => U.ent(v), mIzq: 78, aria: 'Posiciones liberables por tipo de almacén' });
@@ -2931,7 +3092,8 @@ function verMaterial(mat, silencioso) {
   const c = E.corte;
   const reg = c._cons.find(x => x.mat === mat);
   if (!reg) return;
-  const lineas = E.fotoLineas.filter(l => l.m === mat && E.maestro.has(l.u));
+  const maeFis = E.corte._maeFis || E.maestro;
+  const lineas = E.fotoLineas.filter(l => l.m === mat && maeFis.has(l.u));
   const porUbi = new Map();
   for (const l of lineas) {
     const a = porUbi.get(l.u) || { ubi: l.u, ctd: 0, val: 0, lin: 0, fem: l.f };
@@ -2940,7 +3102,7 @@ function verMaterial(mat, silencioso) {
     porUbi.set(l.u, a);
   }
   const filas = [...porUbi.values()].map(a => {
-    const r = E.maestro.get(a.ubi);
+    const r = maeFis.get(a.ubi);
     return { ...a, tipo: r.t, area: r.a, pas: r.p, niv: r.n };
   }).sort((x, y) => y.ctd - x.ctd);
 
@@ -3015,11 +3177,32 @@ function pintarTransito() {
       <div class="rot">Trabado hace más de 1 año</div>
       <div class="val">${U.usd(viejoVir)}</div>
       <div class="pie">${U.pct(c.vir.val ? viejoVir / c.vir.val * 100 : 0)} del valor en tránsito</div>
-    </div>`;
+    </div>
+    ${E.dicc ? `
+    <div class="ficha borde${c.vd && c.vd.reclas ? 2 : 1}">
+      <div class="rot">Reclasificadas por el diccionario</div>
+      <div class="val">${U.ent(c.vd ? c.vd.reclas : 0)}</div>
+      <div class="pie">estaban en el maestro pero son de tránsito: ya no cuentan como capacidad</div>
+    </div>
+    <div class="ficha borde${c.vd && c.vd.sinCatalogo ? 3 : 1}">
+      <div class="rot">Con stock y sin catalogar</div>
+      <div class="val">${U.ent(c.vd ? c.vd.sinCatalogo : 0)}</div>
+      <div class="pie">tienen mercadería pero no figuran en el diccionario</div>
+    </div>
+    <div class="ficha">
+      <div class="rot">Catalogadas sin stock</div>
+      <div class="val">${U.ent(c.vd ? c.vd.catalogoVacio : 0)}</div>
+      <div class="pie">existen en el diccionario y hoy están vacías</div>
+    </div>` : `
+    <div class="ficha">
+      <div class="rot">Diccionario de ubicaciones</div>
+      <div class="val" style="font-size:18px">Sin cargar</div>
+      <div class="pie">cárguelo en <b>Datos</b> y acá aparece para qué sirve cada ubicación</div>
+    </div>`}`;
 
   G.barrasH($('#grafTranTipo'), c.vir.tipos.map(t => ({
     k: t.tipo, v: t.val,
-    globo: `<b>Tipo ${U.esc(t.tipo)}</b><table>
+    globo: `<b>${U.esc(rotTipo(t.tipo))}</b><table>
       <tr><td>Valor</td><td>${U.usdExacto(t.val)}</td></tr>
       <tr><td>Ubicaciones</td><td>${U.ent(t.ubis)}</td></tr>
       <tr><td>Líneas</td><td>${U.ent(t.lin)}</td></tr></table>`
@@ -3032,15 +3215,51 @@ function pintarTransito() {
       <tr><td>Líneas</td><td>${U.ent(b.lin)}</td></tr></table>`
   })), { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 108, aria: 'Antigüedad del stock en tránsito' });
 
+  // valor por destino de la ubicación
+  const prop = (c.vd && c.vd.porProp) || [];
+  $('#cajaProp').hidden = !prop.length;
+  if (prop.length) {
+    const corto = p => p.length > 42 ? p.slice(0, 40) + '…' : p;
+    G.barrasH($('#grafTranProp'), prop.slice(0, 12).map(d => ({
+      k: corto(d.prop), v: d.val,
+      globo: `<b>${U.esc(d.prop)}</b><table>
+        <tr><td>Valor</td><td>${U.usdExacto(d.val)}</td></tr>
+        <tr><td>Ubicaciones</td><td>${U.ent(d.ubis)}</td></tr>
+        <tr><td>Líneas</td><td>${U.ent(d.lin)}</td></tr></table>`
+    })), { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 230, aria: 'Valor en tránsito según el destino de la ubicación' });
+
+    tabla($('#tablaTranProp'), [
+      { n: 'Para qué se usa', v: f => f.prop, h: f => `<b>${U.esc(f.prop)}</b>` },
+      { n: 'Ubicaciones', num: true, v: f => f.ubis, h: f => U.ent(f.ubis) },
+      { n: 'Líneas', num: true, v: f => f.lin, h: f => U.ent(f.lin) },
+      { n: 'Valor', num: true, v: f => f.val, h: f => U.usdExacto(f.val) },
+      {
+        n: 'Participación', num: true, v: f => f.val,
+        h: f => `<div class="barra-celda"><i style="width:${(c.vir.val ? f.val / c.vir.val * 100 : 0).toFixed(0)}%"></i><span>${U.pct(c.vir.val ? f.val / c.vir.val * 100 : 0)}</span></div>`
+      }
+    ], prop, {
+      ordenar: 3, dir: -1,
+      pie: [{ h: 'Total' }, { h: U.ent(prop.reduce((s, x) => s + x.ubis, 0)), num: true },
+      { h: U.ent(prop.reduce((s, x) => s + x.lin, 0)), num: true },
+      { h: U.usdExacto(c.vir.val), num: true }, { h: '' }]
+    });
+  }
+
   const t = $('#selTranTipo').value;
   const ubis = c._virDet.filter(v => !t || v.tipo === t);
-  $('#tarjetasTran').innerHTML = ubis.map(v => `
+  $('#tarjetasTran').innerHTML = ubis.map(v => {
+    const pr = propUbi(v.ubi);
+    const enMaestro = E.maestro && E.maestro.has(v.ubi);
+    return `
     <button class="tv" data-ubi="${U.esc(v.ubi)}" aria-pressed="${v.ubi === ubiTranElegida}">
       <div class="u">${U.esc(v.ubi)}</div>
-      <div class="m">tipo ${U.esc(v.tipo)} · ${U.pl(v.lin, 'línea', 'líneas')} · ${U.pl(v.mats, 'material', 'materiales')}</div>
+      ${pr ? `<div class="m" style="color:var(--s1);font-weight:600">${U.esc(pr)}</div>` : ''}
+      <div class="m">${U.esc(rotTipo(v.tipo))} · ${U.pl(v.lin, 'línea', 'líneas')} · ${U.pl(v.mats, 'material', 'materiales')}</div>
       <div class="v">${U.usd(v.val)}</div>
-      <div class="m">entrada más vieja: ${U.fecha(v.fem)}</div>
-    </button>`).join('') || `<div class="vacio-graf">No hay ubicaciones transitorias con ese filtro.</div>`;
+      <div class="m">entrada más vieja: ${U.fecha(v.fem)}
+        ${enMaestro ? '· <span class="chip v">reclasificada</span>' : ''}</div>
+    </button>`;
+  }).join('') || `<div class="vacio-graf">No hay ubicaciones transitorias con ese filtro.</div>`;
   $('#tarjetasTran').querySelectorAll('[data-ubi]').forEach(b =>
     b.addEventListener('click', () => verUbicacionVirtual(b.dataset.ubi)));
   if (ubiTranElegida) verUbicacionVirtual(ubiTranElegida, true);
@@ -3054,8 +3273,12 @@ function verUbicacionVirtual(ubi, silencioso) {
     b.setAttribute('aria-pressed', String(b.dataset.ubi === ubi)));
   $('#cajaTranDet').hidden = false;
   $('#tituloTranDet').innerHTML = `Contenido de ${U.esc(ubi)}`;
-  $('#subTranDet').innerHTML = `Tipo de almacén ${U.esc(v.tipo)} · ${U.pl(v.lin, 'línea', 'líneas')} · `
-    + `${U.pl(v.mats, 'material distinto', 'materiales distintos')} · <b>${U.usdExacto(v.val)}</b>`;
+  const pr = propUbi(ubi);
+  $('#subTranDet').innerHTML = (pr ? `<b style="color:var(--s1)">${U.esc(pr)}</b><br>` : '')
+    + `Tipo de almacén ${U.esc(rotTipo(v.tipo))} · ${U.pl(v.lin, 'línea', 'líneas')} · `
+    + `${U.pl(v.mats, 'material distinto', 'materiales distintos')} · <b>${U.usdExacto(v.val)}</b>`
+    + (E.maestro && E.maestro.has(ubi)
+      ? ` · <span class="chip v">reclasificada: está en el maestro pero el diccionario la declara de tránsito</span>` : '');
   tabla($('#tablaTranDet'), [
     { n: 'Material', v: f => f.mat, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.mat)}</b>` },
     { n: 'Descripción', v: f => f.desc, h: f => `<span title="${U.esc(f.desc)}">${U.esc((f.desc || '').slice(0, 36))}</span>` },
@@ -3115,11 +3338,28 @@ function pintarCalidad() {
     SAP puede estar ofreciéndolas para almacenar cuando en realidad hay mercadería.
     La lista completa está abajo y se puede exportar.</div></div>`);
   if (c.vir.ubis) av.push(`<div class="aviso alerta"><span class="ic">▲</span><div>
-    <b>${U.pl(c.vir.ubis,'ubicación con stock no existe','ubicaciones con stock no existen')} en el maestro</b>
-    (${U.usdExacto(c.vir.val)}). Son tipos de almacén de tránsito o interinos
-    (${U.esc(c.vir.tipos.slice(0, 5).map(t => t.tipo).join(', '))}${c.vir.tipos.length > 5 ? '…' : ''}).
-    Quedan fuera del cálculo de ocupación porque no tienen capacidad definida. Si alguna debería
-    ser física, falta en el maestro.</div></div>`);
+    <b>${U.pl(c.vir.ubis, 'ubicación de tránsito tiene', 'ubicaciones de tránsito tienen')} stock</b>
+    (${U.usdExacto(c.vir.val)}), en tipos de almacén como
+    ${U.esc(c.vir.tipos.slice(0, 5).map(t => t.tipo).join(', '))}${c.vir.tipos.length > 5 ? '…' : ''}.
+    Quedan fuera del cálculo de ocupación porque no son capacidad de almacenamiento, pero el valor
+    sí se cuenta en el total del depósito.${E.dicc ? '' : ' Sin el diccionario cargado se detectan sólo por ausencia en el maestro, y eso deja contando como capacidad algunas que no lo son.'}</div></div>`);
+  if (E.dicc && c.vd && c.vd.sinCatalogo) {
+    const una = c.vd.sinCatalogo === 1;
+    av.push(`<div class="aviso alerta"><span class="ic">&#9650;</span><div>
+      <b>${U.pl(c.vd.sinCatalogo, 'ubicación tiene', 'ubicaciones tienen')} stock y no ${una ? 'figura' : 'figuran'} en el diccionario.</b>
+      No se sabe para qué ${una ? 'se usa ni quién la controla' : 'se usan ni quién las controla'}.
+      ${una ? 'Conviene darla' : 'Conviene darlas'} de alta en Info_ubicaciones,
+      o ${una ? 'darla' : 'darlas'} de baja en SAP si ya no se ${una ? 'usa' : 'usan'}.
+      ${una ? 'Está listada' : 'Están listadas'} en la pestaña <b>Tránsito</b>.</div></div>`);
+  }
+  if (E.dicc && c.vd && c.vd.reclas) av.push(`<div class="aviso info"><span class="ic">i</span><div>
+    <b>${U.pl(c.vd.reclas, 'ubicación del maestro fue reclasificada', 'ubicaciones del maestro fueron reclasificadas')} como de tránsito</b>
+    según el diccionario. Dejaron de contar como capacidad de almacenamiento, así que la ocupación
+    y el ranking de ubicaciones más caras no las incluyen.</div></div>`);
+  if (!E.dicc) av.push(`<div class="aviso info"><span class="ic">i</span><div>
+    <b>Falta el diccionario de ubicaciones.</b> Sin él, la app deduce qué es tránsito por ausencia en el
+    maestro, y eso deja contando como capacidad algunas ubicaciones que en realidad son playas de
+    exportación, back order o control. Cárguelo en <b>Datos</b>.</div></div>`);
   const vieja = q.antig[q.antig.length - 1];
   if (vieja && vieja.lin) av.push(`<div class="aviso alerta"><span class="ic">▲</span><div>
     <b>${U.pl(vieja.lin,'línea tiene','líneas tienen')} más de 2 años sin movimiento de entrada</b>
@@ -3449,6 +3689,10 @@ function pintarReporte() {
   }
   if (hubo && E.valorizado) {
     estado('#estValor', 'ok', `✓ ${U.ent(E.valorizado.size)} materiales guardados de la sesión anterior.`);
+  }
+  if (hubo && E.dicc) {
+    estado('#estDicc', 'ok', `✓ ${U.pl(E.dicc.ubis.size, 'ubicación catalogada', 'ubicaciones catalogadas')} `
+      + `y ${U.pl(E.dicc.tipos.size, 'tipo de almacén', 'tipos de almacén')} guardados de la sesión anterior.`);
   }
   if (E.historial.length) {
     estado('#estHist', 'trab', `${U.pl(E.historial.length,'corte','cortes')} en el historial, del ${U.fecha(E.historial[0].fecha)} al ${U.fecha(E.historial[E.historial.length - 1].fecha)}.`);
