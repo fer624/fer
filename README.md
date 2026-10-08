@@ -82,7 +82,9 @@ servidor. **Descargar respaldo** genera un archivo para mudarlo a otra máquina.
 
 ### Reporte
 
-La pestaña **Reporte** arma una filmina de una hoja apaisada con los indicadores principales.
+La pestaña **Reporte** arma una filmina de una hoja apaisada que sigue los mismos criterios que la
+pantalla: el titular es la saturación monoproducto, hay un bloque con mono, multi y total que cierra,
+y tránsito y virtual van separados. Las barras van en azul marino con una marca al 90%, sin semáforo.
 **Exportar PDF** abre el diálogo de impresión: elegir *Guardar como PDF*, horizontal, A4.
 
 > Nota: este repositorio publica a GitHub Pages al integrar en `main`. El archivo no contiene datos

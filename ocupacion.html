@@ -3047,37 +3047,57 @@ function pintarReporte() {
   const v = vista();
   Object.assign(F, guard);
 
-  const sm = SEM.ocupacion(v.f.pct);
-  const porTipo = agrupar(v.fis, 'tipo').sort((a, b) => b.pct - a.pct);
-  const porPas = agrupar(v.fis, 'pas').sort((a, b) => b.pct - a.pct);
+  const sm = SEM.ocupacion(v.mono_.pct);
   const s = serie('sem');
   const emp = ($('#repEmp').value || '').trim(), aut = ($('#repAut').value || '').trim(), nota = ($('#repNota').value || '').trim();
 
-  const kpi = (r, val, det, n) => `<div class="c" ${n ? `style="box-shadow:inset 3px 0 0 ${colorSem(n)}"` : ''}>
-    <div class="r">${r}</div><div class="v">${val}</div><div class="d">${det}</div></div>`;
-  const fila = d => {
-    const z = SEM.ocupacion(d.pct);
-    return `<div class="fil-fil"><span class="e">${U.esc(d.k)}</span>
-      <span class="p"><i style="width:${Math.min(100, d.pct).toFixed(0)}%;background:${colorSem(z.n)}"></i></span>
-      <span class="n">${U.dec(d.pct, 0)}%</span>
-      <span class="n" style="width:60px;color:var(--tinta-2)">${U.ent(d.vac)} lib</span></div>`;
-  };
+  const kpi = (r, val, det) => `<div class="c"><div class="r">${r}</div><div class="v">${val}</div><div class="d">${det}</div></div>`;
+
+  // Barra sobria en azul marino. En las de monoproducto va una marca fina al
+  // 90%, que es lo que reemplaza al semáforo.
+  const fila = (d, op = {}) => `<div class="fil-fil">
+    <span class="e">${U.esc(d.k)}</span>
+    <span class="p"><i style="width:${Math.min(100, d.pct).toFixed(0)}%;background:${op.color || 'var(--barra)'}"></i>
+      ${op.umbral ? '<span style="position:absolute;left:90%;top:0;bottom:0;width:1.5px;background:var(--tinta-3)"></span>' : ''}</span>
+    <span class="n">${U.dec(d.pct, 0)}%</span>
+    <span class="n" style="width:58px;color:var(--tinta-2)">${op.der ? op.der(d) : U.ent(d.vac) + ' lib'}</span></div>`;
+
   let mini = '<div style="font-size:11px;color:var(--tinta-3);padding:6px 0">Sin historial todavía.</div>';
   if (s.length > 1) {
     const vals = s.map(x => x.pct), mn = Math.min(...vals), mx = Math.max(...vals), rg = (mx - mn) || 1;
-    const W = 230, H = 58;
+    const W = 230, H = 52;
     const px = i => (i / (s.length - 1)) * W, py = x => H - ((x - mn) / rg) * (H - 12) - 6;
     const pts = s.map((d, i) => `${px(i).toFixed(1)} ${py(d.pct).toFixed(1)}`);
     mini = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible">
-      <path d="M0 ${H} L${pts.join(' L')} L${W} ${H}Z" fill="var(--s1)" opacity=".10"/>
-      <path d="M${pts.join(' L')}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M0 ${H} L${pts.join(' L')} L${W} ${H}Z" fill="var(--barra)" opacity=".10"/>
+      <path d="M${pts.join(' L')}" fill="none" stroke="var(--barra)" stroke-width="2" stroke-linejoin="round"/>
       <circle cx="${px(s.length - 1).toFixed(1)}" cy="${py(vals[vals.length - 1]).toFixed(1)}" r="3.5"
-        fill="var(--s1)" stroke="var(--sup)" stroke-width="2"/></svg>
+        fill="var(--barra)" stroke="var(--sup)" stroke-width="2"/></svg>
       <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--tinta-3)">
         <span>${U.esc(s[0].et)}</span><span>${U.esc(s[s.length - 1].et)}</span></div>
-      <div style="font-size:11px;color:var(--tinta-2);margin-top:5px">De ${U.pct(vals[0])} a
+      <div style="font-size:11px;color:var(--tinta-2);margin-top:4px">De ${U.pct(vals[0])} a
         <b style="color:var(--tinta)">${U.pct(vals[vals.length - 1])}</b> en ${U.pl(s.length, 'período', 'períodos')}.</div>`;
   }
+
+  const porTipo = agrupar(v.fis, 'tipo');
+  const mono = porTipo.filter(d => esMono(d.k)).sort((a, b) => b.pct - a.pct);
+  const multi = porTipo.filter(d => !esMono(d.k)).sort((a, b) => b.pct - a.pct);
+  // Un pasillo de dos o tres posiciones al 100% no dice nada y desplaza a los
+  // que sí importan: para la filmina se piden al menos 10 posiciones.
+  const porPas = agrupar(v.mono, 'pas').filter(d => d.n >= 10).sort((a, b) => b.pct - a.pct);
+  const fuera = agrupar(v.tra.concat(v.vir), 'tipo').filter(d => d.ocu > 0).sort((a, b) => b.val - a.val);
+
+  // Mono, multi y total: las tres filas que cierran.
+  const res = [
+    ['Monoproducto', v.mono_, 'saturación · ' + sm.rot],
+    ['Multiproducto', v.multi_, 'posiciones con stock'],
+    ['Total físico', v.f, 'posiciones con stock']
+  ].map(([k, d, nota2], i) => `<div class="fil-fil" style="${i === 2 ? 'border-top:1px solid var(--borde);padding-top:4px;margin-top:2px;font-weight:700' : ''}">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${k}
+        <span style="color:var(--tinta-3);font-weight:400">· ${nota2}</span></span>
+      <span class="n" style="width:46px">${U.ent(d.ocu)}</span>
+      <span class="n" style="width:46px;color:var(--tinta-2)">${U.ent(d.n)}</span>
+      <span class="n" style="width:42px">${U.dec(d.pct, 1)}%</span></div>`).join('');
 
   $('#filmina').innerHTML = `
     <div class="fil-cab">
@@ -3087,66 +3107,88 @@ function pintarReporte() {
         <div style="font-size:11.5px;color:#c3cde6">Site: <b style="color:#fff">Finning CAT</b>${emp ? ' · ' + U.esc(emp) : ''}</div>
       </div>
       <div class="meta">Corte al <b style="color:#fff">${U.fechaLarga(M.fecha)}</b><br>
-        ${U.ent(v.f.n)} posiciones · ${U.ent(v.v.n)} de tránsito</div>
+        ${U.ent(v.f.n)} posiciones físicas · ${U.ent(v.fuera.n)} fuera de posición</div>
     </div>
     <div class="fil-body">
       <div class="fil-k">
-        ${kpi('Ocupación física', U.pct(v.f.pct), sm.rot, sm.n)}
-        ${kpi('Ocupadas', U.ent(v.f.ocu), 'posiciones con stock')}
+        ${kpi('Saturación mono', U.pct(v.mono_.pct), sm.rot + ' · ' + U.ent(v.mono_.n) + ' posiciones')}
+        ${kpi('Ocupadas', U.ent(v.f.ocu), 'posiciones físicas con stock')}
         ${kpi('Vacías', U.ent(v.f.vac), 'lugar disponible')}
         ${kpi('Total posiciones', U.ent(v.f.n), 'capacidad del maestro')}
-        ${kpi('Ítems distintos', U.ent(v.items), 'materiales en el depósito')}
-        ${kpi('Tránsito', U.ent(v.v.ocu), `de ${U.ent(v.v.n)} ubicaciones con stock`)}
+        ${kpi('Ítems distintos', U.ent(v.f.items), 'materiales en posiciones')}
+        ${kpi('Fuera de posición', U.ent(v.fuera.ocu), `ubicaciones con stock · ${U.usd(v.fuera.val)}`)}
       </div>
+
       <div class="fil-cols">
-        <div class="fil-cj"><h4>Ocupación por tipo de almacén</h4>${porTipo.slice(0, 9).map(fila).join('')}</div>
-        <div class="fil-cj"><h4>Pasillos más cargados</h4>${porPas.slice(0, 9).map(fila).join('')}</div>
+        <div class="fil-cj"><h4>Saturación por tipo monoproducto</h4>
+          ${mono.map(d => fila(d, { umbral: true })).join('')}
+          <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">La marca vertical es el umbral del 90%.</div></div>
+        <div class="fil-cj"><h4>Pasillos más cargados · monoproducto</h4>
+          ${porPas.slice(0, 8).map(d => fila(d, { umbral: true })).join('')}</div>
         <div class="fil-cj"><h4>Evolución de la ocupación</h4>${mini}
-          <div style="margin-top:8px;font-size:11px;color:var(--tinta-2)">
+          <div style="margin-top:6px;font-size:11px;color:var(--tinta-2)">
             Valor en posiciones: <b style="color:var(--tinta)">${U.usd(v.f.val)}</b><br>
-            En tránsito: <b style="color:var(--tinta)">${U.usd(v.v.val)}</b></div></div>
+            Fuera de posición: <b style="color:var(--tinta)">${U.usd(v.fuera.val)}</b></div></div>
       </div>
+
       <div class="fil-cols">
-        <div class="fil-cj"><h4>Ocupación por área de almacenamiento</h4>
-          ${agrupar(v.fis, 'area').sort((a, b) => b.n - a.n).slice(0, 8).map(fila).join('')}</div>
-        <div class="fil-cj"><h4>Uso de las ubicaciones de tránsito</h4>
-          ${agrupar(v.vir, 'tipo').sort((a, b) => b.ocu - a.ocu).slice(0, 8).map(d => `
-            <div class="fil-fil"><span class="e">${U.esc(d.k)}</span>
-              <span class="p"><i style="width:${Math.min(100, d.pct).toFixed(0)}%;background:var(--s2)"></i></span>
-              <span class="n">${U.ent(d.ocu)}</span>
-              <span class="n" style="width:56px;color:var(--tinta-2)">de ${U.ent(d.n)}</span></div>`).join('')}</div>
-        <div class="fil-cj"><h4>Qué mirar</h4>${alertasFilmina(v)}</div>
+        <div class="fil-cj"><h4>Mono, multi y total</h4>
+          <div class="fil-fil" style="color:var(--tinta-3);font-size:10px">
+            <span style="flex:1"></span><span class="n" style="width:46px">OCUP.</span>
+            <span class="n" style="width:46px">TOTAL</span><span class="n" style="width:42px">%</span></div>
+          ${res}
+          <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">
+            En multiproducto entran varios materiales y lo que no entra queda fuera del rack:
+            el porcentaje no se lee como saturación.</div></div>
+        <div class="fil-cj"><h4>Fuera de posición</h4>
+          <div class="fil-fil" style="font-weight:700">
+            <span style="flex:1">Tránsito <span style="color:var(--tinta-3);font-weight:400">· está en el depósito</span></span>
+            <span class="n" style="width:40px">${U.ent(v.t.ocu)}</span>
+            <span class="n" style="width:64px">${U.usd(v.t.val).replace('USD ', '')}</span></div>
+          <div class="fil-fil" style="font-weight:700">
+            <span style="flex:1">Virtual <span style="color:var(--tinta-3);font-weight:400">· contable</span></span>
+            <span class="n" style="width:40px">${U.ent(v.v.ocu)}</span>
+            <span class="n" style="width:64px">${U.usd(v.v.val).replace('USD ', '')}</span></div>
+          <div style="height:5px"></div>
+          ${fuera.slice(0, 5).map(d => `<div class="fil-fil">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${U.esc(d.k)}
+              <span style="color:var(--tinta-3)">· ${CLASES[claseDe(d.k)]}</span></span>
+            <span class="n" style="width:40px">${U.ent(d.ocu)}</span>
+            <span class="n" style="width:64px;color:var(--tinta-2)">${U.usd(d.val).replace('USD ', '')}</span></div>`).join('')}</div>
+        <div class="fil-cj"><h4>Qué mirar</h4>${alertasFilmina(v, mono)}</div>
       </div>
 
       ${nota ? `<div class="fil-nota"><b>Comentario:</b> ${U.esc(nota)}</div>` : ''}
       <div class="fil-pie">
         <span>${aut ? 'Preparado por ' + U.esc(aut) + ' · ' : ''}Generado el ${U.fechaLarga(U.hoy())}</span>
-        <span>Ocupación medida sobre posiciones del maestro. El tránsito no entra en el porcentaje
-          porque no es capacidad.${M.archivo ? ' Fuente: ' + U.esc(M.archivo) + '.' : ''}</span>
+        <span>La saturación se mide sólo sobre posiciones monoproducto. En multiproducto y fuera de
+          posición no hay capacidad contra la cual medir.${M.archivo ? ' Fuente: ' + U.esc(M.archivo) + '.' : ''}</span>
       </div>
     </div>`;
 }
 
-// Las cuatro cosas que conviene mirar primero, ordenadas por gravedad.
-function alertasFilmina(v) {
+// Las cuatro cosas a mirar primero. Sin colores de semáforo: ordenadas por
+// gravedad y marcadas con un punto sobrio.
+function alertasFilmina(v, mono) {
   const fis = M.ubis.filter(x => x.cl === 'F');
-  const crit = agrupar(v.fis, 'tipo').filter(d => d.pct >= 90 && d.n >= 10);
+  const crit = mono.filter(d => d.pct >= 90 && d.n >= 10);
   const inc = fis.filter(x => x.ocu && x.fv).length;
   const c = calcConsolidacion(v);
   const bloq = fis.filter(x => x.bloq).length;
   const it = [];
-  if (crit.length) it.push([4, `<b>${U.pl(crit.length, 'tipo', 'tipos')} por encima del 90%</b>
+  if (crit.length) it.push([3, `<b>${U.pl(crit.length, 'tipo monoproducto', 'tipos monoproducto')} por encima del 90%</b>
     (${U.esc(crit.slice(0, 4).map(d => d.k).join(', '))}). Riesgo de no poder recibir.`]);
-  if (c.ahorro) it.push([c.pct >= 15 ? 4 : c.pct >= 8 ? 3 : 2,
-    `<b>${U.ent(c.ahorro)} posiciones liberables</b> unificando ${U.ent(c.nMulti)} materiales repetidos.`]);
-  if (inc) it.push([3, `<b>${U.ent(inc)} ubicaciones con stock</b> figuran como vacías en el maestro.`]);
-  if (bloq) it.push([2, `<b>${U.ent(bloq)} posiciones bloqueadas</b> de entrada o salida.`]);
-  if (v.v.ocu) it.push([2, `<b>${U.ent(v.v.ocu)} ubicaciones de tránsito</b> con stock, ${U.usd(v.v.val)}.`]);
+  if (c.ahorro) it.push([2, `<b>${U.ent(c.ahorro)} posiciones liberables</b> unificando
+    ${U.ent(c.nMulti)} materiales repetidos.`]);
+  if (inc) it.push([2, `<b>${U.ent(inc)} ubicaciones con stock</b> figuran como vacías en el maestro.`]);
+  if (v.fuera.ocu) it.push([1, `<b>${U.ent(v.fuera.ocu)} ubicaciones fuera de posición</b> con stock,
+    ${U.usd(v.fuera.val)}.`]);
+  if (bloq) it.push([1, `<b>${U.ent(bloq)} posiciones bloqueadas</b> de entrada o salida.`]);
   it.sort((a, b) => b[0] - a[0]);
   return it.slice(0, 4).map(([n, t]) =>
     `<div class="fil-fil" style="align-items:flex-start;padding:3px 0">
-      <span style="color:${colorSem(n)};font-weight:700;flex:none">●</span><span>${t}</span></div>`).join('')
-    || '<div style="font-size:11px;color:var(--tinta-3)">Sin alertas relevantes.</div>';
+      <span style="flex:none;font-weight:700;color:${n >= 3 ? 'var(--tinta)' : 'var(--tinta-3)'}">●</span>
+      <span>${t}</span></div>`).join('') || '<div style="font-size:11px;color:var(--tinta-3)">Sin alertas relevantes.</div>';
 }
 
 /* ===========================================================================
