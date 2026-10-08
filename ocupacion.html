@@ -356,7 +356,8 @@ tfoot td{padding:8px 11px; font-weight:700; background:var(--sup-2); border-top:
   .fil-cols{gap:7px; margin-top:7px}
   .fil-cj{padding:7px 9px}
   .fil-fil{font-size:8.4pt}
-  .fil-nota{font-size:8pt; margin-top:6px; padding:5px 8px}
+  .fil-nota{font-size:8pt; margin-top:6px; padding:5px 8px;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden}
   .fil-pie{font-size:6.8pt; margin-top:6px; padding-top:5px}
   *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
 }
@@ -3121,9 +3122,9 @@ function pintarReporte() {
           ${porPas.slice(0, 8).map(d => fila(d, { umbral: true })).join('')}</div>
       </div>
 
-      <div class="fil-cj" style="margin-top:11px">
+      <div class="fil-cj fil-mapa" style="margin-top:11px">
         <h4>Mapa de saturación: pasillo por nivel · monoproducto</h4>
-        ${mapaFilmina(v)}
+        ${mapaFilmina(v, nota ? 14 : 17)}
       </div>
 
       ${nota ? `<div class="fil-nota"><b>Comentario:</b> ${U.esc(nota)}</div>` : ''}
@@ -3137,7 +3138,7 @@ function pintarReporte() {
 
 // Mapa de saturación para la filmina: compacto, sin interacción y con los
 // mismos pasos de color que la pantalla. Sólo posiciones monoproducto.
-function mapaFilmina(v) {
+function mapaFilmina(v, ch) {
   const acc = new Map();
   for (const x of v.mono) {
     const k = x.pas + '\u0000' + x.niv;
@@ -3150,7 +3151,7 @@ function mapaFilmina(v) {
   const cols = [...new Set(v.mono.map(x => x.niv))].sort(ordNat);
   const ramp = ['--q1', '--q2', '--q3', '--q4', '--q5', '--q6', '--q7', '--q8', '--q9', '--q10', '--q11', '--q12'];
 
-  const mI = 58, mT = 16, cw = Math.max(34, Math.min(74, (1040 - mI) / cols.length)), ch = 19;
+  const mI = 58, mT = 16, cw = Math.max(34, Math.min(74, (1040 - mI) / cols.length));
   const W = mI + cols.length * cw + 4, H = mT + filas.length * ch + 4;
   let g = '';
   cols.forEach((c, j) => {
