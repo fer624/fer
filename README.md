@@ -30,19 +30,40 @@ Responde una sola pregunta: **cuán lleno está el almacén**. Separa en dos blo
 
 Es **interactiva**: filtros de tipo, área, pasillo, nivel y estado en la barra superior, y clic
 sobre cualquier barra o celda para filtrar todo el tablero. Los filtros activos se ven como chips y
-se quitan de a uno o todos juntos.
+se quitan de a uno o todos juntos. No hay barras de desplazamiento: todo entra en pantalla.
+
+Los gráficos van en azul marino, sin semáforo de colores. El umbral se marca con una línea de
+referencia al 90%, y el estado aparece como palabra sobria en la tabla.
 
 El resto del análisis está detrás, en pestañas: Tránsito, Valorizado, Consolidación, Tendencia,
 Calidad, Detalle y Reporte.
+
+### La tabla de tipos manda
+
+Dentro del archivo hay una tabla (`TIPOS`) con los 26 tipos de almacén propios. Define tres cosas de
+una sola vez, y es el lugar donde tocar si cambia algo:
+
+- **Qué es nuestro**: el tipo que no figura ahí no se procesa. Así salen `0041`, `0120` y `0233`.
+- **Mono o multi**: `0001`, `0010`, `0015`, `0016`, `0020`, `0025` y `0100` son monoproducto; el
+  resto, multiproducto.
+- **La clase**: `F` física (capacidad, incluido el Back Order), `T` tránsito (está en el depósito
+  ocupando lugar pero no en una posición) y `V` virtual (contable: mermas, daños, garantías, ajustes).
+
+El **tipo manda sobre la ubicación**. Si el diccionario marca una ubicación suelta como virtual pero
+su tipo es físico, vale el tipo: son posiciones de ocasión especial donde la mercadería queda fuera
+del rack.
 
 ### Criterios de cálculo
 
 - **Ocupada**: está en el maestro y aparece en el fotostock. **Vacía**: está en el maestro y no
   aparece. Se cuentan posiciones distintas, nunca líneas, porque hay ubicaciones multiproducto.
-- **Tránsito (virtual)**: la ubicación tiene stock pero no es capacidad de almacenamiento. Lo define
-  el **diccionario**, que es la fuente con autoridad; sin él se deduce por ausencia en el maestro.
-- **Ubicaciones de terceros**: aparecen en el fotostock porque se comparte el sistema pero no las
-  opera CEVA (hoy, las que contienen `FSM`). Se descartan. El filtro es editable en Datos.
+- **La saturación se mide sólo en monoproducto.** En multiproducto entran varios materiales y lo que
+  no entra queda fuera del rack, así que no hay tope contra el cual medir. Se cuentan y se informan,
+  pero sin semáforo. Las tres filas —mono, multi y total— cierran y las tres llevan porcentaje; sólo
+  la de monoproducto se lee como saturación.
+- **Ubicaciones de terceros**: la tabla de tipos ya saca los almacenes ajenos. Para ubicaciones
+  sueltas dentro de un tipo propio hay una lista de excepciones (`AJENAS`) y un filtro de texto
+  editable en Datos.
 - **Precio**, por orden: columna `Total` del fotostock, `V/U` por cantidad, o `Precio interno
   periódico` del maestro valorizado por cantidad. `V/U` y `Total` no son estándar de SAP, así que es
   normal que un export no las traiga.

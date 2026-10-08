@@ -52,6 +52,9 @@
   /* Semáforos: fijos, nunca se usan como color de serie */
   --bien:#0ca30c; --aviso:#fab219; --serio:#ec835a; --critico:#FF0000;
   --sube:#067a06;
+  /* Barra de ocupación: marino formal. En oscuro usa su equivalente claro,
+     porque un marino sobre fondo marino no se vería. */
+  --barra:#1d3270; --barra-sec:#2c4793;
 
   --f: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --r:12px;
@@ -69,6 +72,7 @@
     --q7:#809de0; --q8:#93ade8; --q9:#a7bdef; --q10:#bccef6; --q11:#ccdbfc; --q12:#dde8ff;
     --o1:#3250a4; --o2:#4768be; --o3:#6282d3; --o4:#7f9de4; --o5:#9fb8f0; --o6:#c1d3fa;
     --sube:#0ca30c;
+    --barra:#7f9de4; --barra-sec:#5c7cce;
   }
 }
 :root[data-tema="oscuro"]{
@@ -83,6 +87,7 @@
   --q7:#809de0; --q8:#93ade8; --q9:#a7bdef; --q10:#bccef6; --q11:#ccdbfc; --q12:#dde8ff;
   --o1:#3250a4; --o2:#4768be; --o3:#6282d3; --o4:#7f9de4; --o5:#9fb8f0; --o6:#c1d3fa;
   --sube:#0ca30c;
+  --barra:#7f9de4; --barra-sec:#5c7cce;
 }
 
 *{box-sizing:border-box}
@@ -196,8 +201,8 @@ main{max-width:1680px; margin:0 auto; padding:18px 20px 60px}
   padding:13px 15px; box-shadow:var(--sombra); position:relative; overflow:hidden;
 }
 .k::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--s1)}
-.k.n1::before{background:var(--bien)} .k.n2::before{background:var(--aviso)}
-.k.n3::before{background:var(--serio)} .k.n4::before{background:var(--critico)}
+.k.n1::before, .k.n2::before{background:var(--eje)}
+.k.n3::before, .k.n4::before{background:var(--barra)}
 .k.gris::before{background:var(--eje)}
 .k.naranja::before{background:var(--s2)}
 .k .rot{font-size:11px; font-weight:700; color:var(--tinta-2); text-transform:uppercase; letter-spacing:.05em; line-height:1.3}
@@ -218,12 +223,17 @@ main{max-width:1680px; margin:0 auto; padding:18px 20px 60px}
   border:1px solid currentColor; border-radius:99px; padding:2px 9px; white-space:nowrap;
 }
 .sem i{width:7px; height:7px; border-radius:50%; background:currentColor; flex:none}
-.sem.n1{color:var(--bien)} .sem.n2{color:#8a6a00} .sem.n3{color:#b4521f} .sem.n4{color:var(--critico)}
-:root[data-tema="oscuro"] .sem.n2, :root:where(:not([data-tema="claro"])) .sem.n2{color:var(--aviso)}
-:root[data-tema="oscuro"] .sem.n3, :root:where(:not([data-tema="claro"])) .sem.n3{color:var(--serio)}
+/* El estado es una palabra sobria, no un semáforo. Lo que marca el umbral es la
+   línea de referencia del gráfico, no el color. */
+.sem{border-color:var(--borde-2); color:var(--tinta-2); font-weight:650}
+.sem i{background:var(--tinta-3)}
+.sem.n3, .sem.n4{color:var(--tinta); font-weight:700}
+.sem.n3 i, .sem.n4 i{background:var(--tinta)}
 
 /* ---------------- Tablas ---------------- */
 .tbl{overflow:auto; max-height:min(62vh,640px); border:1px solid var(--borde); border-radius:10px}
+/* En la pantalla de ocupación no debe haber barra de desplazamiento: se ve todo. */
+.tbl.libre{max-height:none; overflow:visible}
 table{border-collapse:collapse; width:100%; font-size:13px}
 thead th{
   position:sticky; top:0; z-index:2; background:var(--sup-2); text-align:left; white-space:nowrap;
@@ -408,44 +418,59 @@ const LOGO_COLOR  = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOUAAABYCAMAA
       <header>
         <div>
           <h2>Almacenamiento físico</h2>
-          <p>Posiciones del maestro. Son la capacidad real del depósito y la única base sobre la que
-             tiene sentido medir un porcentaje de ocupación.</p>
+          <p>Posiciones del maestro. La saturación se mide sólo sobre las monoproducto: en las
+             multiproducto entran varios materiales y lo que no entra queda fuera del rack, así que
+             no hay tope contra el cual medir.</p>
         </div>
         <div class="tot" id="totFis"></div>
       </header>
 
       <div class="rej kpi" id="kpiFis" style="margin-bottom:14px"></div>
 
-      <div class="rej c23" style="margin-bottom:14px">
+      <div class="tj" style="margin-bottom:14px">
+        <header><h3>Mono, multi y total</h3>
+          <p>Las tres filas cierran. El semáforo vive sólo en monoproducto.</p></header>
+        <div class="cuerpo"><div id="tResumen"></div></div>
+      </div>
+
+      <div class="rej c2" style="margin-bottom:14px">
         <div class="tj">
-          <header><h3>Ocupación por tipo de almacén</h3>
-            <p>Haga clic en una barra para filtrar todo el tablero por ese tipo.</p></header>
-          <div class="cuerpo"><div id="gTipo"></div></div>
+          <header><h3>Saturación por tipo monoproducto</h3>
+            <p>Una posición, un material. Acá el porcentaje sí dice si entra más mercadería.
+               Clic en una barra para filtrar.</p></header>
+          <div class="cuerpo"><div id="gMono"></div></div>
         </div>
         <div class="tj">
-          <header><h3>Detalle por tipo</h3><p>Ordene por cualquier columna. Clic en la fila para filtrar.</p></header>
-          <div class="cuerpo"><div id="tTipo"></div></div>
+          <header><h3>Posiciones con stock, multiproducto</h3>
+            <p>Cuántas tienen mercadería. No es saturación: pueden admitir más o quedar fuera del rack.</p></header>
+          <div class="cuerpo"><div id="gMulti"></div></div>
         </div>
+      </div>
+
+      <div class="tj" style="margin-bottom:14px">
+        <header><h3>Detalle por tipo de almacén</h3>
+          <p>Ordene por cualquier columna. Clic en la fila para filtrar el tablero.</p></header>
+        <div class="cuerpo"><div id="tTipo"></div></div>
       </div>
 
       <div class="rej c3" style="margin-bottom:14px">
         <div class="tj">
-          <header><h3>Ocupación por pasillo</h3><p>Clic para filtrar.</p></header>
+          <header><h3>Saturación por pasillo</h3><p>Sólo monoproducto. Clic para filtrar.</p></header>
           <div class="cuerpo"><div id="gPas"></div></div>
         </div>
         <div class="tj">
-          <header><h3>Ocupación por área</h3><p>Clic para filtrar.</p></header>
+          <header><h3>Saturación por área</h3><p>Sólo monoproducto. Clic para filtrar.</p></header>
           <div class="cuerpo"><div id="gArea"></div></div>
         </div>
         <div class="tj">
-          <header><h3>Ocupación por nivel</h3><p>Altura de la posición. Clic para filtrar.</p></header>
+          <header><h3>Saturación por nivel</h3><p>Altura de la posición. Sólo monoproducto.</p></header>
           <div class="cuerpo"><div id="gNiv"></div></div>
         </div>
       </div>
 
       <div class="tj">
-        <header><h3>Mapa de ocupación: pasillo por nivel</h3>
-          <p>Dónde está realmente lleno el depósito. Cuanto más oscuro, más ocupado.</p></header>
+        <header><h3>Mapa de saturación: pasillo por nivel</h3>
+          <p>Dónde está realmente lleno el depósito. Sólo posiciones monoproducto.</p></header>
         <div class="cuerpo"><div id="gCalor"></div></div>
       </div>
     </div>
@@ -453,25 +478,24 @@ const LOGO_COLOR  = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOUAAABYCAMAA
     <div class="seccion virtual">
       <header>
         <div>
-          <h2>Ubicaciones virtuales y de tránsito</h2>
-          <p>Stock que está en el depósito pero no en una posición de almacenamiento: playas de
-             exportación, control de picking, bahías. No tienen capacidad, así que no se les puede
-             calcular ocupación; se cuentan y se valorizan aparte.</p>
+          <h2>Fuera de posición</h2>
+          <p>Stock que no está en una posición de almacenamiento. <b>Tránsito</b> está físicamente en
+             el depósito y se puede contar; <b>virtual</b> es contable: mermas, daños, garantías y
+             ajustes. El detalle línea por línea está en la pestaña Tránsito.</p>
         </div>
         <div class="tot" id="totVir"></div>
       </header>
 
       <div class="rej kpi" id="kpiVir" style="margin-bottom:14px"></div>
 
-      <div class="rej c23">
+      <div class="rej c2">
         <div class="tj">
-          <header><h3>Uso de las ubicaciones de tránsito</h3>
-            <p>Qué porcentaje de las ubicaciones de cada tipo tiene stock hoy. No es ocupación:
-               estas ubicaciones no tienen capacidad, así que estar llenas no es malo.</p></header>
+          <header><h3>Uso por tipo de almacén</h3>
+            <p>Qué porcentaje de las ubicaciones de cada tipo tiene stock hoy.</p></header>
           <div class="cuerpo"><div id="gVir"></div></div>
         </div>
         <div class="tj">
-          <header><h3>Detalle de virtuales</h3><p>El contenido de cada una está en la pestaña Tránsito.</p></header>
+          <header><h3>Detalle por tipo</h3><p>Tránsito y virtual, separados.</p></header>
           <div class="cuerpo"><div id="tVir"></div></div>
         </div>
       </div>
@@ -1076,6 +1100,61 @@ const D = {
   pref: { tema: '', excluir: 'FSM', empresa: '', autor: '' }
 };
 
+/* ===========================================================================
+   TABLA DE TIPOS DE ALMACÉN
+   Esta tabla es la fuente de verdad. Define tres cosas de una sola vez:
+
+     · QUÉ ES NUESTRO: el tipo que no figura acá no se procesa. Así salen los
+       almacenes de terceros (0041, 0120, 0233) sin filtros de texto.
+     · MONO o MULTI: en monoproducto la posición guarda un solo material y el
+       porcentaje de ocupación significa algo. En multiproducto entran varios
+       materiales y lo que no entra queda fuera del rack, así que no hay tope
+       contra el cual medir: se cuentan pero no se les calcula saturación.
+     · LA CLASE:
+         F · Física   — capacidad de almacenamiento, incluido el Back Order.
+         T · Tránsito — está en el depósito ocupando lugar pero no en posición:
+                        bahías, desconsolidado, pickeado pendiente, despacho.
+         V · Virtual  — contable: mermas, daños, garantías, ajustes.
+
+   El TIPO manda sobre la ubicación. Si el diccionario marca una ubicación
+   suelta como virtual pero su tipo es físico, vale el tipo: son posiciones de
+   ocasión especial donde la mercadería queda fuera del rack.
+   =========================================================================== */
+const TIPOS = {
+  '0001': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0010': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0011': { mm: 'multi', cl: 'F', st: 'Stock' },
+  '0015': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0016': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0020': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0025': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0032': { mm: 'multi', cl: 'F', st: 'Stock' },
+  '0033': { mm: 'multi', cl: 'F', st: 'Stock' },
+  '0081': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '0100': { mm: 'mono', cl: 'F', st: 'Stock' },
+  '0101': { mm: 'multi', cl: 'F', st: 'Stock' },
+  '0122': { mm: 'multi', cl: 'F', st: 'Stock' },
+  '0210': { mm: 'multi', cl: 'F', st: 'BO' },
+  '0220': { mm: 'multi', cl: 'F', st: 'BO' },
+  '0222': { mm: 'multi', cl: 'F', st: 'BO' },
+  '0900': { mm: 'multi', cl: 'V', st: 'Stock / BO' },
+  '0902': { mm: 'multi', cl: 'V', st: 'Stock / BO' },
+  '8010': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '8030': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '8035': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '8040': { mm: 'multi', cl: 'V', st: 'Stock / BO' },
+  '8060': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '9010': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '9020': { mm: 'multi', cl: 'T', st: 'Stock / BO' },
+  '9030': { mm: 'multi', cl: 'T', st: 'Stock / BO' }
+};
+const CLASES = { F: 'Física', T: 'Tránsito', V: 'Virtual' };
+const esNuestro = t => !!TIPOS[t];
+const claseDe = t => (TIPOS[t] ? TIPOS[t].cl : null);
+const esMono = t => !!TIPOS[t] && TIPOS[t].mm === 'mono';
+// Ubicaciones sueltas de terceros dentro de un tipo propio.
+const AJENAS = ['0220-MANGUERAS-FSM'];
+
 /* Conocimiento del site que todavía no está en Info_ubicaciones. Si mañana el
    diccionario lo trae, conviene borrarlo de acá. Para la CLASIFICACIÓN manda
    siempre el diccionario; esto sólo aporta un rótulo más específico. */
@@ -1089,8 +1168,12 @@ const NOTAS = {
   }
 };
 
+// Una ubicación es ajena si su tipo no está en la tabla, si figura en la lista
+// de excepciones, o si coincide con el filtro de texto que se puede editar.
 const patrones = () => (D.pref.excluir || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
-function esTercero(u) {
+function esTercero(u, tipo) {
+  if (tipo !== undefined && tipo !== null && !esNuestro(tipo)) return true;
+  if (AJENAS.includes(u)) return true;
   const ps = patrones();
   if (!ps.length) return false;
   const s = String(u).toUpperCase();
@@ -1293,20 +1376,17 @@ function construirModelo() {
     }
   }
 
-  // 2 · universo físico: maestro, menos lo que el diccionario declara de
-  //     tránsito, menos las ubicaciones de terceros
-  const recl = new Set();
-  if (D.dic) for (const u of D.mae.keys()) {
-    const d = D.dic.ubis.get(u);
-    if (d && d.virtual) recl.add(u);
-  }
-  const terceros = { ubis: new Set(), lin: 0, val: 0 };
+  // 2 · lo ajeno se descarta antes de cualquier cuenta
+  const terceros = { ubis: new Set(), tipos: new Set(), lin: 0, val: 0 };
 
   // 3 · agregación por ubicación, sólo con las líneas que cuentan
   const porUbi = new Map();
   const lineas = [];
   for (const L of D.lineas) {
-    if (esTercero(L.u)) { terceros.ubis.add(L.u); terceros.lin++; terceros.val += L.val; continue; }
+    const tipoL = (D.mae.get(L.u) || {}).t || L.t;
+    if (esTercero(L.u, tipoL)) {
+      terceros.ubis.add(L.u); terceros.tipos.add(tipoL); terceros.lin++; terceros.val += L.val; continue;
+    }
     let a = porUbi.get(L.u);
     if (!a) { a = { lin: 0, ctd: 0, val: 0, mats: new Set(), fem: '' }; porUbi.set(L.u, a); }
     a.lin++; a.ctd += L.ctd; a.val += L.val; a.mats.add(L.mat);
@@ -1317,61 +1397,62 @@ function construirModelo() {
   // 4 · una fila por ubicación
   const ubis = [];
   const vistas = new Set();
-  for (const [u, r] of D.mae) {
-    if (esTercero(u)) { terceros.ubis.add(u); continue; }
-    const o = porUbi.get(u);
-    const virtual = recl.has(u);
-    vistas.add(u);
-    ubis.push({
-      u, tipo: r.t,
-      area: virtual ? '—' : r.a, pas: virtual ? '—' : r.p, niv: virtual ? '—' : r.n,
-      clase: virtual ? 'V' : 'F', enMaestro: true,
+  const nueva = (u, tipo, r, o) => {
+    const T = TIPOS[tipo];
+    const fis = T.cl === 'F';
+    return {
+      u, tipo, cl: T.cl, mm: T.mm, st: T.st,
+      area: fis && r ? r.a : '—', pas: fis && r ? r.p : '—', niv: fis && r ? r.n : '—',
+      enMaestro: !!r,
       ocu: !!o, lin: o ? o.lin : 0, ctd: o ? o.ctd : 0, val: o ? o.val : 0,
       mats: o ? o.mats.size : 0, matsSet: o ? o.mats : null, fem: o ? o.fem : '',
-      fv: r.fv, bloq: [r.be ? 'entrada' : '', r.bs ? 'salida' : ''].filter(Boolean).join(' y '),
+      fv: r ? r.fv : false,
+      bloq: r ? [r.be ? 'entrada' : '', r.bs ? 'salida' : ''].filter(Boolean).join(' y ') : '',
       prop: propUbi(u)
-    });
+    };
+  };
+  for (const [u, r] of D.mae) {
+    if (esTercero(u, r.t)) { terceros.ubis.add(u); terceros.tipos.add(r.t); continue; }
+    vistas.add(u);
+    ubis.push(nueva(u, r.t, r, porUbi.get(u)));
   }
   // ubicaciones con stock que no están en el maestro
   for (const [u, o] of porUbi) {
     if (vistas.has(u)) continue;
-    vistas.add(u);
     const L = lineas.find(x => x.u === u);
-    ubis.push({
-      u, tipo: (L && L.t) || '(sin tipo)', area: '—', pas: '—', niv: '—',
-      clase: 'V', enMaestro: false, ocu: true,
-      lin: o.lin, ctd: o.ctd, val: o.val, mats: o.mats.size, matsSet: o.mats, fem: o.fem,
-      fv: false, bloq: '', prop: propUbi(u)
-    });
-  }
-  // virtuales del catálogo que hoy están vacías: también son parte del parque
-  if (D.dic) for (const [u, d] of D.dic.ubis) {
-    if (!d.virtual || vistas.has(u) || esTercero(u)) continue;
+    const tipo = (L && L.t) || '';
+    if (!esNuestro(tipo)) { terceros.ubis.add(u); terceros.tipos.add(tipo); continue; }
     vistas.add(u);
-    ubis.push({
-      u, tipo: (u.match(/^(\d{4})/) || [, '(sin tipo)'])[1], area: '—', pas: '—', niv: '—',
-      clase: 'V', enMaestro: false, ocu: false,
-      lin: 0, ctd: 0, val: 0, mats: 0, matsSet: null, fem: '',
-      fv: false, bloq: '', prop: propUbi(u)
-    });
+    ubis.push(nueva(u, tipo, null, o));
+  }
+  // ubicaciones del catálogo que hoy están vacías: también son parte del parque
+  if (D.dic) for (const [u] of D.dic.ubis) {
+    if (vistas.has(u)) continue;
+    const tipo = (u.match(/^(\d{4})/) || [, ''])[1];
+    if (!esNuestro(tipo) || esTercero(u, tipo)) continue;
+    vistas.add(u);
+    ubis.push(nueva(u, tipo, null, null));
   }
 
   // 5 · dimensiones pegadas a cada línea, para poder filtrar igual que arriba
   const porU = new Map(ubis.map(x => [x.u, x]));
   for (const L of lineas) {
     const x = porU.get(L.u);
-    L.tipo = x ? x.tipo : (L.t || '(sin tipo)');
+    L.tipo = x ? x.tipo : (L.t || '');
     L.area = x ? x.area : '—';
     L.pas = x ? x.pas : '—';
     L.niv = x ? x.niv : '—';
-    L.clase = x ? x.clase : 'V';
+    L.cl = x ? x.cl : 'V';
+    L.mm = x ? x.mm : 'multi';
   }
 
   M = {
     fecha: D.fecha, archivo: D.nom.foto,
     ubis, lineas,
-    terceros: { ubis: terceros.ubis.size, lin: terceros.lin, val: terceros.val },
-    recl: recl.size,
+    terceros: {
+      ubis: terceros.ubis.size, lin: terceros.lin, val: terceros.val,
+      tipos: [...terceros.tipos].filter(t => t && !esNuestro(t)).sort()
+    },
     val: {
       ...dv, matsSin: dv.matsSin.size,
       fuente: dv.porTotal ? 'columna Total del fotostock'
@@ -1401,8 +1482,9 @@ function pasa(x) {
   return true;
 }
 
-// Vista actual: ubicaciones y líneas que pasan el filtro, partidas en físicas y
-// virtuales, con los totales ya calculados.
+// Vista actual: lo que pasa el filtro, partido en los grupos que se informan
+// por separado. Mono y multi suman el total físico; tránsito y virtual van
+// aparte porque no son capacidad.
 function vista() {
   if (!M) return null;
   const ubis = M.ubis.filter(pasa);
@@ -1413,21 +1495,32 @@ function vista() {
     if (F.niv && l.niv !== F.niv) return false;
     return true;
   });
-  const fis = ubis.filter(x => x.clase === 'F');
-  const vir = ubis.filter(x => x.clase === 'V');
-  const linF = lineas.filter(l => l.clase === 'F');
-  const linV = lineas.filter(l => l.clase === 'V');
-  const tot = o => ({
-    n: o.length,
-    ocu: o.reduce((s, x) => s + (x.ocu ? 1 : 0), 0),
-    val: o.reduce((s, x) => s + x.val, 0),
-    lin: o.reduce((s, x) => s + x.lin, 0)
-  });
-  const tf = tot(fis), tv = tot(vir);
+  const fis = ubis.filter(x => x.cl === 'F');
+  const mono = fis.filter(x => x.mm === 'mono');
+  const multi = fis.filter(x => x.mm === 'multi');
+  const tra = ubis.filter(x => x.cl === 'T');
+  const vir = ubis.filter(x => x.cl === 'V');
+  const linF = lineas.filter(l => l.cl === 'F');
+  const linT = lineas.filter(l => l.cl === 'T');
+  const linV = lineas.filter(l => l.cl === 'V');
+
+  const tot = (o, ls) => {
+    const n = o.length, ocu = o.reduce((s, x) => s + (x.ocu ? 1 : 0), 0);
+    return {
+      n, ocu, vac: n - ocu, pct: n ? ocu / n * 100 : 0,
+      val: o.reduce((s, x) => s + x.val, 0),
+      lin: o.reduce((s, x) => s + x.lin, 0),
+      items: ls ? itemsDe(ls) : 0
+    };
+  };
   return {
-    ubis, lineas, fis, vir, linF, linV,
-    f: { ...tf, vac: tf.n - tf.ocu, pct: tf.n ? tf.ocu / tf.n * 100 : 0, items: itemsDe(linF) },
-    v: { ...tv, vac: tv.n - tv.ocu, val: tv.val, items: itemsDe(linV) },
+    ubis, lineas, fis, mono, multi, tra, vir, linF, linT, linV,
+    mono_: tot(mono, lineas.filter(l => l.cl === 'F' && l.mm === 'mono')),
+    multi_: tot(multi, lineas.filter(l => l.cl === 'F' && l.mm === 'multi')),
+    f: tot(fis, linF),
+    t: tot(tra, linT),
+    v: tot(vir, linV),
+    fuera: tot(tra.concat(vir), linT.concat(linV)),
     items: itemsDe(lineas)
   };
 }
@@ -1607,7 +1700,7 @@ const G = (() => {
     datos.forEach((d, i) => {
       const y = mT + i * alto + (alto - bh) / 2;
       const w = anchoB * Math.min(100, d.pct) / 100;
-      const col = op.color || colorSem(SEM.ocupacion(d.pct).n);
+      const col = op.color || 'var(--barra)';
       const apagado = op.sel && op.sel !== d.k ? ' apagado' : '';
       g += `<text class="lb" x="${mI - 9}" y="${y + bh / 2 + 4}" text-anchor="end">${U.esc(d.et || d.k)}</text>`;
       // resto vacío
@@ -1618,11 +1711,24 @@ const G = (() => {
       g += `<text class="vd" x="${(mI + Math.max(w, 2) + 7).toFixed(1)}" y="${y + bh / 2 + 4}">${U.dec(d.pct, 0)}%</text>`;
     });
     g += `<line class="bs" x1="${mI}" y1="${mT}" x2="${mI}" y2="${mT + datos.length * alto}"/>`;
+    // Línea de referencia: reemplaza al semáforo sin gritar. La barra que la
+    // cruza está por encima del umbral.
+    if (op.ref) {
+      const xr = mI + anchoB * op.ref / 100;
+      g += `<line x1="${xr.toFixed(1)}" y1="${mT - 4}" x2="${xr.toFixed(1)}" y2="${mT + datos.length * alto + 2}"
+        stroke="var(--tinta-3)" stroke-width="1.5"/>`;
+      g += `<text class="tk" x="${xr.toFixed(1)}" y="${mT - 9}" text-anchor="middle"
+        style="font-weight:700;fill:var(--tinta-2)">${op.ref}%</text>`;
+    }
     cont.innerHTML = `<svg class="g" viewBox="0 0 ${W} ${H}" role="img" aria-label="${U.esc(op.aria || 'Ocupación')}">${g}</svg>`
       + (op.leyenda === false ? '' : op.color
         ? `<div class="leyenda"><span><i style="background:${op.color}"></i>${U.esc(op.rotLleno || 'Con stock')}</span>
            <span><i style="background:var(--sup-3)"></i>${U.esc(op.rotVacio || 'Sin stock')}</span></div>`
-        : leyendaSem());
+        : `<div class="leyenda">
+            <span><i style="background:var(--barra)"></i>${U.esc(op.rotLleno || 'Ocupado')}</span>
+            <span><i style="background:var(--sup-3)"></i>${U.esc(op.rotVacio || 'Libre')}</span>
+            ${op.ref ? `<span><i style="width:2px;height:12px;border-radius:0;background:var(--tinta-3)"></i>Umbral ${op.ref}%</span>` : ''}
+          </div>`);
     conectar(cont, datos, op);
   }
   const leyendaSem = () => `<div class="leyenda">
@@ -1647,10 +1753,10 @@ const G = (() => {
     datos.forEach((d, i) => {
       const x = mI + paso * i + (paso - bw) / 2;
       const h = aA * Math.min(100, d.pct) / 100;
-      const sm = SEM.ocupacion(d.pct);
+      const col = op.color || 'var(--barra)';
       const apagado = op.sel && op.sel !== d.k ? ' apagado' : '';
       g += `<rect x="${x.toFixed(1)}" y="${mT}" width="${bw}" height="${aA}" rx="3" fill="var(--sup-3)" class="${apagado.trim()}"/>`;
-      if (h > 0) g += `<path d="${barra(x, mT + aA - h, bw, Math.max(2, h - 2), 4, false)}" fill="${colorSem(sm.n)}"
+      if (h > 0) g += `<path d="${barra(x, mT + aA - h, bw, Math.max(2, h - 2), 4, false)}" fill="${col}"
         class="mk${apagado}" data-i="${i}"/>`;
       g += `<text class="vd" x="${(x + bw / 2).toFixed(1)}" y="${(mT + aA - h - 5).toFixed(1)}" text-anchor="middle"
         style="font-size:10px">${U.dec(d.pct, 0)}%</text>`;
@@ -1659,6 +1765,11 @@ const G = (() => {
       const max = Math.max(3, Math.floor(paso / 6.2));
       g += `<text class="tk" x="${(x + bw / 2).toFixed(1)}" y="${mT + aA + 15}" text-anchor="middle">${U.esc(et.length > max ? et.slice(0, max - 1) + '…' : et)}</text>`;
     });
+    if (op.ref) {
+      const yr = mT + aA * (1 - op.ref / 100);
+      g += `<line x1="${mI}" y1="${yr.toFixed(1)}" x2="${mI + aG}" y2="${yr.toFixed(1)}"
+        stroke="var(--tinta-3)" stroke-width="1.5"/>`;
+    }
     g += `<line class="bs" x1="${mI}" y1="${mT + aA}" x2="${mI + aG}" y2="${mT + aA}"/>`;
     cont.innerHTML = `<svg class="g" viewBox="0 0 ${W} ${H}" role="img" aria-label="${U.esc(op.aria || 'Ocupación')}">${g}</svg>`;
     conectar(cont, datos, op);
@@ -1831,7 +1942,7 @@ function tabla(cont, cols, filas, op = {}) {
   const tb = vis.map(f => `<tr class="${op.alClic ? 'click' : ''}${op.sel && op.sel(f) ? ' sel' : ''}" data-k="${U.esc(op.clave ? op.clave(f) : '')}">`
     + cols.map(c => `<td class="${c.n ? 'n' : ''}">${c.h ? c.h(f) : U.esc(c.v ? c.v(f) : '')}</td>`).join('') + '</tr>').join('');
   const tf = op.pie ? `<tfoot><tr>${op.pie.map(c => `<td class="${c.n ? 'n' : ''}">${c.t || ''}</td>`).join('')}</tr></tfoot>` : '';
-  cont.innerHTML = `<div class="tbl"><table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody>${tf}</table></div>`
+  cont.innerHTML = `<div class="tbl${op.libre ? ' libre' : ''}"><table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody>${tf}</table></div>`
     + (orden.length > lim ? `<p class="est wip">Se muestran ${U.ent(lim)} de ${U.ent(orden.length)} filas. El CSV incluye todas.</p>` : '');
   cont.querySelectorAll('th[data-c]').forEach(th => th.addEventListener('click', () => {
     const i = +th.dataset.c;
@@ -1881,7 +1992,7 @@ $('#btnTema').addEventListener('click', () => {
 /* ------------------------------ Filtros ------------------------------ */
 function llenarFiltros() {
   if (!M) return;
-  const fis = M.ubis.filter(x => x.clase === 'F');
+  const fis = M.ubis.filter(x => x.cl === 'F');
   const opciones = (sel, vals, todos) => {
     const el = $(sel), ant = el.value;
     el.innerHTML = `<option value="">${todos}</option>`
@@ -1957,142 +2068,185 @@ function faltanDatos(idVacio, idCuerpo) {
    =========================================================================== */
 function pintarOcupacion(v) {
   if (!faltanDatos('ocupVacio', 'ocupCuerpo')) return;
-  const sm = SEM.ocupacion(v.f.pct);
+  const sm = SEM.ocupacion(v.mono_.pct);
 
-  // --- totales del encabezado de cada sección
   $('#totFis').innerHTML = `<b>${U.ent(v.f.n)}</b> posiciones en el alcance actual`;
-  $('#totVir').innerHTML = `<b>${U.ent(v.v.n)}</b> ubicaciones de tránsito`;
+  $('#totVir').innerHTML = `<b>${U.ent(v.fuera.n)}</b> ubicaciones fuera de posición`;
 
-  // --- indicadores físicos
+  // --- indicadores
   $('#kpiFis').innerHTML = `
     <div class="k n${sm.n} destacado">
-      <div class="rot">Ocupación física</div>
-      <div class="v">${U.pct(v.f.pct)} <span style="font-size:14px">${chipSem(sm)}</span></div>
-      <div class="med alto"><i style="width:${Math.min(100, v.f.pct).toFixed(1)}%;background:${colorSem(sm.n)}"></i></div>
-      <div class="d" style="margin-top:8px">${U.ent(v.f.ocu)} ocupadas de ${U.ent(v.f.n)} posiciones</div>
+      <div class="rot">Saturación monoproducto</div>
+      <div class="v">${U.pct(v.mono_.pct)} <span style="font-size:14px">${chipSem(sm)}</span></div>
+      <div class="med alto"><i style="width:${Math.min(100, v.mono_.pct).toFixed(1)}%;background:var(--barra)"></i></div>
+      <div class="d" style="margin-top:8px">${U.ent(v.mono_.ocu)} ocupadas de ${U.ent(v.mono_.n)} posiciones
+        de una sola referencia</div>
     </div>
-    <div class="k">
-      <div class="rot">Ocupadas</div><div class="v">${U.ent(v.f.ocu)}</div>
-      <div class="d">posiciones con stock</div>
-    </div>
-    <div class="k gris">
-      <div class="rot">Vacías</div><div class="v">${U.ent(v.f.vac)}</div>
-      <div class="d">lugar disponible</div>
-    </div>
-    <div class="k gris">
-      <div class="rot">Total de posiciones</div><div class="v">${U.ent(v.f.n)}</div>
-      <div class="d">capacidad según el maestro</div>
-    </div>
-    <div class="k">
-      <div class="rot">Ítems distintos</div><div class="v">${U.ent(v.f.items)}</div>
-      <div class="d">materiales diferentes en posiciones</div>
-    </div>
-    <div class="k gris">
-      <div class="rot">Líneas de stock</div><div class="v">${U.ent(v.f.lin)}</div>
-      <div class="d">${U.pl(v.fis.filter(x => x.lin > 1).length, 'posición', 'posiciones')} con más de un material</div>
-    </div>`;
+    <div class="k"><div class="rot">Ocupadas</div><div class="v">${U.ent(v.f.ocu)}</div>
+      <div class="d">posiciones físicas con stock</div></div>
+    <div class="k gris"><div class="rot">Vacías</div><div class="v">${U.ent(v.f.vac)}</div>
+      <div class="d">lugar disponible</div></div>
+    <div class="k gris"><div class="rot">Total de posiciones</div><div class="v">${U.ent(v.f.n)}</div>
+      <div class="d">capacidad según el maestro</div></div>
+    <div class="k"><div class="rot">Ítems distintos</div><div class="v">${U.ent(v.f.items)}</div>
+      <div class="d">materiales diferentes en posiciones</div></div>
+    <div class="k gris"><div class="rot">Líneas de stock</div><div class="v">${U.ent(v.f.lin)}</div>
+      <div class="d">${U.pl(v.fis.filter(x => x.lin > 1).length, 'posición', 'posiciones')} con más de un material</div></div>`;
 
-  // --- por tipo de almacén
-  const porTipo = agrupar(v.fis, 'tipo').sort((a, b) => b.pct - a.pct);
-  G.ocup($('#gTipo'), porTipo.map(d => ({
-    k: d.k, et: d.k, pct: d.pct,
-    globo: globoDim('Tipo ' + rotTipo(d.k), d)
-  })), { sel: F.tipo, alClic: k => alternar('tipo', k), aria: 'Ocupación por tipo de almacén' });
+  // --- mono / multi / total
+  const filasRes = [
+    { k: 'Monoproducto', d: v.mono_, sem: true, nota: 'una posición, un material' },
+    { k: 'Multiproducto', d: v.multi_, sem: false, nota: 'varios materiales por posición' },
+    { k: 'Total físico', d: v.f, sem: false, nota: 'la suma de las dos', tot: true }
+  ];
+  tabla($('#tResumen'), [
+    {
+      t: '', v: null, h: f => `<b${f.tot ? '' : ''}>${U.esc(f.k)}</b>`
+        + `<br><span style="font-size:11.5px;color:var(--tinta-3)">${U.esc(f.nota)}</span>`
+    },
+    { t: 'Posiciones', n: true, h: f => U.ent(f.d.n) },
+    { t: 'Ocupadas', n: true, h: f => U.ent(f.d.ocu) },
+    { t: 'Vacías', n: true, h: f => U.ent(f.d.vac) },
+    {
+      t: '%', n: true, h: f => `<b style="font-size:15px">${U.pct(f.d.pct)}</b>`
+        + `<div class="med" style="margin-top:4px"><i style="width:${Math.min(100, f.d.pct).toFixed(0)}%;background:var(--barra)"></i></div>`
+    },
+    {
+      t: 'Lectura', h: f => f.sem
+        ? chipSem(SEM.ocupacion(f.d.pct))
+        : `<span style="font-size:12px;color:var(--tinta-3)">posiciones con stock<br>no es saturación</span>`
+    },
+    { t: 'Líneas', n: true, h: f => U.ent(f.d.lin) }
+  ], filasRes, { libre: true });
+  // Los ítems distintos no se abren por mono y multi a propósito: un mismo
+  // material puede estar en los dos, así que las filas no sumarían y la tabla
+  // dejaría de cerrar, que es justamente lo que tiene que hacer.
+  $('#tResumen').insertAdjacentHTML('beforeend',
+    `<p class="est wip" style="margin-top:8px">Los ítems distintos no se abren por mono y multi:
+      un mismo material puede estar en los dos y la suma no cerraría.
+      El total del alcance actual es <b>${U.ent(v.f.items)}</b>.</p>`);
+
+  // --- por tipo
+  const porTipo = agrupar(v.fis, 'tipo');
+  const mono = porTipo.filter(d => esMono(d.k)).sort((a, b) => b.pct - a.pct);
+  const multi = porTipo.filter(d => !esMono(d.k)).sort((a, b) => b.pct - a.pct);
+
+  G.ocup($('#gMono'), mono.map(d => ({ k: d.k, et: d.k, pct: d.pct, globo: globoDim('Tipo ' + rotTipo(d.k), d) })),
+    { sel: F.tipo, alClic: k => alternar('tipo', k), ref: 90, aria: 'Saturación por tipo monoproducto' });
+
+  G.ocup($('#gMulti'), multi.map(d => ({ k: d.k, et: d.k, pct: d.pct, globo: globoDim('Tipo ' + rotTipo(d.k), d) })),
+    {
+      sel: F.tipo, alClic: k => alternar('tipo', k), color: 'var(--barra-sec)',
+      rotLleno: 'Con stock', rotVacio: 'Sin stock',
+      aria: 'Posiciones con stock en tipos multiproducto', vacio: 'No hay posiciones multiproducto con este filtro.'
+    });
 
   tabla($('#tTipo'), [
     {
       t: 'Tipo', v: f => f.k, h: f => `<b>${U.esc(f.k)}</b>`
         + (descTipo(f.k) ? ` <span class="pill">${U.esc(descTipo(f.k))}</span>` : '')
     },
-    { t: 'Ocupación', n: true, v: f => f.pct, h: f => barraCelda(f.pct) },
-    { t: 'Estado', v: f => f.pct, h: f => chipSem(SEM.ocupacion(f.pct)) },
-    { t: 'Ocup.', n: true, v: f => f.ocu, h: f => U.ent(f.ocu) },
+    {
+      t: 'Clase', v: f => (esMono(f.k) ? 'A' : 'B'),
+      h: f => esMono(f.k) ? '<span class="pill f">monoproducto</span>' : '<span class="pill">multiproducto</span>'
+    },
+    { t: 'Stock', v: f => (TIPOS[f.k] || {}).st || '', h: f => `<span style="font-size:12px;color:var(--tinta-2)">${U.esc((TIPOS[f.k] || {}).st || '')}</span>` },
+    { t: '%', n: true, v: f => f.pct, h: f => barraCelda(f.pct) },
+    {
+      t: 'Lectura', v: f => f.pct, h: f => esMono(f.k)
+        ? chipSem(SEM.ocupacion(f.pct))
+        : `<span style="font-size:12px;color:var(--tinta-3)">no aplica</span>`
+    },
+    { t: 'Ocupadas', n: true, v: f => f.ocu, h: f => U.ent(f.ocu) },
     { t: 'Vacías', n: true, v: f => f.vac, h: f => U.ent(f.vac) },
     { t: 'Total', n: true, v: f => f.n, h: f => U.ent(f.n) }
-  ], porTipo, {
-    orden: 1, dir: -1, clave: f => f.k, sel: f => F.tipo === f.k,
-    alClic: k => alternar('tipo', k),
-    pie: [{ t: 'Total' }, { t: U.pct(v.f.pct), n: true }, { t: '' },
+  ], porTipo.slice().sort((a, b) => (esMono(b.k) - esMono(a.k)) || b.pct - a.pct), {
+    orden: -1, libre: true, clave: f => f.k, sel: f => F.tipo === f.k, alClic: k => alternar('tipo', k),
+    pie: [{ t: 'Total físico' }, { t: '' }, { t: '' }, { t: U.pct(v.f.pct), n: true }, { t: '' },
     { t: U.ent(v.f.ocu), n: true }, { t: U.ent(v.f.vac), n: true }, { t: U.ent(v.f.n), n: true }]
   });
 
-  // --- por pasillo, área y nivel
-  const porPas = agrupar(v.fis, 'pas').sort((a, b) => ordNat(a.k, b.k));
+  // --- dimensiones: sólo monoproducto, que es donde la saturación significa algo
+  const porPas = agrupar(v.mono, 'pas').sort((a, b) => ordNat(a.k, b.k));
   G.ocupV($('#gPas'), porPas.map(d => ({ k: d.k, et: d.k, pct: d.pct, globo: globoDim('Pasillo ' + d.k, d) })),
-    { sel: F.pas, alClic: k => alternar('pas', k), aria: 'Ocupación por pasillo' });
+    { sel: F.pas, alClic: k => alternar('pas', k), ref: 90, aria: 'Saturación por pasillo' });
 
-  const porArea = agrupar(v.fis, 'area').sort((a, b) => b.n - a.n).slice(0, 12);
+  const porArea = agrupar(v.mono, 'area').sort((a, b) => b.n - a.n);
   G.ocup($('#gArea'), porArea.map(d => ({ k: d.k, et: d.k, pct: d.pct, globo: globoDim('Área ' + d.k, d) })),
-    { sel: F.area, alClic: k => alternar('area', k), mI: 76, aria: 'Ocupación por área' });
+    { sel: F.area, alClic: k => alternar('area', k), mI: 70, ref: 90, leyenda: false, aria: 'Saturación por área' });
 
-  const porNiv = agrupar(v.fis, 'niv').sort((a, b) => ordNat(a.k, b.k));
+  const porNiv = agrupar(v.mono, 'niv').sort((a, b) => ordNat(a.k, b.k));
   G.ocupV($('#gNiv'), porNiv.map(d => ({ k: d.k, et: d.k, pct: d.pct, globo: globoDim('Nivel ' + d.k, d) })),
-    { sel: F.niv, alClic: k => alternar('niv', k), aria: 'Ocupación por nivel' });
+    { sel: F.niv, alClic: k => alternar('niv', k), ref: 90, aria: 'Saturación por nivel' });
 
   // --- mapa pasillo por nivel
-  const celdas = [];
   const acc = new Map();
-  for (const x of v.fis) {
+  for (const x of v.mono) {
     const k = x.pas + '\u0000' + x.niv;
     let a = acc.get(k);
     if (!a) { a = { f: x.pas, c: x.niv, n: 0, ocu: 0 }; acc.set(k, a); }
     a.n++; if (x.ocu) a.ocu++;
   }
-  for (const a of acc.values()) celdas.push({
+  G.calor($('#gCalor'), [...acc.values()].map(a => ({
     f: a.f, c: a.c, v: a.n ? a.ocu / a.n * 100 : 0,
     globo: `<b>Pasillo ${U.esc(a.f)} · nivel ${U.esc(a.c)}</b><table>
-      <tr><td>Ocupación</td><td>${U.pct(a.n ? a.ocu / a.n * 100 : 0)}</td></tr>
+      <tr><td>Saturación</td><td>${U.pct(a.n ? a.ocu / a.n * 100 : 0)}</td></tr>
       <tr><td>Ocupadas</td><td>${U.ent(a.ocu)}</td></tr>
       <tr><td>Vacías</td><td>${U.ent(a.n - a.ocu)}</td></tr>
       <tr><td>Total</td><td>${U.ent(a.n)}</td></tr></table>
       <div class="pie">Clic para filtrar por este pasillo y nivel</div>`
-  });
-  G.calor($('#gCalor'), celdas, {
+  })), {
     filas: porPas.map(d => d.k), cols: porNiv.map(d => d.k),
-    alClic: (f, c) => { F.pas = F.pas === f && F.niv === c ? '' : f; F.niv = F.pas ? c : ''; sincronizarFiltros(); pintar(); },
-    aria: 'Mapa de ocupación por pasillo y nivel'
+    alClic: (f, c) => { F.pas = (F.pas === f && F.niv === c) ? '' : f; F.niv = F.pas ? c : ''; sincronizarFiltros(); pintar(); },
+    aria: 'Mapa de saturación por pasillo y nivel'
   });
 
-  // --- virtuales
+  // --- fuera de posición
   $('#kpiVir').innerHTML = `
     <div class="k naranja destacado">
-      <div class="rot">Ubicaciones de tránsito</div>
-      <div class="v">${U.ent(v.v.n)}</div>
-      <div class="med"><i style="width:${(v.v.n ? v.v.ocu / v.v.n * 100 : 0).toFixed(1)}%;background:var(--s2)"></i></div>
-      <div class="d" style="margin-top:8px">${U.ent(v.v.ocu)} con stock · ${U.ent(v.v.n - v.v.ocu)} vacías</div>
-    </div>
-    <div class="k naranja"><div class="rot">Con stock</div><div class="v">${U.ent(v.v.ocu)}</div>
-      <div class="d">tienen mercadería hoy</div></div>
-    <div class="k gris"><div class="rot">Vacías</div><div class="v">${U.ent(v.v.n - v.v.ocu)}</div>
-      <div class="d">catalogadas y sin uso hoy</div></div>
-    <div class="k naranja"><div class="rot">Ítems distintos</div><div class="v">${U.ent(v.v.items)}</div>
+      <div class="rot">Tránsito · está en el depósito</div>
+      <div class="v">${U.ent(v.t.ocu)}</div>
+      <div class="med"><i style="width:${(v.t.n ? v.t.ocu / v.t.n * 100 : 0).toFixed(1)}%;background:var(--s2)"></i></div>
+      <div class="d" style="margin-top:8px">ubicaciones con stock de ${U.ent(v.t.n)} ·
+        ${U.usd(v.t.val)} · ${U.pl(v.t.items, 'ítem', 'ítems')}</div></div>
+    <div class="k naranja">
+      <div class="rot">Virtual · contable</div><div class="v">${U.ent(v.v.ocu)}</div>
+      <div class="d">de ${U.ent(v.v.n)} ubicaciones · ${U.usd(v.v.val)}<br>mermas, daños, garantías, ajustes</div></div>
+    <div class="k gris"><div class="rot">Total fuera de posición</div><div class="v">${U.ent(v.fuera.ocu)}</div>
+      <div class="d">ubicaciones con stock · ${U.usd(v.fuera.val)}</div></div>
+    <div class="k gris"><div class="rot">Ítems distintos</div><div class="v">${U.ent(v.fuera.items)}</div>
       <div class="d">materiales fuera de posición</div></div>
-    <div class="k gris"><div class="rot">Líneas de stock</div><div class="v">${U.ent(v.v.lin)}</div>
+    <div class="k gris"><div class="rot">Líneas de stock</div><div class="v">${U.ent(v.fuera.lin)}</div>
       <div class="d">el detalle está en Tránsito</div></div>`;
 
-  const porTipoV = agrupar(v.vir, 'tipo').sort((a, b) => b.ocu - a.ocu);
-  G.ocup($('#gVir'), porTipoV.map(d => ({
+  const fueraTipos = agrupar(v.tra.concat(v.vir), 'tipo').sort((a, b) => b.ocu - a.ocu);
+  G.ocup($('#gVir'), fueraTipos.map(d => ({
     k: d.k, et: d.k, pct: d.pct,
-    globo: `<b>${U.esc(rotTipo(d.k))}</b><table>
+    globo: `<b>${U.esc(rotTipo(d.k))}</b> · ${CLASES[claseDe(d.k)]}<table>
       <tr><td>Ubicaciones</td><td>${U.ent(d.n)}</td></tr>
       <tr><td>Con stock</td><td>${U.ent(d.ocu)}</td></tr>
-      <tr><td>Vacías</td><td>${U.ent(d.vac)}</td></tr>
-      <tr><td>Líneas</td><td>${U.ent(d.lin)}</td></tr></table>`
+      <tr><td>Líneas</td><td>${U.ent(d.lin)}</td></tr>
+      <tr><td>Valor</td><td>${U.usdX(d.val)}</td></tr></table>`
   })), {
-    sel: F.tipo, alClic: k => alternar('tipo', k), mI: 76, color: 'var(--s2)',
-    rotLleno: 'Con stock', rotVacio: 'Sin uso hoy',
-    aria: 'Uso de las ubicaciones de tránsito por tipo'
+    sel: F.tipo, alClic: k => alternar('tipo', k), mI: 70, color: 'var(--s2)',
+    rotLleno: 'Con stock', rotVacio: 'Sin uso hoy', aria: 'Uso de las ubicaciones fuera de posición'
   });
 
   tabla($('#tVir'), [
     { t: 'Tipo', v: f => f.k, h: f => `<b>${U.esc(f.k)}</b>` + (descTipo(f.k) ? ` <span class="pill v">${U.esc(descTipo(f.k))}</span>` : '') },
+    {
+      t: 'Clase', v: f => claseDe(f.k),
+      h: f => `<span class="pill${claseDe(f.k) === 'T' ? '' : ' v'}">${U.esc(CLASES[claseDe(f.k)])}</span>`
+    },
     { t: 'Ubic.', n: true, v: f => f.n, h: f => U.ent(f.n) },
     { t: 'Con stock', n: true, v: f => f.ocu, h: f => U.ent(f.ocu) },
-    { t: 'Líneas', n: true, v: f => f.lin, h: f => U.ent(f.lin) }
-  ], porTipoV, {
-    orden: 2, dir: -1, clave: f => f.k, sel: f => F.tipo === f.k, alClic: k => alternar('tipo', k),
-    vacio: 'No hay ubicaciones de tránsito con este filtro.',
-    pie: [{ t: 'Total' }, { t: U.ent(v.v.n), n: true }, { t: U.ent(v.v.ocu), n: true }, { t: U.ent(v.v.lin), n: true }]
+    { t: 'Líneas', n: true, v: f => f.lin, h: f => U.ent(f.lin) },
+    { t: 'Valor', n: true, v: f => f.val, h: f => U.usdX(f.val) }
+  ], fueraTipos, {
+    orden: 5, dir: -1, libre: true, clave: f => f.k, sel: f => F.tipo === f.k, alClic: k => alternar('tipo', k),
+    vacio: 'No hay ubicaciones fuera de posición con este filtro.',
+    pie: [{ t: 'Total' }, { t: '' }, { t: U.ent(v.fuera.n), n: true }, { t: U.ent(v.fuera.ocu), n: true },
+    { t: U.ent(v.fuera.lin), n: true }, { t: U.usdX(v.fuera.val), n: true }]
   });
 }
 
@@ -2104,7 +2258,7 @@ const globoDim = (titulo, d) => `<b>${U.esc(titulo)}</b><table>
   <div class="pie">Clic para filtrar el tablero</div>`;
 
 const barraCelda = pct => `<div class="minibar">
-  <i style="width:${Math.min(100, pct).toFixed(0)}%;background:${colorSem(SEM.ocupacion(pct).n)}"></i>
+  <i style="width:${Math.min(100, pct).toFixed(0)}%;background:var(--barra)"></i>
   <span>${U.pct(pct)}</span></div>`;
 
 // Orden natural: así el pasillo 10 va después del 9 y no entre el 1 y el 2.
@@ -2123,9 +2277,10 @@ let ubiSel = null;
 
 function pintarTransito(v) {
   if (!faltanDatos('tranVacio', 'tranCuerpo')) return;
-  const conStock = M.ubis.filter(x => x.clase === 'V' && x.ocu);
-  const todas = M.ubis.filter(x => x.clase === 'V');
-  const lin = M.lineas.filter(l => l.clase === 'V');
+  const fuera = M.ubis.filter(x => x.cl === 'T' || x.cl === 'V');
+  const conStock = fuera.filter(x => x.ocu);
+  const todas = fuera;
+  const lin = M.lineas.filter(l => l.cl === 'T' || l.cl === 'V');
   const valTot = conStock.reduce((s, x) => s + x.val, 0);
 
   // antigüedad
@@ -2216,7 +2371,7 @@ function pintarTransito(v) {
   }
 }
 $('#btnCsvTran').addEventListener('click', () => {
-  const ls = M.lineas.filter(l => l.clase === 'V');
+  const ls = M.lineas.filter(l => l.cl === 'T' || l.cl === 'V');
   U.bajar(`transito_${M.fecha}.csv`, U.csv(
     ['Ubicación', 'Para qué se usa', 'Tipo', 'Material', 'Descripción', 'Cantidad', 'UM', 'Valor USD', 'Entrada', 'Tipo de stock'],
     ls.map(l => [l.u, propUbi(l.u), l.tipo, l.mat, l.desc, Math.round(l.ctd), l.um, Math.round(l.val), l.fem, l.ts])));
@@ -2545,19 +2700,19 @@ $('#btnCsvTen').addEventListener('click', () => {
    =========================================================================== */
 function pintarCalidad(v) {
   if (!faltanDatos('calVacio', 'calCuerpo')) return;
-  const fis = M.ubis.filter(x => x.clase === 'F');
+  const fis = M.ubis.filter(x => x.cl === 'F');
   const inc = fis.filter(x => x.ocu && x.fv);
   const incInv = fis.filter(x => !x.ocu && !x.fv).length;
   const bloq = fis.filter(x => x.bloq);
   const sinCat = D.dic ? M.ubis.filter(x => !D.dic.ubis.has(x.u)
-    && (!/^\d{4}(-\d+){3,6}$/.test(x.u) || x.clase === 'V')).sort((a, b) => b.val - a.val) : [];
-  const virSinCat = M.ubis.filter(x => x.clase === 'V' && x.ocu && D.dic && !D.dic.ubis.has(x.u)).length;
+    && (!/^\d{4}(-\d+){3,6}$/.test(x.u) || x.cl !== 'F')).sort((a, b) => b.val - a.val) : [];
+  const virSinCat = M.ubis.filter(x => x.cl !== 'F' && x.ocu && D.dic && !D.dic.ubis.has(x.u)).length;
 
   const bandas = [['0 a 30 días', 30], ['31 a 90 días', 90], ['91 a 180 días', 180],
   ['181 a 365 días', 365], ['1 a 2 años', 730], ['Más de 2 años', Infinity]]
     .map(([b, d]) => ({ b, d, lin: 0, val: 0 }));
   let sinFecha = 0;
-  for (const l of M.lineas.filter(l => l.clase === 'F')) {
+  for (const l of M.lineas.filter(l => l.cl === 'F')) {
     if (!l.fem) { sinFecha++; continue; }
     const bb = bandas.find(x => U.dias(l.fem, M.fecha) <= x.d) || bandas[5];
     bb.lin++; bb.val += l.val;
@@ -2574,8 +2729,8 @@ function pintarCalidad(v) {
       <div class="v">${U.ent(virSinCat)}</div><div class="d">no figuran en el diccionario</div></div>
     <div class="k gris"><div class="rot">Posiciones bloqueadas</div><div class="v">${U.ent(bloq.length)}</div>
       <div class="d">${U.ent(bloq.filter(x => x.ocu).length)} con stock · reducen la capacidad real</div></div>
-    <div class="k gris"><div class="rot">Reclasificadas</div><div class="v">${U.ent(M.recl)}</div>
-      <div class="d">del maestro, pasadas a tránsito por el diccionario</div></div>
+    <div class="k gris"><div class="rot">Ubicaciones ajenas</div><div class="v">${U.ent(M.terceros.ubis)}</div>
+      <div class="d">descartadas: ${M.terceros.tipos.length ? 'tipos ' + U.esc(M.terceros.tipos.join(', ')) : 'por filtro'}</div></div>
     <div class="k gris"><div class="rot">Líneas sin fecha de entrada</div><div class="v">${U.ent(sinFecha)}</div>
       <div class="d">no se les puede calcular antigüedad</div></div>`;
 
@@ -2617,7 +2772,7 @@ function pintarCalidad(v) {
   tabla($('#tSinCat'), [
     { t: 'Ubicación', v: f => f.u, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.u)}</b>` },
     { t: 'Tipo', v: f => f.tipo },
-    { t: 'Cuenta como', v: f => f.clase, h: f => f.clase === 'V' ? '<span class="pill v">tránsito</span>' : '<span class="pill f">capacidad</span>' },
+    { t: 'Cuenta como', v: f => f.cl, h: f => f.cl === 'F' ? '<span class="pill f">capacidad</span>' : `<span class="pill v">${CLASES[f.cl].toLowerCase()}</span>` },
     { t: 'Valor', n: true, v: f => f.val, h: f => f.val ? U.usdX(f.val) : '' }
   ], sinCat, { orden: 3, dir: -1, limite: 200, vacio: D.dic ? 'Todas las ubicaciones relevantes están catalogadas.' : 'Cargue el diccionario para este control.' });
 }
@@ -2628,7 +2783,7 @@ $('#btnCsvInc').addEventListener('click', () => U.bajar(`inconsistencias_${M.fec
 $('#btnCsvSinCat').addEventListener('click', () => U.bajar(`sin_catalogar_${M.fecha}.csv`, U.csv(
   ['Ubicación', 'Tipo almacén', 'Hoy cuenta como', 'Estado', 'Líneas', 'Valor USD',
     'CLASE (Ubicación Fisica / Ubicación Virtual)', 'PARA QUÉ SE USA'],
-  CAL_SINCAT.map(f => [f.u, f.tipo, f.clase === 'V' ? 'tránsito' : 'capacidad',
+  CAL_SINCAT.map(f => [f.u, f.tipo, CLASES[f.cl],
     f.ocu ? 'Ocupada' : 'Vacía', f.lin, Math.round(f.val), '', '']))));
 
 /* ===========================================================================
@@ -2649,7 +2804,7 @@ function pintarDetalle(v) {
   DET_ULT = filas;
   tabla($('#tDet'), [
     { t: 'Ubicación', v: f => f.u, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.u)}</span>` },
-    { t: 'Clase', v: f => f.clase, h: f => f.clase === 'V' ? '<span class="pill v">tránsito</span>' : '<span class="pill f">física</span>' },
+    { t: 'Clase', v: f => f.cl, h: f => f.cl === 'F' ? `<span class="pill f">física ${f.mm}</span>` : `<span class="pill v">${CLASES[f.cl].toLowerCase()}</span>` },
     { t: 'Tipo', v: f => f.tipo }, { t: 'Área', v: f => f.area },
     { t: 'Pasillo', v: f => f.pas }, { t: 'Nivel', v: f => f.niv },
     { t: 'Estado', v: f => (f.ocu ? 1 : 0), h: f => f.ocu ? '<b>Ocupada</b>' : 'Vacía' },
@@ -2665,9 +2820,9 @@ $('#buscaDet').addEventListener('input', () => {
   $('#buscaDet')._t = setTimeout(pintar, 220);
 });
 $('#btnCsvDet').addEventListener('click', () => U.bajar(`ubicaciones_${M.fecha}.csv`, U.csv(
-  ['Ubicación', 'Clase', 'Tipo almacén', 'Área', 'Pasillo', 'Nivel', 'Estado', 'Líneas', 'Ítems',
+  ['Ubicación', 'Clase', 'Mono/Multi', 'Tipo almacén', 'Área', 'Pasillo', 'Nivel', 'Estado', 'Líneas', 'Ítems',
     'Cantidad', 'Valor USD', 'Entrada más vieja', 'Bloqueo', 'Para qué se usa'],
-  DET_ULT.map(f => [f.u, f.clase === 'V' ? 'Tránsito' : 'Física', f.tipo, f.area, f.pas, f.niv,
+  DET_ULT.map(f => [f.u, CLASES[f.cl], f.mm === 'mono' ? 'Monoproducto' : 'Multiproducto', f.tipo, f.area, f.pas, f.niv,
     f.ocu ? 'Ocupada' : 'Vacía', f.lin, f.mats, Math.round(f.ctd), Math.round(f.val), f.fem, f.bloq, f.prop]))));
 </script>
 <script>
@@ -2974,7 +3129,7 @@ function pintarReporte() {
 
 // Las cuatro cosas que conviene mirar primero, ordenadas por gravedad.
 function alertasFilmina(v) {
-  const fis = M.ubis.filter(x => x.clase === 'F');
+  const fis = M.ubis.filter(x => x.cl === 'F');
   const crit = agrupar(v.fis, 'tipo').filter(d => d.pct >= 90 && d.n >= 10);
   const inc = fis.filter(x => x.ocu && x.fv).length;
   const c = calcConsolidacion(v);
