@@ -3048,7 +3048,6 @@ function pintarReporte() {
   Object.assign(F, guard);
 
   const sm = SEM.ocupacion(v.mono_.pct);
-  const s = serie('sem');
   const emp = ($('#repEmp').value || '').trim(), aut = ($('#repAut').value || '').trim(), nota = ($('#repNota').value || '').trim();
 
   const kpi = (r, val, det) => `<div class="c"><div class="r">${r}</div><div class="v">${val}</div><div class="d">${det}</div></div>`;
@@ -3062,22 +3061,6 @@ function pintarReporte() {
     <span class="n">${U.dec(d.pct, 0)}%</span>
     <span class="n" style="width:58px;color:var(--tinta-2)">${op.der ? op.der(d) : U.ent(d.vac) + ' lib'}</span></div>`;
 
-  let mini = '<div style="font-size:11px;color:var(--tinta-3);padding:6px 0">Sin historial todavía.</div>';
-  if (s.length > 1) {
-    const vals = s.map(x => x.pct), mn = Math.min(...vals), mx = Math.max(...vals), rg = (mx - mn) || 1;
-    const W = 230, H = 52;
-    const px = i => (i / (s.length - 1)) * W, py = x => H - ((x - mn) / rg) * (H - 12) - 6;
-    const pts = s.map((d, i) => `${px(i).toFixed(1)} ${py(d.pct).toFixed(1)}`);
-    mini = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible">
-      <path d="M0 ${H} L${pts.join(' L')} L${W} ${H}Z" fill="var(--barra)" opacity=".10"/>
-      <path d="M${pts.join(' L')}" fill="none" stroke="var(--barra)" stroke-width="2" stroke-linejoin="round"/>
-      <circle cx="${px(s.length - 1).toFixed(1)}" cy="${py(vals[vals.length - 1]).toFixed(1)}" r="3.5"
-        fill="var(--barra)" stroke="var(--sup)" stroke-width="2"/></svg>
-      <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--tinta-3)">
-        <span>${U.esc(s[0].et)}</span><span>${U.esc(s[s.length - 1].et)}</span></div>
-      <div style="font-size:11px;color:var(--tinta-2);margin-top:4px">De ${U.pct(vals[0])} a
-        <b style="color:var(--tinta)">${U.pct(vals[vals.length - 1])}</b> en ${U.pl(s.length, 'período', 'períodos')}.</div>`;
-  }
 
   const porTipo = agrupar(v.fis, 'tipo');
   const mono = porTipo.filter(d => esMono(d.k)).sort((a, b) => b.pct - a.pct);
@@ -3123,15 +3106,6 @@ function pintarReporte() {
         <div class="fil-cj"><h4>Saturación por tipo monoproducto</h4>
           ${mono.map(d => fila(d, { umbral: true })).join('')}
           <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">La marca vertical es el umbral del 90%.</div></div>
-        <div class="fil-cj"><h4>Pasillos más cargados · monoproducto</h4>
-          ${porPas.slice(0, 8).map(d => fila(d, { umbral: true })).join('')}</div>
-        <div class="fil-cj"><h4>Evolución de la ocupación</h4>${mini}
-          <div style="margin-top:6px;font-size:11px;color:var(--tinta-2)">
-            Valor en posiciones: <b style="color:var(--tinta)">${U.usd(v.f.val)}</b><br>
-            Fuera de posición: <b style="color:var(--tinta)">${U.usd(v.fuera.val)}</b></div></div>
-      </div>
-
-      <div class="fil-cols">
         <div class="fil-cj"><h4>Mono, multi y total</h4>
           <div class="fil-fil" style="color:var(--tinta-3);font-size:10px">
             <span style="flex:1"></span><span class="n" style="width:46px">OCUP.</span>
@@ -3139,23 +3113,17 @@ function pintarReporte() {
           ${res}
           <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">
             En multiproducto entran varios materiales y lo que no entra queda fuera del rack:
-            el porcentaje no se lee como saturación.</div></div>
-        <div class="fil-cj"><h4>Fuera de posición</h4>
-          <div class="fil-fil" style="font-weight:700">
-            <span style="flex:1">Tránsito <span style="color:var(--tinta-3);font-weight:400">· está en el depósito</span></span>
-            <span class="n" style="width:40px">${U.ent(v.t.ocu)}</span>
-            <span class="n" style="width:64px">${U.usd(v.t.val).replace('USD ', '')}</span></div>
-          <div class="fil-fil" style="font-weight:700">
-            <span style="flex:1">Virtual <span style="color:var(--tinta-3);font-weight:400">· contable</span></span>
-            <span class="n" style="width:40px">${U.ent(v.v.ocu)}</span>
-            <span class="n" style="width:64px">${U.usd(v.v.val).replace('USD ', '')}</span></div>
-          <div style="height:5px"></div>
-          ${fuera.slice(0, 5).map(d => `<div class="fil-fil">
-            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${U.esc(d.k)}
-              <span style="color:var(--tinta-3)">· ${CLASES[claseDe(d.k)]}</span></span>
-            <span class="n" style="width:40px">${U.ent(d.ocu)}</span>
-            <span class="n" style="width:64px;color:var(--tinta-2)">${U.usd(d.val).replace('USD ', '')}</span></div>`).join('')}</div>
-        <div class="fil-cj"><h4>Qué mirar</h4>${alertasFilmina(v, mono)}</div>
+            el porcentaje no se lee como saturación.</div>
+          <div style="margin-top:6px;font-size:11px;color:var(--tinta-2)">
+            Valor en posiciones: <b style="color:var(--tinta)">${U.usd(v.f.val)}</b> ·
+            fuera de posición: <b style="color:var(--tinta)">${U.usd(v.fuera.val)}</b></div></div>
+        <div class="fil-cj"><h4>Pasillos más cargados · monoproducto</h4>
+          ${porPas.slice(0, 8).map(d => fila(d, { umbral: true })).join('')}</div>
+      </div>
+
+      <div class="fil-cj" style="margin-top:11px">
+        <h4>Mapa de saturación: pasillo por nivel · monoproducto</h4>
+        ${mapaFilmina(v)}
       </div>
 
       ${nota ? `<div class="fil-nota"><b>Comentario:</b> ${U.esc(nota)}</div>` : ''}
@@ -3167,28 +3135,51 @@ function pintarReporte() {
     </div>`;
 }
 
-// Las cuatro cosas a mirar primero. Sin colores de semáforo: ordenadas por
-// gravedad y marcadas con un punto sobrio.
-function alertasFilmina(v, mono) {
-  const fis = M.ubis.filter(x => x.cl === 'F');
-  const crit = mono.filter(d => d.pct >= 90 && d.n >= 10);
-  const inc = fis.filter(x => x.ocu && x.fv).length;
-  const c = calcConsolidacion(v);
-  const bloq = fis.filter(x => x.bloq).length;
-  const it = [];
-  if (crit.length) it.push([3, `<b>${U.pl(crit.length, 'tipo monoproducto', 'tipos monoproducto')} por encima del 90%</b>
-    (${U.esc(crit.slice(0, 4).map(d => d.k).join(', '))}). Riesgo de no poder recibir.`]);
-  if (c.ahorro) it.push([2, `<b>${U.ent(c.ahorro)} posiciones liberables</b> unificando
-    ${U.ent(c.nMulti)} materiales repetidos.`]);
-  if (inc) it.push([2, `<b>${U.ent(inc)} ubicaciones con stock</b> figuran como vacías en el maestro.`]);
-  if (v.fuera.ocu) it.push([1, `<b>${U.ent(v.fuera.ocu)} ubicaciones fuera de posición</b> con stock,
-    ${U.usd(v.fuera.val)}.`]);
-  if (bloq) it.push([1, `<b>${U.ent(bloq)} posiciones bloqueadas</b> de entrada o salida.`]);
-  it.sort((a, b) => b[0] - a[0]);
-  return it.slice(0, 4).map(([n, t]) =>
-    `<div class="fil-fil" style="align-items:flex-start;padding:3px 0">
-      <span style="flex:none;font-weight:700;color:${n >= 3 ? 'var(--tinta)' : 'var(--tinta-3)'}">●</span>
-      <span>${t}</span></div>`).join('') || '<div style="font-size:11px;color:var(--tinta-3)">Sin alertas relevantes.</div>';
+// Mapa de saturación para la filmina: compacto, sin interacción y con los
+// mismos pasos de color que la pantalla. Sólo posiciones monoproducto.
+function mapaFilmina(v) {
+  const acc = new Map();
+  for (const x of v.mono) {
+    const k = x.pas + '\u0000' + x.niv;
+    let a = acc.get(k);
+    if (!a) { a = { f: x.pas, c: x.niv, n: 0, ocu: 0 }; acc.set(k, a); }
+    a.n++; if (x.ocu) a.ocu++;
+  }
+  if (!acc.size) return '<div style="font-size:11px;color:var(--tinta-3)">Sin posiciones monoproducto.</div>';
+  const filas = [...new Set(v.mono.map(x => x.pas))].sort(ordNat);
+  const cols = [...new Set(v.mono.map(x => x.niv))].sort(ordNat);
+  const ramp = ['--q1', '--q2', '--q3', '--q4', '--q5', '--q6', '--q7', '--q8', '--q9', '--q10', '--q11', '--q12'];
+
+  const mI = 58, mT = 16, cw = Math.max(34, Math.min(74, (1040 - mI) / cols.length)), ch = 19;
+  const W = mI + cols.length * cw + 4, H = mT + filas.length * ch + 4;
+  let g = '';
+  cols.forEach((c, j) => {
+    g += `<text x="${mI + j * cw + cw / 2}" y="${mT - 5}" text-anchor="middle"
+      style="font-size:9px;fill:var(--tinta-3)">${U.esc(c)}</text>`;
+  });
+  filas.forEach((f, i) => {
+    g += `<text x="${mI - 6}" y="${mT + i * ch + ch / 2 + 3}" text-anchor="end"
+      style="font-size:9px;fill:var(--tinta-2)">${U.esc(f)}</text>`;
+    cols.forEach((c, j) => {
+      const d = acc.get(f + '\u0000' + c);
+      const x = mI + j * cw, y = mT + i * ch;
+      if (!d) {
+        g += `<rect x="${x + 1}" y="${y + 1}" width="${cw - 2}" height="${ch - 2}" rx="2" fill="var(--sup-2)" opacity=".5"/>`;
+        return;
+      }
+      const pct = d.n ? d.ocu / d.n * 100 : 0;
+      const p = Math.min(11, Math.max(0, Math.floor(pct / 100 * 12)));
+      g += `<rect x="${x + 1}" y="${y + 1}" width="${cw - 2}" height="${ch - 2}" rx="2" fill="var(${ramp[p]})"/>`;
+      g += `<text x="${x + cw / 2}" y="${y + ch / 2 + 3}" text-anchor="middle"
+        style="font-size:8.5px;font-weight:700;font-variant-numeric:tabular-nums;fill:${p >= 7 ? '#fff' : 'var(--tinta)'}">${U.dec(pct, 0)}</text>`;
+    });
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${g}</svg>
+    <div style="display:flex;align-items:center;gap:7px;font-size:9.5px;color:var(--tinta-2);margin-top:5px">
+      <span>0%</span>
+      <span style="display:flex;height:8px;width:110px;border-radius:2px;overflow:hidden;border:1px solid var(--borde)">
+        ${ramp.map(r => `<i style="flex:1;background:var(${r})"></i>`).join('')}</span>
+      <span>100% ocupado · filas: pasillo · columnas: nivel</span></div>`;
 }
 
 /* ===========================================================================
