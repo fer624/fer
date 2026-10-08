@@ -49,6 +49,16 @@ seleccionar varios fotostock juntos para cargar historial de semanas anteriores.
   ocupación en cambio sólo puede medirse sobre lo físico, porque el tránsito no tiene capacidad
   definida contra la cual calcular un porcentaje. Sale de la columna `Total` del fotostock, que ya
   viene valorizada.
+- **Ubicaciones de terceros**: las que aparecen en el fotostock porque se comparte el sistema pero no
+  opera CEVA (hoy, las que contienen `FSM`) se descartan por completo. El filtro es editable en la
+  pestaña Datos.
+- **Back Order** (tipos marcados así en el diccionario): cuenta como capacidad, porque ocupa
+  estantería real, pero se informa aparte: es mercadería comprometida y ese espacio no está
+  realmente disponible.
+- **Rótulos del site**: el tipo 0122 es un rack cantilever para cuchillas, y cuatro de sus
+  ubicaciones (`MUELLE.DER`, `MUELLE.IZQ`, `CORES`, `PORTON.IN`) se crearon para sobredimensionados
+  que no entran en ningún rack. Son capacidad real. Esos rótulos están en el código, en
+  `NOTAS_SITE`, hasta que se incorporen a `Info_ubicaciones`, que es su lugar natural.
 - **Consolidación**: el ahorro de posiciones es un techo teórico. Supone que todo el material entra en
   una sola posición, cosa que depende de la capacidad de cada ubicación, dato que el maestro no trae.
 - **Fecha del corte**: la define el usuario. `Fecha EM` es la fecha de entrada de

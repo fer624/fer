@@ -500,6 +500,22 @@ textarea{min-height:68px; resize:vertical; width:100%}
     </div>
   </div>
 
+  <div class="tarjeta">
+    <header>
+      <h2>Ubicaciones de terceros</h2>
+      <p>Ubicaciones que aparecen en el fotostock porque se comparte el sistema, pero que no opera
+         CEVA. Se descartan por completo del cálculo. Escriba los textos que identifican esas
+         ubicaciones, separados por coma.</p>
+    </header>
+    <div class="controles">
+      <div class="campo">
+        <label for="inExcluir">Descartar ubicaciones cuyo nombre contenga</label>
+        <input type="text" id="inExcluir" placeholder="por ejemplo: FSM" style="min-width:230px">
+      </div>
+      <span class="estado" id="estExcluir"></span>
+    </div>
+  </div>
+
   <div class="tarjeta" id="cajaFecha" hidden>
     <header>
       <h2>Fecha del corte</h2>
@@ -573,9 +589,10 @@ textarea{min-height:68px; resize:vertical; width:100%}
     </div>
 
     <div class="tarjeta">
-      <header><h2>Ubicaciones virtuales</h2>
-        <p>Tipos de almacén que traen stock pero no tienen posiciones en el maestro: tránsito, interinas y similares.
-           No entran en el cálculo de ocupación porque no tienen capacidad definida.</p></header>
+      <header><h2>Ubicaciones de tránsito</h2>
+        <p>Stock que está en el depósito pero no en una posición de almacenamiento: playas de exportación,
+           control de picking, bahías, interinas. No entra en el cálculo de ocupación porque no es capacidad,
+           pero sí suma al valor total. El detalle de cada una está en la pestaña <b>Tránsito</b>.</p></header>
       <div id="tablaVirt"></div>
     </div>
   </div>
@@ -792,6 +809,15 @@ textarea{min-height:68px; resize:vertical; width:100%}
            Es inconsistencia de SAP y conviene revisarla: puede esconder stock no disponible para asignar.</p></header>
       <div class="controles no-imprimir"><button class="btn sec" id="btnCsvInc">Exportar CSV</button></div>
       <div id="tablaInc"></div>
+    </div>
+
+    <div class="tarjeta" id="cajaSinCat" hidden>
+      <header><h2>Ubicaciones sin catalogar en el diccionario</h2>
+        <p>No figuran en <b>Info_ubicaciones</b>, así que no se sabe para qué se usan ni si deberían
+           contar como capacidad. Las que tienen nombre en vez de coordenadas son las que más importan:
+           un nombre propio suele indicar un uso especial. Exporte la lista y complétela en el diccionario.</p></header>
+      <div class="controles no-imprimir"><button class="btn sec" id="btnCsvSinCat">Exportar para completar</button></div>
+      <div id="tablaSinCat"></div>
     </div>
 
     <div class="rejilla c2">
@@ -1213,7 +1239,7 @@ const E = {
   corte: null,         // agregado del corte actual
   detalle: null,       // una fila por ubicación, para la pestaña Detalle
   historial: [],
-  pref: { tema: '', empresa: '', autor: '' }
+  pref: { tema: '', empresa: '', autor: '', excluir: 'FSM' }
 };
 
 /* --- Búsqueda tolerante de columnas: SAP cambia tildes, puntos y recortes --- */
@@ -1338,6 +1364,41 @@ function clavMat(s) {
 }
 
 
+
+/* ------------------- Conocimiento propio del site -------------------
+   Cosas que hoy no están en Info_ubicaciones pero hacen falta para leer bien
+   los números. Si mañana el diccionario las trae, conviene borrarlas de acá y
+   dejar que mande el archivo, que es el lugar correcto para esta información.
+
+   Para la CLASIFICACIÓN (física o tránsito) manda siempre el diccionario.
+   Esto sólo aporta el rótulo, que es más específico que el "Stock" genérico. */
+const NOTAS_SITE = {
+  tipos: {
+    '0122': 'Rack cantilever (cuchillas)'
+  },
+  ubis: {
+    '0122-MUELLE.DER': 'Sobredimensionado: no entra en ningún rack',
+    '0122-MUELLE.IZQ': 'Sobredimensionado: no entra en ningún rack',
+    '0122-CORES': 'Sobredimensionado: no entra en ningún rack',
+    '0122-PORTON.IN': 'Sobredimensionado: no entra en ningún rack'
+  }
+};
+
+/* Ubicaciones de terceros: aparecen en el fotostock porque comparten el
+   sistema, pero no las opera CEVA. Se descartan del cálculo. El patrón es
+   editable desde la pestaña Datos por si mañana cambia. */
+const EXCLUIR_POR_DEFECTO = 'FSM';
+function patronesExcluir() {
+  const v = (E.pref.excluir ?? EXCLUIR_POR_DEFECTO).trim();
+  return v ? v.split(',').map(x => x.trim().toUpperCase()).filter(Boolean) : [];
+}
+function esExcluida(u) {
+  const pats = patronesExcluir();
+  if (!pats.length) return false;
+  const U_ = String(u).toUpperCase();
+  return pats.some(p => U_.includes(p));
+}
+
 /* ---------------------------- DICCIONARIO ----------------------------
    Info_ubicaciones: traduce los códigos de SAP. Trae, por un lado, qué es cada
    tipo de almacén (Stock, Back Order, Bahía de Guardado) y si es mono o
@@ -1387,14 +1448,22 @@ async function cargarDiccionario(buf, nombre) {
 // Rótulo de un tipo de almacén: "0210 · Back Order (BO)" si el diccionario lo
 // describe, o el código solo si no está cargado.
 function rotTipo(t) {
+  const propia = NOTAS_SITE.tipos[t];
+  if (propia) return `${t} · ${propia}`;
   const d = E.dicc && E.dicc.tipos.get(t);
   return d && d.com ? `${t} · ${d.com}` : t;
 }
-// Para qué se usa una ubicación, según el diccionario.
+function descTipo(t) {
+  const propia = NOTAS_SITE.tipos[t];
+  if (propia) return propia;
+  const d = E.dicc && E.dicc.tipos.get(t);
+  return d && d.com ? d.com : '';
+}
+// Para qué se usa una ubicación: la nota propia del site, si no el diccionario.
 function propUbi(u) {
+  if (NOTAS_SITE.ubis[u]) return NOTAS_SITE.ubis[u];
   const d = E.dicc && E.dicc.ubis.get(u);
-  if (!d) return '';
-  return d.com || '';
+  return d ? (d.com || '') : '';
 }
 
 /* ----------------------------- FOTOSTOCK ----------------------------- */
@@ -1468,8 +1537,18 @@ function armarISO(d, m, a) {
 
 /* =========================== CÁLCULO DEL CORTE =========================== */
 function calcularCorte(fecha) {
-  const maeTodo = E.maestro, lin = E.fotoLineas, val = E.valorizado;
-  if (!maeTodo || !lin) return null;
+  const maeTodo = E.maestro, linTodo = E.fotoLineas, val = E.valorizado;
+  if (!maeTodo || !linTodo) return null;
+
+  // Ubicaciones de terceros: se descartan enteras, no son stock de CEVA. Se
+  // filtran acá y no al cargar el archivo, para poder cambiar el patrón y
+  // recalcular sin volver a leer el fotostock.
+  const exc = { ubis: new Set(), lin: 0, val: 0 };
+  const lin = [];
+  for (const L of linTodo) {
+    if (esExcluida(L.u)) { exc.ubis.add(L.u); exc.lin++; exc.val += L.v; continue; }
+    lin.push(L);
+  }
 
   // El diccionario manda sobre qué es tránsito. Una ubicación puede estar en el
   // maestro y aun así ser operativamente virtual (playa de exportación, back
@@ -1483,9 +1562,16 @@ function calcularCorte(fecha) {
       if (d && d.virtual) reclas.add(u);
     }
   }
+  let maeUsar = maeTodo;
+  if (patronesExcluir().length) {
+    maeUsar = new Map([...maeTodo].filter(([u]) => {
+      if (!esExcluida(u)) return true;
+      exc.ubis.add(u); return false;
+    }));
+  }
   const mae = reclas.size
-    ? new Map([...maeTodo].filter(([u]) => !reclas.has(u)))
-    : maeTodo;
+    ? new Map([...maeUsar].filter(([u]) => !reclas.has(u)))
+    : maeUsar;
 
   // --- agregación por ubicación
   const porUbi = new Map();        // ubi -> {lin,ctd,val,mats:Set,femMin,ts}
@@ -1645,6 +1731,20 @@ function calcularCorte(fecha) {
     abcAcc[k].mats++; abcAcc[k].val += d.val; abcAcc[k].pos += d.ubis.size;
   }
 
+  /* ---------------- Back Order ----------------
+     Ocupa estantería real, así que cuenta como capacidad, pero es mercadería ya
+     comprometida: ese espacio no está realmente disponible. Los tipos de Back
+     Order salen del diccionario, no van escritos a mano. */
+  const tiposBO = new Set();
+  if (E.dicc) for (const [t, d] of E.dicc.tipos) if (/back\s*order/i.test(d.com || '')) tiposBO.add(t);
+  const bo = { tipos: [...tiposBO], pos: 0, ocu: 0, val: 0, lin: 0 };
+  for (const [u, r] of mae) {
+    if (!tiposBO.has(r.t)) continue;
+    bo.pos++;
+    const o = porUbi.get(u);
+    if (o) { bo.ocu++; bo.val += o.val; bo.lin += o.lin; }
+  }
+
   /* ---------------- Detalle de cada ubicación transitoria ---------------- */
   const virDet = [...virLin.entries()].map(([u, ls]) => ({
     ubi: u, tipo: ls[0].t || '(sin tipo)',
@@ -1729,6 +1829,8 @@ function calcularCorte(fecha) {
       disper: disper.map(d => ({ b: d.b, mats: d.mats, pos: d.pos, val: d.val })),
       porTipo: [...ahorroTipo.values()].sort((a, b) => b.ahorro - a.ahorro)
     },
+    bo: { ...bo, pctPos: tot ? bo.pos / tot * 100 : 0, pctOcu: ocu ? bo.ocu / ocu * 100 : 0 },
+    exc: { ubis: exc.ubis.size, lin: exc.lin, val: exc.val, patrones: patronesExcluir().join(', ') },
     vd: {
       ubis: virDet.length, antig: bandasVir.map(b => ({ b: b.b, lin: b.lin, val: b.val })),
       mats: new Set([].concat(...virDet.map(v => v.lineas.map(l => l.mat)))).size,
@@ -2429,6 +2531,28 @@ conectarSoltar('soltarFoto', 'archFoto', async fs => {
   repintarTodo();
 });
 
+/* --------------------- Ubicaciones de terceros --------------------- */
+$('#inExcluir').addEventListener('input', () => {
+  const el = $('#inExcluir');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => {
+    E.pref.excluir = el.value;
+    guardarPref();
+    if (E.fotoLineas) recalcular();
+    llenarSelectores();
+    repintarTodo();
+    mostrarExcluidas();
+  }, 300);
+});
+function mostrarExcluidas() {
+  if (!E.corte || !E.corte.exc) { estado('#estExcluir', 'trab', ''); return; }
+  const e = E.corte.exc;
+  if (!e.patrones) return estado('#estExcluir', 'trab', 'Sin filtro: no se descarta ninguna ubicación.');
+  estado('#estExcluir', e.ubis ? 'ok' : 'trab', e.ubis
+    ? `✓ Descarté ${U.pl(e.ubis, 'ubicación', 'ubicaciones')} · ${U.pl(e.lin, 'línea', 'líneas')} · ${U.usdExacto(e.val)}.`
+    : 'Ninguna ubicación coincide con ese filtro en este corte.');
+}
+
 /* ------------------------- Fecha del corte ------------------------- */
 $('#inFecha').addEventListener('change', () => {
   const v = $('#inFecha').value;
@@ -2530,6 +2654,7 @@ function recalcular() {
 }
 function repintarTodo() {
   pintarHistorial();
+  mostrarExcluidas();
   $('#rotCorte').textContent = E.corte
     ? `corte ${U.fecha(E.corte.fecha)} · ${U.pct(E.corte.fis.pct)} de ocupación`
     : (E.maestro ? 'maestro cargado · falta el fotostock' : 'sin datos cargados');
@@ -2718,6 +2843,13 @@ function pintarResumen() {
       <div class="pie">${U.pl(c.fis.multi, 'posición', 'posiciones')} con más de un material</div>
     </div>
 
+    ${c.bo && c.bo.pos ? `
+    <div class="ficha borde${c.bo.pctOcu >= 10 ? 3 : (c.bo.pctOcu >= 5 ? 2 : 1)}">
+      <div class="rot">Tomado por Back Order</div>
+      <div class="val">${U.ent(c.bo.ocu)}</div>
+      <div class="pie">${U.pct(c.bo.pctOcu)} de lo ocupado · ${U.usd(c.bo.val)}<br>
+        mercadería ya comprometida: ocupa estantería pero no es espacio disponible</div>
+    </div>` : ''}
     <div class="ficha">
       <div class="rot">Valor por posición ocupada</div>
       <div class="val">${U.usd(c.fis.ocu ? c.fis.val / c.fis.ocu : 0)}</div>
@@ -2749,9 +2881,12 @@ function pintarResumen() {
   tabla($('#tablaDim'), [
     {
       n: rot === 'tipo de almacén' ? 'Tipo' : rot.split(' ')[0], v: f => f.k,
-      h: f => nd === 'tipo' && E.dicc && E.dicc.tipos.get(f.k) && E.dicc.tipos.get(f.k).com
-        ? `<b>${U.esc(f.k)}</b> <span class="chip">${U.esc(E.dicc.tipos.get(f.k).com)}</span>`
-        : `<b>${U.esc(f.k)}</b>`
+      h: f => {
+        const d = nd === 'tipo' ? descTipo(f.k) : '';
+        const esBO = nd === 'tipo' && c.bo && c.bo.tipos.includes(f.k);
+        return `<b>${U.esc(f.k)}</b>`
+          + (d ? ` <span class="chip"${esBO ? ' style="color:var(--serio)"' : ''}>${U.esc(d)}</span>` : '');
+      }
     },
     {
       n: 'Ocupación', num: true, v: f => f.pct,
@@ -2782,7 +2917,7 @@ function pintarResumen() {
     { n: '% del valor total', num: true, v: f => f.val, h: f => U.pct(c.fis.val + c.vir.val ? f.val / (c.fis.val + c.vir.val) * 100 : 0) }
   ], c.vir.tipos, {
     ordenar: 3, dir: -1,
-    msgVacio: 'No hay ubicaciones virtuales en este corte: todo el stock cae en posiciones del maestro.',
+    msgVacio: 'No hay stock en tránsito en este corte: todo está en posiciones de almacenamiento.',
     pie: [{ h: 'Total' }, { h: U.ent(c.vir.ubis), num: true }, { h: U.ent(c.vir.lin), num: true },
     { h: U.usdExacto(c.vir.val), num: true }, { h: '' }]
   });
@@ -3389,6 +3524,30 @@ function pintarCalidad() {
       <tr><td>Posiciones</td><td>${U.ent(b.ubis)}</td></tr></table>`
   })), { fmt: v => U.usd(v).replace('USD ', ''), mIzq: 108, aria: 'Valor del stock por antigüedad de entrada' });
 
+  // ubicaciones que el diccionario no cataloga
+  const estr = /^\d{4}(-\d+){3,6}$/;
+  const sinCat = E.dicc ? (E.detalle || [])
+    .filter(f => !E.dicc.ubis.has(f.ubi))
+    .map(f => ({ ...f, nombrada: !estr.test(f.ubi) }))
+    .filter(f => f.nombrada || f.clase === 'Virtual')
+    .sort((a, b) => b.val - a.val) : [];
+  E._sinCat = sinCat;
+  $('#cajaSinCat').hidden = !E.dicc;
+  if (E.dicc) {
+    tabla($('#tablaSinCat'), [
+      { n: 'Ubicación', v: f => f.ubi, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.ubi)}</b>` },
+      { n: 'Tipo', v: f => f.tipo, h: f => U.esc(rotTipo(f.tipo)) },
+      { n: 'Hoy cuenta como', v: f => f.clase, h: f => f.clase === 'Virtual'
+        ? '<span class="chip v">tránsito</span>' : '<span class="chip">capacidad</span>' },
+      { n: 'Estado', v: f => f.est },
+      { n: 'Líneas', num: true, v: f => f.lin, h: f => f.lin ? U.ent(f.lin) : '' },
+      { n: 'Valor', num: true, v: f => f.val, h: f => f.val ? U.usdExacto(f.val) : '' }
+    ], sinCat, {
+      ordenar: 5, dir: -1, limite: 200,
+      msgVacio: 'Todas las ubicaciones relevantes están catalogadas en el diccionario.'
+    });
+  }
+
   const bloq = (E.detalle || []).filter(f => f.bloq);
   tabla($('#tablaBloq'), [
     { n: 'Ubicación', v: f => f.ubi, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.ubi)}</span>` },
@@ -3408,6 +3567,17 @@ function pintarCalidad() {
     { n: 'Valor', num: true, v: f => f.v, h: f => U.usdExacto(f.v) }
   ], c._viejas, { ordenar: 0, dir: 1, msgVacio: 'Sin fechas de entrada para evaluar.' });
 }
+$('#btnCsvSinCat').addEventListener('click', () => {
+  const filas = E._sinCat || [];
+  // Las dos últimas columnas van vacías a propósito: son para que las completen
+  // y peguen el resultado en Info_ubicaciones.
+  U.bajar(`ubicaciones_sin_catalogar_${E.corte.fecha}.csv`, U.csv(
+    ['Ubicación', 'Tipo almacén', 'Hoy cuenta como', 'Estado', 'Líneas', 'Valor USD',
+      'CLASE (Ubicación Fisica / Ubicación Virtual)', 'PARA QUÉ SE USA'],
+    filas.map(f => [f.ubi, f.tipo, f.clase === 'Virtual' ? 'tránsito' : 'capacidad',
+      f.est, f.lin, Math.round(f.val), '', ''])));
+});
+
 $('#btnCsvInc').addEventListener('click', () => {
   if (!E.corte) return;
   U.bajar(`inconsistencias_${E.corte.fecha}.csv`, U.csv(
@@ -3679,6 +3849,7 @@ function pintarReporte() {
 (function arrancar() {
   cargarPref();
   if (E.pref.tema) aplicarTema(E.pref.tema);
+  $('#inExcluir').value = E.pref.excluir ?? EXCLUIR_POR_DEFECTO;
   $('#inRepEmpresa').value = E.pref.empresa || '';
   $('#inRepAutor').value = E.pref.autor || '';
   cargarHistorial();
