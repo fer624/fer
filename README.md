@@ -47,8 +47,15 @@ seleccionar varios fotostock juntos para cargar historial de semanas anteriores.
   exportación, back order o control de picking.
 - **Valor total**: es todo lo que está dentro del depósito, posiciones físicas más tránsito. La
   ocupación en cambio sólo puede medirse sobre lo físico, porque el tránsito no tiene capacidad
-  definida contra la cual calcular un porcentaje. Sale de la columna `Total` del fotostock, que ya
-  viene valorizada.
+  definida contra la cual calcular un porcentaje.
+- **De dónde sale el precio**, por orden: la columna `Total` del fotostock, si viene; si no, `V/U`
+  por la cantidad; y si el fotostock no trae ninguna de las dos, el `Precio interno periódico` del
+  **maestro valorizado** por la cantidad. `V/U` y `Total` no son columnas estándar de SAP, así que
+  es normal que un export no las traiga: con el maestro valorizado cargado el valor se calcula
+  igual, y da el mismo resultado. Si no hay de dónde sacar el precio, la app lo dice en pantalla en
+  vez de mostrar ceros.
+- **Códigos de material**: se usan tal cual vienen, sin recortar decimales ni ceros a la izquierda.
+  En esta base `1006666` y `1006666.000` son materiales distintos.
 - **Ubicaciones de terceros**: las que aparecen en el fotostock porque se comparte el sistema pero no
   opera CEVA (hoy, las que contienen `FSM`) se descartan por completo. El filtro es editable en la
   pestaña Datos.

@@ -553,6 +553,7 @@ textarea{min-height:68px; resize:vertical; width:100%}
 <section class="panel" id="pResumen" role="tabpanel" hidden>
   <div id="resumenVacio"></div>
   <div id="resumenCuerpo" hidden>
+    <div id="avisoValor"></div>
     <div class="controles no-imprimir">
       <div class="campo">
         <label for="selComp">Comparar contra</label>
@@ -1151,6 +1152,19 @@ const U = {
     return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
   },
   hoyISO: () => new Date().toISOString().slice(0, 10),
+  // Los exportes de SAP en español a veces traen "1.234,56" en vez de "1234.56".
+  // Devuelve NaN si no hay número, para poder distinguir "sin dato" de cero.
+  num(v) {
+    if (v === null || v === undefined) return NaN;
+    let t = String(v).trim();
+    if (!t) return NaN;
+    if (t.includes(',')) {
+      if (/\.\d{3}(\D|$)/.test(t)) t = t.replace(/\./g, '');  // punto de miles
+      t = t.replace(',', '.');
+    }
+    const n = parseFloat(t);
+    return isFinite(n) ? n : NaN;
+  },
   // Plural correcto en lugar de "ubicación(es)", que se lee mal en un reporte.
   pl: (n, sing, plur) => U.ent(n) + ' ' + (Math.round(n) === 1 ? sing : plur),
   esc(s) {
@@ -1231,7 +1245,8 @@ const CLAVE_PREF = 'ocupacion.pref.v2';
 const E = {
   maestro: null,       // Map ubi -> {t,a,p,n,tu,fv,be,bs}
   totales: null,       // {tipo:Map, area:Map, pasillo:Map, nivel:Map}
-  valorizado: null,    // Map material -> {desc,fam,precio}
+  valorizado: null,    // Map material -> {desc,fam,precio}, por codigo EXACTO
+  valorizadoLaxo: null,// indice de respaldo, sin claves ambiguas
   dicc: null,          // {tipos:Map, ubis:Map} traduccion de codigos de SAP
   nomMaestro: '', nomValor: '', nomFoto: '', nomDicc: '',
   fotoLineas: null,    // líneas del fotostock en memoria (para detalle y exportes)
@@ -1349,18 +1364,44 @@ async function cargarValorizado(buf, nombre) {
     val.set(m, { desc: g(ix.desc), fam: g(ix.fam) || '(sin familia)', precio: parseFloat(g(ix.pr)) || 0, mon: g(ix.mo) });
   });
 
-  E.valorizado = val; E.nomValor = nombre;
+  // Índice de respaldo por código laxo. Se descartan las claves ambiguas: si dos
+  // códigos distintos caen en la misma forma laxa, no se puede elegir.
+  const laxo = new Map(), ambiguas = new Set();
+  for (const [k, v] of val) {
+    const kl = clavMatLaxa(k);
+    if (kl === k) continue;
+    if (laxo.has(kl) || val.has(kl)) { ambiguas.add(kl); continue; }
+    laxo.set(kl, v);
+  }
+  for (const k of ambiguas) laxo.delete(k);
+  E.valorizado = val; E.valorizadoLaxo = laxo; E.nomValor = nombre;
   guardarBases();
   return { materiales: val.size, repetidos };
 }
 
-// SAP escribe los materiales como "1123540.000". Se normaliza para que el
-// fotostock y el valorizado matcheen aunque uno traiga los decimales y el otro no.
+// El código de material se usa TAL CUAL viene, sin recortar decimales ni ceros.
+// Parece inofensivo normalizar "1123540.000" a "1123540", pero en esta base
+// 1006666 (dado estándar, USD 0,04) y 1006666.000 (segmento de cuchilla,
+// USD 152,74) son materiales DISTINTOS: normalizar los fusiona, arruina el
+// valor y hace creer que un material está en más posiciones de las que está.
+// Con los códigos exactos, el fotostock matchea el 100% contra el valorizado.
 function clavMat(s) {
+  return String(s ?? '').trim();
+}
+// Sólo como último recurso, si algún día un archivo viene con otro formato.
+function clavMatLaxa(s) {
   let m = String(s ?? '').trim();
   if (!m) return '';
   if (/^\d+(\.\d+)?$/.test(m)) m = m.replace(/\.0+$/, '');
   return m.replace(/^0+(?=\d)/, '');
+}
+// Ficha del material: primero por código exacto; si no aparece, se intenta la
+// forma laxa, y sólo si esa forma no es ambigua.
+function fichaMat(m) {
+  if (!E.valorizado) return null;
+  const d = E.valorizado.get(m);
+  if (d) return d;
+  return (E.valorizadoLaxo && E.valorizadoLaxo.get(clavMatLaxa(m))) || null;
 }
 
 
@@ -1494,16 +1535,19 @@ async function cargarFotostock(buf, nombre) {
     const g = i => (i >= 0 ? String(c[i] ?? '').trim() : '');
     const u = g(ix.ubi);
     if (!u) return;
-    const ctd = parseFloat(g(ix.ctd)) || 0;
-    let tot = parseFloat(g(ix.tot));
-    if (!isFinite(tot)) {           // sin columna Total, se reconstruye
-      const vu = parseFloat(g(ix.vu));
-      tot = isFinite(vu) ? vu * ctd : 0;
-    }
+    const ctd = U.num(g(ix.ctd)) || 0;
+    // Se guardan las piezas sin resolver. El valor se arma en el cálculo, así
+    // cargar el maestro valorizado después arregla los importes sin tener que
+    // volver a leer el fotostock.
+    const tot = U.num(g(ix.tot));
+    const vu = U.num(g(ix.vu));
     const fem = XLSX.serialAFecha(g(ix.fem));
     lineas.push({
       u, t: g(ix.tipo), m: clavMat(g(ix.mat)), d: g(ix.desc),
-      c: ctd, um: g(ix.um), v: tot,
+      c: ctd, um: g(ix.um),
+      tot: isFinite(tot) ? tot : null,
+      vu: isFinite(vu) ? vu : null,
+      v: 0,
       f: fem ? fem.toISOString().slice(0, 10) : '',
       ts: g(ix.ts) || '(sin tipo de stock)'
     });
@@ -1512,7 +1556,13 @@ async function cargarFotostock(buf, nombre) {
   if (!lineas.length) throw new Error('El fotostock no tiene líneas con ubicación. Revise el archivo.');
   E.fotoLineas = lineas; E.nomFoto = nombre;
   E.fechaFoto = fechaDesdeNombre(nombre) || U.hoyISO();
-  return { lineas: lineas.length, fecha: E.fechaFoto, detectada: !!fechaDesdeNombre(nombre) };
+  const conTot = lineas.filter(l => l.tot !== null).length;
+  const conVu = lineas.filter(l => l.vu !== null).length;
+  return {
+    lineas: lineas.length, fecha: E.fechaFoto, detectada: !!fechaDesdeNombre(nombre),
+    conTot, conVu,
+    traeValor: conTot > 0 || conVu > 0
+  };
 }
 
 // "FotoStock_2809" -> 28/09 del año en curso. También acepta DDMMAAAA,
@@ -1543,6 +1593,24 @@ function calcularCorte(fecha) {
   // Ubicaciones de terceros: se descartan enteras, no son stock de CEVA. Se
   // filtran acá y no al cargar el archivo, para poder cambiar el patrón y
   // recalcular sin volver a leer el fotostock.
+  /* Valorización, por orden de preferencia:
+       1. columna Total del fotostock, que ya viene calculada
+       2. V/U por la cantidad
+       3. Precio interno periódico del maestro valorizado por la cantidad
+     Los exportes de SAP no siempre traen V/U y Total: son columnas agregadas.
+     Cuando faltan, el precio sale del maestro valorizado. Si tampoco está, la
+     línea queda sin valor y se informa, nunca se muestra un cero silencioso. */
+  const dv = { porTotal: 0, porVU: 0, porMaestro: 0, sinPrecio: 0, matsSinPrecio: new Set() };
+  for (const L of linTodo) {
+    if (L.tot !== null) { L.v = L.tot; dv.porTotal++; }
+    else if (L.vu !== null) { L.v = L.vu * L.c; dv.porVU++; }
+    else {
+      const p = fichaMat(L.m);
+      if (p && isFinite(p.precio) && p.precio > 0) { L.v = p.precio * L.c; dv.porMaestro++; }
+      else { L.v = 0; dv.sinPrecio++; dv.matsSinPrecio.add(L.m); }
+    }
+  }
+
   const exc = { ubis: new Set(), lin: 0, val: 0 };
   const lin = [];
   for (const L of linTodo) {
@@ -1664,8 +1732,8 @@ function calcularCorte(fecha) {
 
   // --- top materiales y familias
   const topMat = [...porMat.entries()].map(([m, v]) => ({
-    mat: m, desc: v.desc || (val && val.get(m) ? val.get(m).desc : '') || '',
-    fam: val && val.get(m) ? val.get(m).fam : '(sin maestro valorizado)',
+    mat: m, desc: v.desc || (fichaMat(m) ? fichaMat(m).desc : '') || '',
+    fam: fichaMat(m) ? fichaMat(m).fam : '(sin maestro valorizado)',
     val: v.val, ctd: v.ctd, ubis: v.ubis.size
   })).sort((a, b) => b.val - a.val);
 
@@ -1782,7 +1850,7 @@ function calcularCorte(fecha) {
   }
   listaIncOV.sort((a, b) => b.val - a.val);
 
-  const sinCosto = val ? topMat.filter(m => !val.has(m.mat)).length : 0;
+  const sinCosto = val ? topMat.filter(m => !fichaMat(m.mat)).length : 0;
 
   // antigüedad del stock según Fecha EM, contra la fecha del corte
   const bandas = [
@@ -1831,6 +1899,14 @@ function calcularCorte(fecha) {
     },
     bo: { ...bo, pctPos: tot ? bo.pos / tot * 100 : 0, pctOcu: ocu ? bo.ocu / ocu * 100 : 0 },
     exc: { ubis: exc.ubis.size, lin: exc.lin, val: exc.val, patrones: patronesExcluir().join(', ') },
+    val: {
+      porTotal: dv.porTotal, porVU: dv.porVU, porMaestro: dv.porMaestro,
+      sinPrecio: dv.sinPrecio, matsSinPrecio: dv.matsSinPrecio.size,
+      fuente: dv.porTotal ? 'columna Total del fotostock'
+        : dv.porVU ? 'V/U por cantidad del fotostock'
+          : dv.porMaestro ? 'precio del maestro valorizado por cantidad'
+            : 'sin fuente de precio'
+    },
     vd: {
       ubis: virDet.length, antig: bandasVir.map(b => ({ b: b.b, lin: b.lin, val: b.val })),
       mats: new Set([].concat(...virDet.map(v => v.lineas.map(l => l.mat)))).size,
@@ -1973,6 +2049,15 @@ function restaurarBases() {
       const v = new Map();
       for (const [m, desc, fam, precio] of p.valorizado) v.set(m, { desc, fam, precio });
       E.valorizado = v; E.nomValor = p.nomValor || '(guardado)';
+      const lx = new Map(), amb = new Set();
+      for (const [k, d] of v) {
+        const kl = clavMatLaxa(k);
+        if (kl === k) continue;
+        if (lx.has(kl) || v.has(kl)) { amb.add(kl); continue; }
+        lx.set(kl, d);
+      }
+      for (const k of amb) lx.delete(k);
+      E.valorizadoLaxo = lx;
     }
     if (p.dicc) {
       const t = new Map(), u = new Map();
@@ -2500,8 +2585,19 @@ conectarSoltar('soltarFoto', 'archFoto', async fs => {
       recalcular();
       $('#cajaFecha').hidden = false;
       $('#inFecha').value = E.fechaFoto;
-      estado('#estFoto', 'ok', `✓ ${U.ent(r.lineas)} líneas. `
-        + (r.detectada ? `Fecha detectada del nombre: <b>${U.fecha(r.fecha)}</b>.` : `<b>No pude detectar la fecha del nombre</b>: indíquela abajo.`));
+      let msg = `✓ ${U.ent(r.lineas)} líneas. `
+        + (r.detectada ? `Fecha detectada del nombre: <b>${U.fecha(r.fecha)}</b>.` : `<b>No pude detectar la fecha del nombre</b>: indíquela abajo.`);
+      if (!r.traeValor) {
+        msg += E.valorizado
+          ? ` Este archivo <b>no trae las columnas V/U ni Total</b>, así que los precios salen del maestro valorizado.`
+          : ` <b>Ojo:</b> este archivo no trae las columnas V/U ni Total, y no hay maestro valorizado cargado.
+             Sin una de las dos cosas no se puede calcular el valor del stock. Cargue el maestro valorizado.`;
+      }
+      if (E.corte && E.corte.val && E.corte.val.sinPrecio) {
+        msg += ` ${U.pl(E.corte.val.sinPrecio, 'línea quedó', 'líneas quedaron')} sin precio
+          (${U.pl(E.corte.val.matsSinPrecio, 'material', 'materiales')} sin ficha en el valorizado).`;
+      }
+      estado('#estFoto', r.traeValor || E.valorizado ? 'ok' : 'mal', msg);
       estado('#estCorte', 'trab', 'Confirme la fecha y guarde el corte para que entre en las tendencias.');
       repintarTodo();
       llenarSelectores();
@@ -2781,6 +2877,27 @@ function pintarResumen() {
   const viejoVal = c.cal.antig.slice(4).reduce((a, b) => a + b.val, 0);
   const semAnt = SEM.antiguedad(c.fis.val ? viejoVal / c.fis.val * 100 : 0);
   const semCal = SEM.calidad(c.fis.tot ? c.cal.incOcuVac / c.fis.tot * 100 : 0);
+
+  // Si no hay de dónde sacar precios, decirlo arriba de todo: un tablero con
+  // los importes en cero y sin explicación es peor que no mostrarlos.
+  const dvz = c.val;
+  let avisoVal = '';
+  if (dvz && dvz.fuente === 'sin fuente de precio') {
+    avisoVal = `<div class="aviso grave"><span class="ic">●</span><div>
+      <b>No se puede valorizar este corte.</b> El fotostock no trae las columnas <b>V/U</b> ni
+      <b>Total</b>, y los materiales no tienen precio en el maestro valorizado. Por eso todos los
+      importes figuran en cero. Cargue el <b>maestro valorizado</b> en la pestaña Datos y los
+      valores se recalculan solos, sin volver a cargar el fotostock.
+      <div style="margin-top:8px"><button class="btn sec" onclick="irA('pDatos')">Ir a Datos</button></div>
+    </div></div>`;
+  } else if (dvz && dvz.sinPrecio) {
+    avisoVal = `<div class="aviso alerta"><span class="ic">▲</span><div>
+      <b>${U.pl(dvz.sinPrecio, 'línea quedó', 'líneas quedaron')} sin precio</b>
+      (${U.pl(dvz.matsSinPrecio, 'material', 'materiales')} sin ficha en el maestro valorizado).
+      El valor total está subestimado en esa parte.
+      Los precios de este corte salen de: <b>${U.esc(dvz.fuente)}</b>.</div></div>`;
+  }
+  $('#avisoValor').innerHTML = avisoVal;
 
   $('#fichasResumen').innerHTML = `
     <div class="ficha grande borde${m.n}">
