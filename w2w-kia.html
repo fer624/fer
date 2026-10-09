@@ -330,7 +330,7 @@ details.twin[open] summary{margin-bottom:8px}
 
   <div class="pie-pagina">
     <span id="pie-origen"></span>
-    <span>Cantidad final = <b>FINAL</b> del archivo; si viene vacía se toma el último conteo con dato. Diferencia final = cantidad final − stock a fecha. Importes = diferencia × costo unitario, sobre filas con costo &gt; 0.</span>
+    <span>Cantidad final = <b>último conteo cargado</b> (3º, 2º o 1º): si el segundo conteo repite el número del primero, la ubicación queda con diferencia. La columna <b>FINAL</b> del archivo solo se usa cuando no hay ningún conteo. Diferencia final = cantidad final − stock a fecha. Importes = diferencia × costo unitario, sobre filas con costo &gt; 0.</span>
   </div>
 
 </div>
@@ -459,7 +459,11 @@ function enriquecer(filas){
     var conteos=[o.c1,o.c2,o.c3].filter(function(v){return v!==null&&v!==undefined});
     o.nc=o.nconteos||conteos.length;
     o.contada=conteos.length>0;
-    o.cant=(o.final!==null&&o.final!==undefined)?o.final:(conteos.length?conteos[conteos.length-1]:null);
+    o.ultimo=conteos.length?conteos[conteos.length-1]:null;
+    o.finArch=(o.final!==null&&o.final!==undefined)?o.final:null;
+    o.cant=o.ultimo!==null?o.ultimo:o.finArch;
+    o.desvio=(o.finArch!==null&&o.ultimo!==null&&o.finArch!==o.ultimo);
+    o.conf2=(o.c2!==null&&o.c2!==undefined&&o.c1!==null&&o.c1!==undefined)?(o.c2===o.c1?'confirma':(o.c2===(o.teorico||0)?'teorico':'otro')):'';
     o.teo=o.teorico||0;
     o.dif=(o.contada&&o.cant!==null)?o.cant-o.teo:null;
     o.dif1=(o.c1!==null&&o.c1!==undefined)?o.c1-o.teo:null;
@@ -537,7 +541,7 @@ function metricas(rows){
     cierre1:0,dif1:0,falt1:0,sob1:0,difPiezas1:0,absVal1:0,
     piezasTeo:0,piezasCont:0,difPiezas:0,
     valTeo:0,valCont:0,difVal:0,absVal:0,faltVal:0,sobVal:0,
-    costeadas:0,sinFecha:0,recSinOp:0,dupes:0,sinCostoConDif:0,
+    costeadas:0,sinFecha:0,recSinOp:0,dupes:0,sinCostoConDif:0,desvios:0,confirma:0,corrige:0,rec3:0,
     skus:{},nSkus:0,jornadas:{},nJornadas:0,ultima:'',ops:{},nOps:0,claves:{}};
   rows.forEach(function(r){
     if(r.cod){if(!m.skus[r.cod]){m.skus[r.cod]=1;m.nSkus++}}
@@ -558,7 +562,14 @@ function metricas(rows){
     else if(r.dif<0){m.faltantes++;m.faltVal+=r.difVal}
     else {m.sobrantes++;m.sobVal+=r.difVal}
     if(r.dif!==0&&!r.costeada)m.sinCostoConDif++;
-    if(r.recuento){m.recuentos++;if(!r.op2)m.recSinOp++}
+    if(r.desvio)m.desvios++;
+    if(r.recuento){
+      m.recuentos++;
+      if(!r.op2)m.recSinOp++;
+      if(r.conf2==='confirma')m.confirma++;
+      else if(r.conf2==='teorico')m.corrige++;
+      else if(r.conf2==='otro')m.rec3++;
+    }
     if(r.dif1===0)m.cierre1++;
     else if(r.dif1!==null){
       m.dif1++;m.difPiezas1+=r.dif1;m.absVal1+=Math.abs(r.dif1*r.cost);
@@ -770,6 +781,7 @@ function render(){
     tile('Diferencia final',firmaEnt(m.difPiezas)+' pzas',n0(m.faltantes)+' faltantes · '+n0(m.sobrantes)+' sobrantes',m.difPiezas?(m.difPiezas<0?'crit':'warn'):'good'),
     tile('Cerró al primer conteo',n0(m.cierre1),pct(m.cierre1,m.contadas)+' de lo contado','good'),
     tile('Pasó a segundo conteo',n0(m.recuentos),pct(m.recuentos,m.contadas)+' de lo contado','warn'),
+    tile('Recuento que ratificó la diferencia',n0(m.confirma),m.recuentos?'el 2do conteo repitió el 1ro en '+pct(m.confirma,m.recuentos):'sin recuentos',m.confirma?'crit':'good'),
     tile('Jornadas',n0(m.nJornadas),m.ultima?'última '+fechaLarga(m.ultima):'sin fechas'),
     tile('Operadores',n0(m.nOps),'en el primer conteo')
   ].join('');
@@ -859,17 +871,20 @@ function render(){
   /* recuentos */
   var recs=SEL.filter(function(r){return r.recuento});
   $('sub-rec').textContent=recs.length?
-    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo. El segundo conteo es el que define la cantidad final.'):
+    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo. Manda el último conteo: '+
+     n0(m.confirma)+' confirmaron el primer conteo y quedan con diferencia real, '+
+     n0(m.corrige)+' coincidieron con el teórico'+(m.rec3?' y '+n0(m.rec3)+' dieron un tercer valor':'')+'.'):
     'Ninguna ubicación de la selección pasó a segundo conteo.';
   tabla('t-rec',[
     {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
     {k:'teo',t:'Teórico',num:true},{k:'c1',t:'Conteo 1',num:true},
     {k:'d1',t:'Dif. 1',num:true,fmt:function(v){return '<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
     {k:'c2',t:'Conteo 2',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">pendiente</span>':n0(v)}},
+    {k:'conf2',t:'Qué dijo el 2do',fmt:function(v){return v==='confirma'?'<span class="estado"><i class="pt falt"></i>confirma el 1er conteo</span>':v==='teorico'?'<span class="estado"><i class="pt ok"></i>coincide con el teórico</span>':v==='otro'?'<span class="estado"><i class="pt sob"></i>tercer valor</span>':'<span class="neutro">sin segundo conteo</span>'}},
     {k:'cant',t:'Final',num:true},{k:'dif',t:'Dif. final',num:true,fmt:function(v){return firmaEnt(v)}},
     {k:'op',t:'Contó'},{k:'op2',t:'Recontó',fmt:function(v){return v?esc(v):'<span class="neutro">sin operador</span>'}},
     {k:'estado',t:'Resultado',fmt:function(v){return pinta(v)}}
-  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:25});
+  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,conf2:r.conf2,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:25});
 
   /* calidad de datos */
   var chequeos=[
@@ -878,7 +893,8 @@ function render(){
     {q:m.recSinOp,d:'Recuentos sin operador cargado en el <b>Usuario</b> del segundo conteo.',f:'recuento'},
     {q:m.dupes,d:'Claves <b>ubicación + código</b> repetidas: el mismo material contado dos veces en la misma posición.',f:''},
     {q:m.pendientes,d:'Filas con tarea generada y <b>sin ningún conteo</b> cargado.',f:'pendiente'},
-    {q:m.sinCostoConDif,d:'Ubicaciones con diferencia final <b>y sin costo</b>: la diferencia existe pero no se puede valorizar.',f:''}
+    {q:m.sinCostoConDif,d:'Ubicaciones con diferencia final <b>y sin costo</b>: la diferencia existe pero no se puede valorizar.',f:''},
+    {q:m.desvios,d:'Filas donde la columna <b>FINAL</b> del archivo no coincide con el último conteo cargado. El tablero usa el último conteo; si esto no da 0, la fórmula del Excel quedó desactualizada.',f:''}
   ];
   $('t-calidad').innerHTML=chequeos.map(function(c){
     return '<li><span class="q '+(c.q?'neg':'pos')+'">'+n0(c.q)+'</span><span class="d">'+c.d+'</span>'+
