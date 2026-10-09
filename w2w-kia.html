@@ -476,6 +476,11 @@ details.twin[open] summary{margin-bottom:8px}
   <!-- 6. Conteos -->
   <section class="vista" id="v-conteos" hidden>
     <div class="card">
+      <h3>Detalle de la selección</h3>
+      <p class="sub" id="sub-todo"></p>
+      <div id="t-todo"></div>
+    </div>
+    <div class="card">
       <h3>Diferencias finales</h3>
       <p class="sub" id="sub-dif"></p>
       <div id="t-dif"></div>
@@ -1146,7 +1151,7 @@ function render(){
   if($('f-jornada').value)ch.push('Jornada '+fechaLarga($('f-jornada').value));
   if($('f-estado').value)ch.push($('f-estado').options[$('f-estado').selectedIndex].text);
   if($('f-buscar').value.trim())ch.push('"'+$('f-buscar').value.trim()+'"');
-  $('resumen-filtro').innerHTML='<span>'+n0(m.filas)+' de '+n0(DATOS.rows.length)+' registros en la selección</span>'+
+  $('resumen-filtro').innerHTML='<span>'+n0(m.filas)+' de '+n0(DATOS.rows.length)+' líneas · '+n0(m.ubis)+(m.ubis===1?' ubicación':' ubicaciones')+'</span>'+
     ch.map(function(c){return '<span class="chip">'+esc(c)+'</span>'}).join('');
   FILTROS_TXT=ch;
 
@@ -1465,6 +1470,22 @@ function vValorizado(m){
     'Todas las filas de la selección tienen costo cargado: los importes son completos.';
 }
 function vConteos(m){
+  $('sub-todo').textContent=n0(m.filas)+' líneas de producto en '+n0(m.ubis)+(m.ubis===1?' ubicación':' ubicaciones')+
+    '. Una misma ubicación puede tener más de un código y un mismo código puede estar en varias ubicaciones.';
+  tabla('t-todo',[
+    {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
+    {k:'fecha',t:'Jornada',fmt:function(v){return v?fechaLarga(v):'<span class="neutro">sin fecha</span>'}},
+    {k:'teo',t:'Teórico',num:true},
+    {k:'c1',t:'Conteo 1',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
+    {k:'c2',t:'Conteo 2',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
+    {k:'c3',t:'Conteo 3',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
+    {k:'cant',t:'Final',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
+    {k:'dif',t:'Dif. unid.',num:true,fmt:function(v){return v===null||v===undefined?'':firmaEnt(v)}},
+    {k:'costo',t:'Costo',num:true,fmt:function(v){return v?mon(v):'<span class="neutro">sin costo</span>'}},
+    {k:'val',t:'Valorizado contado',num:true,fmt:function(v){return mon(v)}},
+    {k:'op',t:'Contó'},{k:'estado',t:'Estado',fmt:function(v){return pinta(v)}}
+  ],SEL.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,fecha:r.fecha,teo:r.teo,c1:r.c1,c2:r.c2,c3:r.c3,
+    cant:r.cant,dif:r.dif,costo:r.cost,val:r.valCont,op:r.op,estado:r.estado}}),{k:'ub',dir:1,tope:CFG.tope});
   var difs=SEL.filter(function(r){return r.contada&&r.dif!==0&&r.dif!==null});
   $('sub-dif').textContent=difs.length?
     (n0(difs.length)+' ubicaciones quedaron con diferencia después de la cascada de conteos, ordenadas por impacto.'):
