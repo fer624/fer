@@ -113,6 +113,12 @@ body{margin:0;background:var(--plane);color:var(--ink);font-family:var(--sans);f
 .campo select,.campo input{font:inherit;font-size:13px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0;width:100%}
 .resumen-filtro{flex:1 1 100%;font-size:12.5px;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+.chips-filtro{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 12px}
+.chips-filtro button{font:inherit;font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:5px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.chips-filtro button:hover{background:var(--inset)}
+.chips-filtro button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.chips-filtro b{font-variant-numeric:tabular-nums}
 
 /* ---------- tarjetas ---------- */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px;box-shadow:var(--sombra);min-width:0}
@@ -476,19 +482,10 @@ details.twin[open] summary{margin-bottom:8px}
   <!-- 6. Conteos -->
   <section class="vista" id="v-conteos" hidden>
     <div class="card">
-      <h3>Detalle de la selección</h3>
+      <h3>Detalle de conteos</h3>
       <p class="sub" id="sub-todo"></p>
+      <div class="chips-filtro" id="chips-detalle"></div>
       <div id="t-todo"></div>
-    </div>
-    <div class="card">
-      <h3>Diferencias finales</h3>
-      <p class="sub" id="sub-dif"></p>
-      <div id="t-dif"></div>
-    </div>
-    <div class="card">
-      <h3>Ubicaciones que pasaron a segundo conteo</h3>
-      <p class="sub" id="sub-rec"></p>
-      <div id="t-rec"></div>
     </div>
     <div class="card">
       <h3>Calidad de datos</h3>
@@ -676,7 +673,7 @@ function normOp(v){
 }
 
 /* ================== estado y configuración ================== */
-var DATOS=null,PEND=null,SEL=[],MET=null,TOT=null,VISTA='resumen',LS='w2wKia.v1',LSP='w2wKia.pend.v1',LSC='w2wKia.cfg.v1',LST='w2wKia.tema',ORDEN={};
+var DATOS=null,PEND=null,SEL=[],MET=null,TOT=null,VISTA='resumen',DETALLE='todas',LS='w2wKia.v1',LSP='w2wKia.pend.v1',LSC='w2wKia.cfg.v1',LST='w2wKia.tema',ORDEN={};
 var LOGOS_BASE={};
 try{LOGOS_BASE=JSON.parse($('logos-base').textContent)}catch(e){LOGOS_BASE={}}
 var CFG_DEF={cliente:'KIA',operadorLog:'CEVA Logistics',area:'Gestión de Inventarios',emisor:'',destinatario:'Gerencia',
@@ -1470,55 +1467,43 @@ function vValorizado(m){
     'Todas las filas de la selección tienen costo cargado: los importes son completos.';
 }
 function vConteos(m){
+  var grupos=[
+    {k:'todas',t:'Todas',fn:function(){return true}},
+    {k:'dif',t:'Con diferencia',fn:function(r){return r.contada&&r.dif!==0&&r.dif!==null}},
+    {k:'rec',t:'Pasaron a recuento',fn:function(r){return r.recuento}},
+    {k:'rec3',t:'Llegaron al tercer conteo',fn:function(r){return r.tiene3}},
+    {k:'pend',t:'Sin contar',fn:function(r){return !r.contada}}
+  ];
+  var actual=grupos.filter(function(g){return g.k===DETALLE})[0]||grupos[0];
+  $('chips-detalle').innerHTML=grupos.map(function(g){
+    var n=SEL.filter(g.fn).length;
+    if(!n&&g.k!=='todas')return '';
+    return '<button type="button" data-grupo="'+g.k+'" aria-pressed="'+(g.k===actual.k)+'">'+esc(g.t)+' <b>'+n0(n)+'</b></button>';
+  }).join('');
+  [].forEach.call($('chips-detalle').querySelectorAll('button[data-grupo]'),function(bt){
+    bt.addEventListener('click',function(){DETALLE=bt.getAttribute('data-grupo');render()});
+  });
+  var filas=SEL.filter(actual.fn);
   $('sub-todo').textContent=n0(m.filas)+' líneas de producto en '+n0(m.ubis)+(m.ubis===1?' ubicación':' ubicaciones')+
-    '. Una misma ubicación puede tener más de un código y un mismo código puede estar en varias ubicaciones.';
+    '. Una ubicación puede tener más de un código y un código puede estar en varias ubicaciones.'+
+    (m.rec3?' '+n0(m.rec3)+' ubicaciones llegaron al tercer conteo.':'');
   tabla('t-todo',[
     {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
     {k:'fecha',t:'Jornada',fmt:function(v){return v?fechaLarga(v):'<span class="neutro">sin fecha</span>'}},
     {k:'teo',t:'Teórico',num:true},
-    {k:'c1',t:'Conteo 1',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
-    {k:'c2',t:'Conteo 2',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
-    {k:'c3',t:'Conteo 3',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
-    {k:'cant',t:'Final',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
-    {k:'dif',t:'Dif. unid.',num:true,fmt:function(v){return v===null||v===undefined?'':firmaEnt(v)}},
+    {k:'c1',t:'Conteo 1',num:true,fmt:guion},
+    {k:'c2',t:'Conteo 2',num:true,fmt:guion},
+    {k:'c3',t:'Conteo 3',num:true,fmt:guion},
+    {k:'cant',t:'Final',num:true,fmt:guion},
+    {k:'dif',t:'Dif. unid.',num:true,fmt:function(v){return v===null||v===undefined?'':'<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
     {k:'costo',t:'Costo',num:true,fmt:function(v){return v?mon(v):'<span class="neutro">sin costo</span>'}},
-    {k:'val',t:'Valorizado contado',num:true,fmt:function(v){return mon(v)}},
-    {k:'op',t:'Contó'},{k:'estado',t:'Estado',fmt:function(v){return pinta(v)}}
-  ],SEL.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,fecha:r.fecha,teo:r.teo,c1:r.c1,c2:r.c2,c3:r.c3,
-    cant:r.cant,dif:r.dif,costo:r.cost,val:r.valCont,op:r.op,estado:r.estado}}),{k:'ub',dir:1,tope:CFG.tope});
-  var difs=SEL.filter(function(r){return r.contada&&r.dif!==0&&r.dif!==null});
-  $('sub-dif').textContent=difs.length?
-    (n0(difs.length)+' ubicaciones quedaron con diferencia después de la cascada de conteos, ordenadas por impacto.'):
-    'Ninguna ubicación de la selección quedó con diferencia después de la cascada de conteos.';
-  if(!difs.length){
-    $('t-dif').innerHTML='<div class="vacio">Inventario conciliado: las '+n0(m.recuentos)+' ubicaciones que pasaron a segundo conteo cerraron en 0.</div>';
-  }else{
-    tabla('t-dif',[
-      {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
-      {k:'teo',t:'Teórico',num:true},{k:'cant',t:'Final',num:true},
-      {k:'dif',t:'Dif. unid.',num:true,fmt:function(v){return firmaEnt(v)}},
-      {k:'costo',t:'Costo',num:true,fmt:function(v){return v?mon(v):'<span class="neutro">sin costo</span>'}},
-      {k:'difVal',t:'Dif. valorizada',num:true,fmt:function(v){return '<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+monFirma(v)+'</span>'}},
-      {k:'abs',t:'Impacto',num:true,fmt:function(v){return mon(v)}},
-      {k:'estado',t:'Estado',fmt:function(v){return pinta(v)}}
-    ],difs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,cant:r.cant,dif:r.dif,costo:r.cost,difVal:r.difVal,abs:Math.abs(r.difVal),estado:r.estado}}),{k:'abs',dir:-1,tope:CFG.tope});
-  }
-  var recs=SEL.filter(function(r){return r.recuento});
-  $('sub-rec').textContent=recs.length?
-    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo'+(m.rec3?', '+n0(m.rec3)+' de ellas llegaron al tercer conteo':'')+
-     '. Manda siempre el último conteo cargado.'):
-    'Ninguna ubicación de la selección pasó a segundo conteo.';
-  tabla('t-rec',[
-    {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
-    {k:'teo',t:'Teórico',num:true},{k:'c1',t:'Conteo 1',num:true},
-    {k:'d1',t:'Dif. 1',num:true,fmt:function(v){return '<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
-    {k:'c2',t:'Conteo 2',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">pendiente</span>':n0(v)}},
-    {k:'d2',t:'Dif. 2',num:true,fmt:function(v){return v===null||v===undefined?'':'<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
-    {k:'c3',t:'Conteo 3',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
-    {k:'cant',t:'Final',num:true},{k:'dif',t:'Dif. final',num:true,fmt:function(v){return firmaEnt(v)}},
-    {k:'op',t:'Contó'},{k:'op2',t:'Recontó',fmt:function(v){return v?esc(v):'<span class="neutro">sin operador</span>'}},
-    {k:'estado',t:'Resultado',fmt:function(v){return pinta(v)}}
-  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,d2:r.dif2,c3:r.c3,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:CFG.tope});
+    {k:'difVal',t:'Dif. valorizada',num:true,fmt:function(v){return v?'<span class="'+(v<0?'neg':'pos')+'">'+monFirma(v)+'</span>':mon(0)}},
+    {k:'op',t:'Contó'},
+    {k:'op2',t:'Recontó',fmt:function(v){return v?esc(v):'<span class="neutro">—</span>'}},
+    {k:'estado',t:'Estado',fmt:function(v){return pinta(v)}}
+  ],filas.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,fecha:r.fecha,teo:r.teo,c1:r.c1,c2:r.c2,c3:r.c3,
+    cant:r.cant,dif:r.dif,costo:r.cost,difVal:r.difVal,op:r.op,op2:r.op2,estado:r.estado}}),
+    {k:'ub',dir:1,tope:CFG.tope});
   var chequeos=[
     {q:m.filas-m.costeadas,d:'Filas con <b>Costo</b> en 0: no aportan valorizado. El '+pct(m.costeadas,m.filas)+' del archivo está costeado.',f:'sincosto'},
     {q:m.sinFecha,d:'Filas sin <b>Fecha Conteo</b>: quedan fuera del avance por jornada.',f:'sinfecha'},
@@ -1535,6 +1520,7 @@ function vConteos(m){
   }).join('');
   ligar($('t-calidad'));
 }
+function guion(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}
 
 /* ================== filmina, logos y configuración ================== */
 function renderFilmina(m,ira,univ){
