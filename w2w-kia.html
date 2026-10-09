@@ -305,6 +305,7 @@ details.twin[open] summary{margin-bottom:8px}
         <option value="faltante">Faltante</option>
         <option value="sobrante">Sobrante</option>
         <option value="recuento">Pasó a segundo conteo</option>
+        <option value="recuento3">Pasó a tercer conteo</option>
         <option value="pendiente">Sin contar</option>
         <option value="sincosto">Sin costo</option>
         <option value="sinfecha">Sin fecha de conteo</option>
@@ -337,11 +338,6 @@ details.twin[open] summary{margin-bottom:8px}
         <p class="sub">Sobre el universo completo: gavetas más ubicaciones de altura.</p>
         <div class="dona"><div id="d-avance"></div><div class="dona-leyenda" id="d-avance-leg"></div></div>
       </div>
-    </div>
-    <div class="card">
-      <h3>Resumen para gerencia</h3>
-      <p class="sub">El mismo texto que sale en el PDF.</p>
-      <p id="resumen-eje" style="margin:0;font-size:13.5px;line-height:1.55"></p>
     </div>
   </section>
 
@@ -798,7 +794,10 @@ function enriquecer(filas){
     o.teo=o.teorico||0;
     o.dif=(o.contada&&o.cant!==null)?o.cant-o.teo:null;
     o.dif1=(o.c1!==null&&o.c1!==undefined)?o.c1-o.teo:null;
-    o.recuento=(o.c2!==null&&o.c2!==undefined)||o.nc>1||/conteo\s*2/i.test(o.audit||'');
+    o.tiene2=(o.c2!==null&&o.c2!==undefined);
+    o.tiene3=(o.c3!==null&&o.c3!==undefined);
+    o.recuento=o.tiene2||o.tiene3||o.nc>1||/conteo\s*2/i.test(o.audit||'');
+    o.dif2=o.tiene2?o.c2-o.teo:null;
     o.cost=o.costo||0;
     o.costeada=o.cost>0;
     o.difVal=o.dif===null?0:o.dif*o.cost;
@@ -855,6 +854,7 @@ function filtrar(){
     if(op&&r.op!==op&&r.op2!==op&&r.op3!==op)return false;
     if(jor&&r.fecha!==jor)return false;
     if(est==='recuento'){if(!r.recuento)return false}
+    else if(est==='recuento3'){if(!r.tiene3)return false}
     else if(est==='sincosto'){if(r.costeada)return false}
     else if(est==='sinfecha'){if(r.fecha)return false}
     else if(est){if(r.estado!==est)return false}
@@ -878,7 +878,7 @@ function ligar(cont){
 /* ================== métricas ================== */
 function metricas(rows){
   var m={filas:rows.length,lineasContadas:0,ubis:0,contadas:0,pendientes:0,multi:0,ok:0,faltantes:0,sobrantes:0,recuentos:0,
-    cierre1:0,cierre1Lin:0,dif1:0,falt1:0,sob1:0,difPiezas1:0,
+    cierre1:0,cierre1Lin:0,rec2:0,rec3:0,dif1:0,falt1:0,sob1:0,difPiezas1:0,
     piezasTeo:0,piezasCont:0,difPiezas:0,
     valTeo:0,valCont:0,difVal:0,absVal:0,faltVal:0,sobVal:0,
     costeadas:0,sinFecha:0,recSinOp:0,dupes:0,sinCostoConDif:0,desvios:0,
@@ -915,9 +915,10 @@ function metricas(rows){
   var U={};
   rows.forEach(function(r){
     var u=U[r.ub];
-    if(!u)u=U[r.ub]={lineas:0,contadas:0,dif:0,difLin:0,neg:0,rec:0,c1ok:0,c1lin:0};
+    if(!u)u=U[r.ub]={lineas:0,contadas:0,dif:0,difLin:0,neg:0,rec:0,rec3:0,c1ok:0,c1lin:0};
     u.lineas++;
     if(r.recuento)u.rec++;
+    if(r.tiene3)u.rec3=1;
     if(r.dif1!==null){u.c1lin++;if(r.dif1===0)u.c1ok++}
     if(!r.contada)return;
     u.contadas++;u.dif+=r.dif||0;
@@ -930,6 +931,7 @@ function metricas(rows){
     if(!u.contadas){m.pendientes++;return}
     m.contadas++;
     if(u.rec)m.recuentos++;
+    if(u.rec3)m.rec3++;else if(u.rec)m.rec2++;
     if(u.c1lin&&u.c1ok===u.c1lin)m.cierre1++;
     if(!u.difLin)m.ok++;
     else if(u.dif<0||(u.dif===0&&u.neg))m.faltantes++;
@@ -1158,7 +1160,7 @@ function vResumen(m,ira,univ){
     tile('Unidades contadas',n0(m.piezasCont),'teórico '+n0(m.piezasTeo)),
     tile('Diferencia final',firmaEnt(m.difPiezas)+' un',monFirma(m.difVal),m.difPiezas?(m.difPiezas<0?'crit':'warn'):'good'),
     tile('Cerró al primer conteo',n0(m.cierre1),pct(m.cierre1,m.contadas),'good'),
-    tile('Pasó a segundo conteo',n0(m.recuentos),pct(m.recuentos,m.contadas),'warn')
+    tile('Pasó a segundo conteo',n0(m.recuentos),m.rec3?n0(m.rec3)+' llegaron al tercero':pct(m.recuentos,m.contadas),'warn')
   ].join('');
   dona('d-estado','d-estado-leg',[
     {t:'Cerró sin diferencia',v:m.ok,color:'var(--good)',fcampo:'f-estado',fvalor:'ok'},
@@ -1167,7 +1169,7 @@ function vResumen(m,ira,univ){
     {t:'Sin contar',v:m.pendientes,color:'var(--axis)',fcampo:'f-estado',fvalor:'pendiente'}
   ],{centro:n0(m.filas),centroEt:'UBICACIONES',aria:'Estado final de las ubicaciones'});
   donaAvance('d-avance','d-avance-leg');
-  $('resumen-eje').innerHTML=resumenEjecutivo(m,univ);
+  if($('resumen-eje'))$('resumen-eje').innerHTML=resumenEjecutivo(m,univ);
 }
 
 function donaAvance(id,leg,tam){
@@ -1175,9 +1177,9 @@ function donaAvance(id,leg,tam){
   var contadas=TOT.contadas,resto=Math.max(0,univ-contadas-pendAlt-TOT.pendientes);
   var partes=[
     {t:'Contadas',v:contadas,color:'var(--s1)'},
-    {t:'Pendientes de inventariar',v:pendAlt,color:'var(--s2)'},
-    {t:'Del archivo de conteos sin contar',v:TOT.pendientes,color:'var(--axis)'}
+    {t:'Pendientes de inventariar',v:pendAlt,color:'var(--s2)'}
   ];
+  if(TOT.pendientes)partes.push({t:'Del archivo de conteos sin contar',v:TOT.pendientes,color:'var(--axis)'});
   if(resto)partes.push({t:'Resto del universo cargado a mano',v:resto,color:'var(--inset)'});
   dona(id,leg,partes,{tam:tam||170,centro:univ?fm1.format(100*contadas/univ)+'%':'—',centroEt:'AVANCE',tamCentro:20,aria:'Avance del inventario'});
 }
@@ -1209,11 +1211,11 @@ function vAvance(m){
   ligar($('g-jornada'));
   tabla('t-jornada',[{k:'j',t:'Jornada'},{k:'t',t:'Ubicaciones',num:true},{k:'a',t:'Cerró 1er conteo',num:true},{k:'b',t:'Pasó a 2do',num:true},{k:'un',t:'Unidades',num:true},{k:'ac',t:'Acumulado',num:true}],
     dias.map(function(d){acum+=d.a+d.b;return {j:fechaLarga(d.k),t:d.a+d.b,a:d.a,b:d.b,un:d.un,ac:acum}}),null);
-  dona('d-cierre','d-cierre-leg',[
-    {t:'Cerró en el primer conteo',v:m.cierre1,color:'var(--s1)'},
-    {t:'Necesitó recuento',v:m.recuentos,color:'var(--s2)',fcampo:'f-estado',fvalor:'recuento'},
-    {t:'Sin contar',v:m.pendientes,color:'var(--axis)',fcampo:'f-estado',fvalor:'pendiente'}
-  ],{centro:m.contadas?fm1.format(100*m.cierre1/m.contadas)+'%':'—',centroEt:'AL PRIMER PASE',tamCentro:20,aria:'Cómo cerró cada ubicación'});
+  var pc=[{t:'Cerró en el primer conteo',v:m.cierre1,color:'var(--s1)'},
+    {t:'Necesitó segundo conteo',v:m.rec2,color:'var(--s2)',fcampo:'f-estado',fvalor:'recuento'}];
+  if(m.rec3)pc.push({t:'Llegó al tercer conteo',v:m.rec3,color:'var(--s4)',fcampo:'f-estado',fvalor:'recuento3'});
+  if(m.pendientes)pc.push({t:'Sin contar',v:m.pendientes,color:'var(--axis)',fcampo:'f-estado',fvalor:'pendiente'});
+  dona('d-cierre','d-cierre-leg',pc,{centro:m.contadas?fm1.format(100*m.cierre1/m.contadas)+'%':'—',centroEt:'AL PRIMER PASE',tamCentro:20,aria:'Cómo cerró cada ubicación'});
   $('g-piezas').innerHTML=svgColumnas(dias.map(function(d){return {k:d.k,a:d.un,b:0}}),anchoDe('g-piezas',420),240,{etTotal:'Unidades',color:'var(--s3)',aria:'Unidades contadas por jornada'});
   ligar($('g-piezas'));
   var porCalle={},calles=[];
@@ -1256,8 +1258,8 @@ function vPendientes(m){
   $('sub-pend').textContent=pendAlt?
     (n0(sel.length)+' de '+n0(pendAlt)+' ubicaciones pendientes en la selección. Ninguna tiene conteo todavía.'):
     'Todavía no cargaste el archivo de posiciones a inventariar.';
-  tabla('t-pend',[{k:'ub',t:'Ubicación',mono:true},{k:'pas',t:'Pasillo',mono:true},{k:'rack',t:'Rack',num:true},{k:'est',t:'Estante',num:true},{k:'est2',t:'Estado'}],
-    sel.map(function(r){return {ub:r[0],pas:r[1],rack:r[2],est:r[3],est2:'<span class="estado"><i class="pt pend"></i>Pendiente</span>'}}),
+  tabla('t-pend',[{k:'ub',t:'Ubicación',mono:true},{k:'pas',t:'Pasillo',mono:true},{k:'rack',t:'Rack',num:true},{k:'est',t:'Estante',num:true},{k:'est2',t:'Estado',fmt:function(){return '<span class="estado"><i class="pt pend"></i>Pendiente de inventariar</span>'}}],
+    sel.map(function(r){return {ub:r[0],pas:r[1],rack:r[2],est:r[3],est2:''}}),
     {k:'ub',dir:1,tope:CFG.tope});
   tabla('t-pend-res',[{k:'n',t:'Pasillo',mono:true},{k:'v',t:'Ubicaciones',num:true},{k:'nRacks',t:'Racks',num:true},{k:'p',t:'% del pendiente',num:true}],
     pas.map(function(p){return {n:p.n,v:p.v,nRacks:p.nRacks,p:pct(p.v,pendAlt)}}),null);
@@ -1459,17 +1461,20 @@ function vConteos(m){
   }
   var recs=SEL.filter(function(r){return r.recuento});
   $('sub-rec').textContent=recs.length?
-    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo. El segundo conteo es el que define la cantidad final.'):
+    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo'+(m.rec3?', '+n0(m.rec3)+' de ellas llegaron al tercer conteo':'')+
+     '. Manda siempre el último conteo cargado.'):
     'Ninguna ubicación de la selección pasó a segundo conteo.';
   tabla('t-rec',[
     {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
     {k:'teo',t:'Teórico',num:true},{k:'c1',t:'Conteo 1',num:true},
     {k:'d1',t:'Dif. 1',num:true,fmt:function(v){return '<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
     {k:'c2',t:'Conteo 2',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">pendiente</span>':n0(v)}},
+    {k:'d2',t:'Dif. 2',num:true,fmt:function(v){return v===null||v===undefined?'':'<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
+    {k:'c3',t:'Conteo 3',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">—</span>':n0(v)}},
     {k:'cant',t:'Final',num:true},{k:'dif',t:'Dif. final',num:true,fmt:function(v){return firmaEnt(v)}},
     {k:'op',t:'Contó'},{k:'op2',t:'Recontó',fmt:function(v){return v?esc(v):'<span class="neutro">sin operador</span>'}},
     {k:'estado',t:'Resultado',fmt:function(v){return pinta(v)}}
-  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:CFG.tope});
+  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,d2:r.dif2,c3:r.c3,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:CFG.tope});
   var chequeos=[
     {q:m.filas-m.costeadas,d:'Filas con <b>Costo</b> en 0: no aportan valorizado. El '+pct(m.costeadas,m.filas)+' del archivo está costeado.',f:'sincosto'},
     {q:m.sinFecha,d:'Filas sin <b>Fecha Conteo</b>: quedan fuera del avance por jornada.',f:'sinfecha'},
@@ -1477,7 +1482,8 @@ function vConteos(m){
     {q:m.dupes,d:'Claves <b>ubicación + código</b> repetidas: el mismo material contado dos veces en la misma posición.',f:''},
     {q:m.pendientes,d:'Filas con tarea generada y <b>sin ningún conteo</b> cargado.',f:'pendiente'},
     {q:m.sinCostoConDif,d:'Ubicaciones con diferencia final <b>y sin costo</b>: la diferencia existe pero no se puede valorizar.',f:''},
-    {q:m.desvios,d:'Filas donde la columna <b>FINAL</b> del archivo no coincide con el último conteo cargado.',f:''}
+    {q:m.desvios,d:'Filas donde la columna <b>FINAL</b> del archivo no coincide con el último conteo cargado.',f:''},
+    {q:m.rec3,d:'Ubicaciones que llegaron al <b>tercer conteo</b>.',f:'recuento3'}
   ];
   $('t-calidad').innerHTML=chequeos.map(function(c){
     return '<li><span class="q '+(c.q?'neg':'pos')+'">'+n0(c.q)+'</span><span class="d">'+c.d+'</span>'+
@@ -1526,11 +1532,9 @@ function renderFilmina(m,ira,univ){
   ].join('');
   $('fl-jornada').innerHTML=svgColumnas(porJornada(SEL),560,205,{dos:true,chico:true,mL:34});
   $('fl-tit2').textContent='Avance del inventario';
-  dona('fl-dona','fl-dona-leg',[
-    {t:'Contadas',v:TOT.contadas,color:'#2a78d6'},
-    {t:'Pendientes',v:pendAlt,color:'#eb6834'},
-    {t:'Del archivo sin contar',v:TOT.pendientes,color:'#9aa7b4'}
-  ],{tam:150,gro:24,centro:uni?fm1.format(100*TOT.contadas/uni)+'%':'—',centroEt:'AVANCE',tamCentro:17});
+  var flp=[{t:'Contadas',v:TOT.contadas,color:'#2a78d6'},{t:'Pendientes',v:pendAlt,color:'#eb6834'}];
+  if(TOT.pendientes)flp.push({t:'Del archivo sin contar',v:TOT.pendientes,color:'#9aa7b4'});
+  dona('fl-dona','fl-dona-leg',flp,{tam:150,gro:24,centro:uni?fm1.format(100*TOT.contadas/uni)+'%':'—',centroEt:'AVANCE',tamCentro:17});
   var pc={},lista=[];
   SEL.forEach(function(r){
     if(!r.cal)return;
