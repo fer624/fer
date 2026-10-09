@@ -781,7 +781,6 @@ function render(){
     tile('Diferencia final',firmaEnt(m.difPiezas)+' pzas',n0(m.faltantes)+' faltantes · '+n0(m.sobrantes)+' sobrantes',m.difPiezas?(m.difPiezas<0?'crit':'warn'):'good'),
     tile('Cerró al primer conteo',n0(m.cierre1),pct(m.cierre1,m.contadas)+' de lo contado','good'),
     tile('Pasó a segundo conteo',n0(m.recuentos),pct(m.recuentos,m.contadas)+' de lo contado','warn'),
-    tile('Recuento que ratificó la diferencia',n0(m.confirma),m.recuentos?'el 2do conteo repitió el 1ro en '+pct(m.confirma,m.recuentos):'sin recuentos',m.confirma?'crit':'good'),
     tile('Jornadas',n0(m.nJornadas),m.ultima?'última '+fechaLarga(m.ultima):'sin fechas'),
     tile('Operadores',n0(m.nOps),'en el primer conteo')
   ].join('');
@@ -871,20 +870,17 @@ function render(){
   /* recuentos */
   var recs=SEL.filter(function(r){return r.recuento});
   $('sub-rec').textContent=recs.length?
-    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo. Manda el último conteo: '+
-     n0(m.confirma)+' confirmaron el primer conteo y quedan con diferencia real, '+
-     n0(m.corrige)+' coincidieron con el teórico'+(m.rec3?' y '+n0(m.rec3)+' dieron un tercer valor':'')+'.'):
+    (n0(recs.length)+' ubicaciones con diferencia en el primer conteo. El segundo conteo es el que define la cantidad final.'):
     'Ninguna ubicación de la selección pasó a segundo conteo.';
   tabla('t-rec',[
     {k:'ub',t:'Ubicación',mono:true},{k:'cod',t:'Código',mono:true},{k:'desc',t:'Descripción'},
     {k:'teo',t:'Teórico',num:true},{k:'c1',t:'Conteo 1',num:true},
     {k:'d1',t:'Dif. 1',num:true,fmt:function(v){return '<span class="'+(v<0?'neg':v>0?'pos':'')+'">'+firmaEnt(v)+'</span>'}},
     {k:'c2',t:'Conteo 2',num:true,fmt:function(v){return v===null||v===undefined?'<span class="neutro">pendiente</span>':n0(v)}},
-    {k:'conf2',t:'Qué dijo el 2do',fmt:function(v){return v==='confirma'?'<span class="estado"><i class="pt falt"></i>confirma el 1er conteo</span>':v==='teorico'?'<span class="estado"><i class="pt ok"></i>coincide con el teórico</span>':v==='otro'?'<span class="estado"><i class="pt sob"></i>tercer valor</span>':'<span class="neutro">sin segundo conteo</span>'}},
     {k:'cant',t:'Final',num:true},{k:'dif',t:'Dif. final',num:true,fmt:function(v){return firmaEnt(v)}},
     {k:'op',t:'Contó'},{k:'op2',t:'Recontó',fmt:function(v){return v?esc(v):'<span class="neutro">sin operador</span>'}},
     {k:'estado',t:'Resultado',fmt:function(v){return pinta(v)}}
-  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,conf2:r.conf2,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:25});
+  ],recs.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,teo:r.teo,c1:r.c1,d1:r.dif1,c2:r.c2,cant:r.cant,dif:r.dif,op:r.op,op2:r.op2,estado:r.estado}}),{k:'d1',dir:1,tope:25});
 
   /* calidad de datos */
   var chequeos=[
