@@ -313,7 +313,7 @@ details.twin[open] summary{margin-bottom:8px}
     <div class="campo"><label for="f-calle">Calle</label><select id="f-calle"></select></div>
     <div class="campo"><label for="f-operador">Operador</label><select id="f-operador"></select></div>
     <div class="campo"><label for="f-jornada">Jornada</label><select id="f-jornada"></select></div>
-    <div class="campo"><label for="f-estado">Estado final</label>
+    <div class="campo"><label for="f-estado">Estado de la ubicación</label>
       <select id="f-estado">
         <option value="">Todos</option>
         <option value="ok">Cerró sin diferencia</option>
@@ -843,7 +843,7 @@ function llenarPasillos(){
   opciones(sel,Object.keys(p).sort(),null,'Todas');
 }
 function enriquecer(filas){
-  return filas.map(function(r){
+  var rows=filas.map(function(r){
     var o={},i;
     for(i=0;i<COLS.length;i++)o[COLS[i]]=r[i]===undefined?null:r[i];
     o.op=aliasDe(o.u1);o.op2=aliasDe(o.u2);o.op3=aliasDe(o.u3);
@@ -870,6 +870,29 @@ function enriquecer(filas){
     o.clave=o.ub+'|'+o.cod;
     return o;
   });
+  /* una ubicación con varios códigos se consolida: su estado sale de la suma de sus líneas */
+  var U={};
+  rows.forEach(function(o){
+    var u=U[o.ub];
+    if(!u)u=U[o.ub]={lineas:0,contadas:0,dif:0,difLin:0,neg:0,rec:0,rec3:0,c1ok:0,c1lin:0};
+    u.lineas++;
+    if(o.recuento)u.rec++;
+    if(o.tiene3)u.rec3++;
+    if(o.dif1!==null){u.c1lin++;if(o.dif1===0)u.c1ok++}
+    if(!o.contada)return;
+    u.contadas++;u.dif+=o.dif||0;
+    if(o.dif!==0){u.difLin++;if(o.dif<0)u.neg++}
+  });
+  rows.forEach(function(o){
+    var u=U[o.ub];
+    o.ubLineas=u.lineas;
+    o.ubDif=u.dif;
+    o.ubRecuento=u.rec>0;
+    o.ubRec3=u.rec3>0;
+    o.ubCierre1=(u.c1lin>0&&u.c1ok===u.c1lin);
+    o.estadoUb=!u.contadas?'pendiente':(!u.difLin?'ok':((u.dif<0||(u.dif===0&&u.neg))?'faltante':'sobrante'));
+  });
+  return rows;
 }
 
 function avisar(msg,tipo){
@@ -916,11 +939,11 @@ function filtrar(){
     if(calle&&r.cal!==calle)return false;
     if(op&&r.op!==op&&r.op2!==op&&r.op3!==op)return false;
     if(jor&&r.fecha!==jor)return false;
-    if(est==='recuento'){if(!r.recuento)return false}
-    else if(est==='recuento3'){if(!r.tiene3)return false}
+    if(est==='recuento'){if(!r.ubRecuento)return false}
+    else if(est==='recuento3'){if(!r.ubRec3)return false}
     else if(est==='sincosto'){if(r.costeada)return false}
     else if(est==='sinfecha'){if(r.fecha)return false}
-    else if(est){if(r.estado!==est)return false}
+    else if(est){if(r.estadoUb!==est)return false}
     if(q&&(r.cod+' '+r.desc+' '+r.ub).toLowerCase().indexOf(q)<0)return false;
     return true;
   });
@@ -975,30 +998,20 @@ function metricas(rows){
     if(r.dif1===0)m.cierre1Lin++;
     else if(r.dif1!==null){m.dif1++;m.difPiezas1+=r.dif1;if(r.dif1<0)m.falt1++;else m.sob1++}
   });
-  /* una ubicación puede tener más de un código: se cuenta una sola vez */
-  var U={};
+  /* el estado de cada ubicación ya viene consolidado desde el archivo completo */
+  var vistas={};
   rows.forEach(function(r){
-    var u=U[r.ub];
-    if(!u)u=U[r.ub]={lineas:0,contadas:0,dif:0,difLin:0,neg:0,rec:0,rec3:0,c1ok:0,c1lin:0};
-    u.lineas++;
-    if(r.recuento)u.rec++;
-    if(r.tiene3)u.rec3=1;
-    if(r.dif1!==null){u.c1lin++;if(r.dif1===0)u.c1ok++}
-    if(!r.contada)return;
-    u.contadas++;u.dif+=r.dif||0;
-    if(r.dif!==0){u.difLin++;if(r.dif<0)u.neg++}
-  });
-  Object.keys(U).forEach(function(k){
-    var u=U[k];
+    if(vistas[r.ub])return;
+    vistas[r.ub]=1;
     m.ubis++;
-    if(u.lineas>1)m.multi++;
-    if(!u.contadas){m.pendientes++;return}
+    if(r.ubLineas>1)m.multi++;
+    if(r.estadoUb==='pendiente'){m.pendientes++;return}
     m.contadas++;
-    if(u.rec)m.recuentos++;
-    if(u.rec3)m.rec3++;else if(u.rec)m.rec2++;
-    if(u.c1lin&&u.c1ok===u.c1lin)m.cierre1++;
-    if(!u.difLin)m.ok++;
-    else if(u.dif<0||(u.dif===0&&u.neg))m.faltantes++;
+    if(r.ubRecuento)m.recuentos++;
+    if(r.ubRec3)m.rec3++;else if(r.ubRecuento)m.rec2++;
+    if(r.ubCierre1)m.cierre1++;
+    if(r.estadoUb==='ok')m.ok++;
+    else if(r.estadoUb==='faltante')m.faltantes++;
     else m.sobrantes++;
   });
   return m;
@@ -1507,15 +1520,17 @@ function vValorizado(m){
 }
 function vConteos(m){
   var grupos=[
-    {k:'todas',t:'Todas',fn:function(){return true}},
-    {k:'dif',t:'Con diferencia',fn:function(r){return r.contada&&r.dif!==0&&r.dif!==null}},
-    {k:'rec',t:'Pasaron a recuento',fn:function(r){return r.recuento}},
-    {k:'rec3',t:'Llegaron al tercer conteo',fn:function(r){return r.tiene3}},
-    {k:'pend',t:'Sin contar',fn:function(r){return !r.contada}}
+    {k:'todas',t:'Todas las líneas',fn:function(){return true}},
+    {k:'dif',t:'Ítems con diferencia',fn:function(r){return r.contada&&r.dif!==0&&r.dif!==null}},
+    {k:'difub',t:'Ubicaciones con diferencia',ub:true,fn:function(r){return r.estadoUb==='faltante'||r.estadoUb==='sobrante'}},
+    {k:'rec',t:'Pasaron a recuento',ub:true,fn:function(r){return r.ubRecuento}},
+    {k:'rec3',t:'Llegaron al tercer conteo',ub:true,fn:function(r){return r.ubRec3}},
+    {k:'pend',t:'Sin contar',ub:true,fn:function(r){return !r.contada}}
   ];
   var actual=grupos.filter(function(g){return g.k===DETALLE})[0]||grupos[0];
   $('chips-detalle').innerHTML=grupos.map(function(g){
-    var n=SEL.filter(g.fn).length;
+    var fil=SEL.filter(g.fn),n=fil.length;
+    if(g.ub){var v={},u=0;fil.forEach(function(r){if(!v[r.ub]){v[r.ub]=1;u++}});n=u}
     if(!n&&g.k!=='todas')return '';
     return '<button type="button" data-grupo="'+g.k+'" aria-pressed="'+(g.k===actual.k)+'">'+esc(g.t)+' <b>'+n0(n)+'</b></button>';
   }).join('');
@@ -1539,9 +1554,10 @@ function vConteos(m){
     {k:'difVal',t:'Dif. valorizada',num:true,fmt:function(v){return v?'<span class="'+(v<0?'neg':'pos')+'">'+monFirma(v)+'</span>':mon(0)}},
     {k:'op',t:'Contó'},
     {k:'op2',t:'Recontó',fmt:function(v){return v?esc(v):'<span class="neutro">—</span>'}},
-    {k:'estado',t:'Estado',fmt:function(v){return pinta(v)}}
+    {k:'estado',t:'Estado de la línea',fmt:function(v){return pinta(v)}},
+    {k:'estadoUb',t:'Estado de la ubicación',fmt:function(v,r){return pinta(v)+(r.ubLineas>1?' <span class="neutro">('+n0(r.ubLineas)+' líneas)</span>':'')}}
   ],filas.map(function(r){return {ub:r.ub,cod:r.cod,desc:r.desc,fecha:r.fecha,teo:r.teo,c1:r.c1,c2:r.c2,c3:r.c3,
-    cant:r.cant,dif:r.dif,costo:r.cost,difVal:r.difVal,op:r.op,op2:r.op2,estado:r.estado}}),
+    cant:r.cant,dif:r.dif,costo:r.cost,difVal:r.difVal,op:r.op,op2:r.op2,estado:r.estado,estadoUb:r.estadoUb,ubLineas:r.ubLineas}}),
     {k:'ub',dir:1,tope:CFG.tope});
   var chequeos=[
     {q:m.filas-m.costeadas,d:'Filas con <b>Costo</b> en 0: no aportan valorizado. El '+pct(m.costeadas,m.filas)+' del archivo está costeado.',f:'sincosto'},
