@@ -676,7 +676,7 @@ function normOp(v){
 }
 
 /* ================== estado y configuración ================== */
-var DATOS=null,PEND=null,MAESTRO=null,UNI=null,SEL=[],MET=null,TOT=null,VISTA='resumen',DETALLE='todas',LS='w2wKia.v1',LSP='w2wKia.pend.v1',LSM='w2wKia.maestro.v1',LSC='w2wKia.cfg.v1',LST='w2wKia.tema',ORDEN={};
+var DATOS=null,PEND=null,MAESTRO=null,UNI=null,MAPEO=null,SEL=[],MET=null,TOT=null,VISTA='resumen',DETALLE='todas',LS='w2wKia.v1',LSP='w2wKia.pend.v1',LSM='w2wKia.maestro.v1',LSC='w2wKia.cfg.v1',LST='w2wKia.tema',ORDEN={};
 var LOGOS_BASE={};
 try{LOGOS_BASE=JSON.parse($('logos-base').textContent)}catch(e){LOGOS_BASE={}}
 var CFG_DEF={cliente:'KIA',operadorLog:'CEVA Logistics',area:'Gestión de Inventarios',emisor:'',destinatario:'Gerencia',
@@ -706,26 +706,60 @@ function mon(v){return (CFG.moneda?CFG.moneda+' ':'')+n2(v)}
 function monFirma(v){v=v||0;return (v>0?'+':v<0?'−':'')+(CFG.moneda?CFG.moneda+' ':'')+n2(Math.abs(v))}
 
 /* ================== lectura del archivo ================== */
+var ALIAS_COL=[
+  ['cod',['producto codigo','codigo producto','codigo de producto','codigo del producto','codigo','cod producto','cod','material','sku','articulo','art','item','numero de parte','nro parte','part number','pieza'],
+         ['codigo','material','sku','articulo','parte','pieza','item']],
+  ['desc',['descripcion','descripcion producto','descripcion del producto','descripcion material','desc','detalle','denominacion','texto breve','nombre'],
+          ['descrip','detalle','denominacion','texto','nombre']],
+  ['teorico',['stock a fecha','stock sistema','stock teorico','teorico','cantidad sistema','stock'],['teorico','sistema']],
+  ['c1',['conteo 1','primer conteo','conteo1','conteo uno'],['conteo 1','1er conteo']],
+  ['costo',['costo','costo unitario','precio','precio unitario','valor unitario','costo unit'],['costo','precio']]
+];
 function mapearColumnas(hdr){
-  var usados=[],idx={};
-  for(var i=0;i<hdr.length;i++){
-    var n=normHdr(hdr[i]==null?'':hdr[i]);
+  var usados=[],idx={},cols={},i,k,n;
+  for(i=0;i<hdr.length;i++){
+    n=normHdr(hdr[i]==null?'':hdr[i]);
     if(!n)continue;
-    for(var k=0;k<MAPA_HDR.length;k++){
+    for(k=0;k<MAPA_HDR.length;k++){
       if(usados[k])continue;
-      if(MAPA_HDR[k][0]===n){usados[k]=true;if(idx[MAPA_HDR[k][1]]===undefined)idx[MAPA_HDR[k][1]]=i;break}
+      if(MAPA_HDR[k][0]===n){usados[k]=true;if(idx[MAPA_HDR[k][1]]===undefined){idx[MAPA_HDR[k][1]]=i;cols[i]=1}break}
     }
   }
+  /* segunda vuelta: nombres alternativos y coincidencia parcial para las columnas clave */
+  ALIAS_COL.forEach(function(a){
+    var clave=a[0],exactos=a[1],parciales=a[2];
+    if(idx[clave]!==undefined)return;
+    var j,p;
+    for(j=0;j<hdr.length;j++){
+      if(cols[j])continue;
+      n=normHdr(hdr[j]==null?'':hdr[j]);
+      if(n&&exactos.indexOf(n)>-1){idx[clave]=j;cols[j]=1;return}
+    }
+    for(j=0;j<hdr.length;j++){
+      if(cols[j])continue;
+      n=normHdr(hdr[j]==null?'':hdr[j]);
+      if(!n)continue;
+      for(p=0;p<parciales.length;p++){
+        if(n.indexOf(parciales[p])>-1){idx[clave]=j;cols[j]=1;return}
+      }
+    }
+  });
   return idx;
 }
 function filasDesdeAoa(aoa){
-  var hi=-1,i,fila;
+  var hi=-1,i,fila,j;
   for(i=0;i<Math.min(aoa.length,30);i++){
     fila=(aoa[i]||[]).map(function(c){return normHdr(c==null?'':c)});
-    if(fila.indexOf('ubicacion')>-1&&(fila.indexOf('conteo 1')>-1||fila.indexOf('stock a fecha')>-1)){hi=i;break}
+    if(fila.indexOf('ubicacion')<0)continue;
+    for(j=0;j<fila.length;j++){
+      var n=fila[j];
+      if(n&&(n.indexOf('conteo')>-1||n.indexOf('stock')>-1||n.indexOf('teorico')>-1)){hi=i;break}
+    }
+    if(hi>-1)break;
   }
-  if(hi<0)throw new Error('No encontré la fila de encabezados: esperaba las columnas "Ubicación" y "CONTEO 1".');
+  if(hi<0)throw new Error('No encontré la fila de encabezados: esperaba una columna "Ubicación" y otra con el conteo o el stock teórico.');
   var idx=mapearColumnas(aoa[hi]);
+  MAPEO={hdr:(aoa[hi]||[]).map(function(x){return txt(x)}),idx:idx};
   var faltan=['ub','c1','costo'].filter(function(k){return idx[k]===undefined});
   if(idx.teorico===undefined&&idx.si===undefined)faltan.push('teorico');
   if(faltan.length)throw new Error('El archivo no tiene estas columnas: '+faltan.map(function(k){return NOMBRE_COL[k]||k}).join(', ')+'.');
@@ -753,7 +787,12 @@ function filasDesdeAoa(aoa){
 function esDeConteos(aoa){
   for(var i=0;i<Math.min(aoa.length,30);i++){
     var f=(aoa[i]||[]).map(function(x){return normHdr(x==null?'':x)});
-    if(f.indexOf('conteo 1')>-1||f.indexOf('stock a fecha')>-1)return true;
+    if(f.indexOf('ubicacion')<0)continue;
+    for(var j=0;j<f.length;j++){
+      var n=f[j];
+      if(!n)continue;
+      if(n.indexOf('conteo')>-1||n.indexOf('stock')>-1||n.indexOf('teorico')>-1||n.indexOf('audit')>-1||n.indexOf('diferencia')>-1)return true;
+    }
   }
   return false;
 }
@@ -1646,7 +1685,14 @@ function renderConfig(){
     '<b>Conteos:</b> '+esc(DATOS.archivo)+(DATOS.origen==='base'?' (archivo base)':'')+' · '+
     n0(DATOS.rows.length)+' líneas · '+n0(TOT?TOT.ubis:0)+' ubicaciones'+(TOT&&TOT.ultima?' · última jornada '+fechaLarga(TOT.ultima):'')+'.<br>'+
     '<b>Tareas pendientes:</b> '+(PEND?esc(PEND.archivo)+(PEND.origen==='base'?' (archivo base)':'')+' · '+n0(PEND.filas.length)+' ubicaciones':'sin archivo cargado')+'.<br>'+
-    'El avance se mide contra el maestro. Si cargás un archivo con columnas de conteo reemplaza los conteos; si solo trae ubicaciones, reemplaza el maestro.';
+    'El avance se mide contra el maestro. Si cargás un archivo con columnas de conteo reemplaza los conteos; si solo trae ubicaciones, reemplaza el maestro.'+
+    (MAPEO?('<br><br><b>Columnas detectadas en el archivo de conteos:</b><br>'+
+      [['ub','Ubicación'],['cod','Código'],['desc','Descripción'],['fecha','Fecha de conteo'],['teorico','Stock teórico'],
+       ['c1','Conteo 1'],['u1','Operador 1'],['c2','Conteo 2'],['u2','Operador 2'],['c3','Conteo 3'],['final','FINAL'],['costo','Costo']]
+      .map(function(par){
+        var i=MAPEO.idx[par[0]];
+        return par[1]+': '+(i===undefined?'<span class="neg">no encontrada</span>':'<b>'+esc(MAPEO.hdr[i]||('columna '+(i+1)))+'</b>');
+      }).join(' · ')):'');
   var crudos={},cuenta={};
   DATOS.rows.forEach(function(r){
     [r.u1,r.u2,r.u3].forEach(function(v){var k=claveOp(v);if(k&&!crudos[k])crudos[k]=txt(v)});
@@ -1738,7 +1784,14 @@ function leerArchivo(file,forzar){
       }
       var filas=filasDesdeAoa(aoa);
       setDatos({archivo:file.name,hoja:hoja,filas:filas,origen:'archivo'},true);
-      avisar(n0(filas.length)+' líneas cargadas desde '+file.name+'. '+n0(metricas(DATOS.rows).ubis)+' ubicaciones.','ok');
+      var sinCod=DATOS.rows.filter(function(r){return !r.cod}).length;
+      var sinDesc=DATOS.rows.filter(function(r){return !r.desc}).length;
+      var faltantes=[];
+      if(sinCod>DATOS.rows.length*0.5)faltantes.push('código de producto');
+      if(sinDesc>DATOS.rows.length*0.5)faltantes.push('descripción');
+      avisar(n0(filas.length)+' líneas cargadas desde '+file.name+'. '+n0(metricas(DATOS.rows).ubis)+' ubicaciones.'+
+        (faltantes.length?' No pude leer '+faltantes.join(' ni ')+': revisá en Configuración qué columnas detecté.':''),
+        faltantes.length?'':'ok');
     }catch(err){avisar(err&&err.message?err.message:'No pude interpretar el archivo.','error')}
   };
   if(esCsv)lector.readAsText(file,'utf-8');else lector.readAsArrayBuffer(file);
