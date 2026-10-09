@@ -124,6 +124,7 @@ body{margin:0;background:var(--plane);color:var(--ink);font-family:var(--sans);f
 @media (max-width:880px){.hero-fila{grid-template-columns:1fr}}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
 .tiles-4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.tiles-3{grid-template-columns:repeat(auto-fit,minmax(252px,1fr))}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;display:flex;flex-direction:column;gap:3px;box-shadow:var(--sombra);min-width:0;border-left:3px solid var(--line)}
 .tile .et{font-family:var(--cond);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .tile .val{font-size:25px;font-weight:600;line-height:1.1;letter-spacing:-.01em}
@@ -323,9 +324,8 @@ details.twin[open] summary{margin-bottom:8px}
         <span class="et">Exactitud de inventario (IRA)</span>
         <span class="cifra" id="hero-val">—</span>
         <span class="chip-meta" id="hero-meta" hidden></span>
-        <span class="pie" id="hero-pie"></span>
       </div>
-      <div class="tiles" id="tiles-resumen"></div>
+      <div class="tiles tiles-3" id="tiles-resumen"></div>
     </div>
     <div class="grid2">
       <div class="card">
@@ -572,8 +572,7 @@ details.twin[open] summary{margin-bottom:8px}
     <div class="fl-caja"><h3>Calles de mayor valorizado</h3><div id="fl-calles"></div></div>
     <div class="fl-caja"><h3>Puntos de atención del archivo</h3><div id="fl-atencion"></div></div>
   </div>
-  <p class="fl-resumen" id="fl-resumen"></p>
-  <div class="fl-pie"><span id="fl-firma"></span><span id="fl-pie"></span></div>
+
 </div>
 
 <div class="tip" id="tip" role="status" aria-live="polite"></div>
@@ -1083,10 +1082,9 @@ function tabla(id,cols,datos,ord){
     });
   }
 }
-function tile(et,val,nota,franja){
+function tile(et,val,franja){
   return '<div class="tile'+(franja?' franja-'+franja:'')+'"><span class="et">'+esc(et)+'</span>'+
-    '<span class="val'+(String(val).length>10?' chico':'')+'">'+esc(val)+'</span>'+
-    (nota?'<span class="nota">'+nota+'</span>':'')+'</div>';
+    '<span class="val'+(String(val).length>10?' chico':'')+'">'+esc(val)+'</span></div>';
 }
 function pinta(estado){
   var mapa={ok:['ok','Cerró sin diferencia'],faltante:['falt','Faltante'],sobrante:['sob','Sobrante'],pendiente:['pend','Sin contar']};
@@ -1151,25 +1149,22 @@ function vResumen(m,ira,univ){
   if(ira===null||!meta)hm.hidden=true;
   else{hm.hidden=false;hm.className='chip-meta '+(ira>=meta?'cumple':'falla');
     hm.textContent=(ira>=meta?'Cumple la meta de ':'Por debajo de la meta de ')+fm1.format(meta)+' %'}
-  $('hero-pie').textContent=n0(m.ok)+' de '+n0(m.contadas)+' ubicaciones contadas cerraron sin diferencia final'+
-    (m.faltantes+m.sobrantes?' · '+n0(m.faltantes)+' con faltante y '+n0(m.sobrantes)+' con sobrante':'')+'.';
-  var pendAlt=PEND?PEND.filas.length:0;
+  var pendAlt=PEND?PEND.filas.length:0,conDif=m.faltantes+m.sobrantes;
   $('tiles-resumen').innerHTML=[
-    tile('Ubicaciones contadas',n0(m.contadas),n0(m.filas)+' líneas'+(m.multi?' · '+n0(m.multi)+' con más de un código':''),'s1'),
-    tile('Pendientes de inventariar',n0(pendAlt+TOT.pendientes),(pendAlt+TOT.pendientes)?'sobre un universo de '+n0(universoTotal()):'sin pendientes',(pendAlt+TOT.pendientes)?'warn':'good'),
-    tile('Unidades contadas',n0(m.piezasCont),'teórico '+n0(m.piezasTeo)),
-    tile('Diferencia final',firmaEnt(m.difPiezas)+' un',monFirma(m.difVal),m.difPiezas?(m.difPiezas<0?'crit':'warn'):'good'),
-    tile('Cerró al primer conteo',n0(m.cierre1),pct(m.cierre1,m.contadas),'good'),
-    tile('Pasó a segundo conteo',n0(m.recuentos),m.rec3?n0(m.rec3)+' llegaron al tercero':pct(m.recuentos,m.contadas),'warn')
+    tile('Total de ubicaciones',n0(univ),'navy'),
+    tile('Contadas',n0(m.contadas),'good'),
+    tile('Pendientes',n0(pendAlt+TOT.pendientes),(pendAlt+TOT.pendientes)?'warn':'good'),
+    tile('Ítems contados',n0(m.lineasContadas),'s1'),
+    tile('Unidades contadas',n0(m.piezasCont),'s1'),
+    tile('Con diferencias',n0(conDif),conDif?'crit':'good')
   ].join('');
   dona('d-estado','d-estado-leg',[
     {t:'Cerró sin diferencia',v:m.ok,color:'var(--good)',fcampo:'f-estado',fvalor:'ok'},
     {t:'Faltante',v:m.faltantes,color:'var(--crit)',fcampo:'f-estado',fvalor:'faltante'},
     {t:'Sobrante',v:m.sobrantes,color:'var(--warn)',fcampo:'f-estado',fvalor:'sobrante'},
     {t:'Sin contar',v:m.pendientes,color:'var(--axis)',fcampo:'f-estado',fvalor:'pendiente'}
-  ],{centro:n0(m.filas),centroEt:'UBICACIONES',aria:'Estado final de las ubicaciones'});
+  ],{centro:n0(m.ubis),centroEt:'UBICACIONES',aria:'Estado final de las ubicaciones'});
   donaAvance('d-avance','d-avance-leg');
-  if($('resumen-eje'))$('resumen-eje').innerHTML=resumenEjecutivo(m,univ);
 }
 
 function donaAvance(id,leg,tam){
@@ -1201,10 +1196,10 @@ function vAvance(m){
   var dias=porJornada(SEL),mejor=null,acum=0;
   dias.forEach(function(d){if(!mejor||d.a+d.b>mejor.a+mejor.b)mejor=d});
   $('tiles-avance').innerHTML=[
-    tile('Jornadas con conteo',n0(m.nJornadas),m.primera?fechaLarga(m.primera)+' a '+fechaLarga(m.ultima):'sin fechas','s1'),
-    tile('Promedio por jornada',n0(m.nJornadas?Math.round(m.contadas/m.nJornadas):0),'ubicaciones por día'),
-    tile('Mejor jornada',mejor?n0(mejor.a+mejor.b):'—',mejor?fechaLarga(mejor.k):'','good'),
-    tile('Sin fecha de conteo',n0(m.sinFecha),m.sinFecha?'quedan fuera del avance':'todas con fecha',m.sinFecha?'warn':'good')
+    tile('Jornadas con conteo',n0(m.nJornadas),'s1'),
+    tile('Ubicaciones por jornada',n0(m.nJornadas?Math.round(m.contadas/m.nJornadas):0),'s1'),
+    tile('Mejor jornada',mejor?diaMes(mejor.k):'—','good'),
+    tile('Sin fecha de conteo',n0(m.sinFecha),m.sinFecha?'warn':'good')
   ].join('');
   $('sub-jornada').textContent=m.nJornadas?('Ubicaciones contadas en cada jornada'+(m.sinFecha?' · '+n0(m.sinFecha)+' registros sin fecha':'')+'.'):'Sin fechas de conteo en la selección.';
   $('g-jornada').innerHTML=svgColumnas(dias,anchoDe('g-jornada',700),260,{dos:true,aria:'Ubicaciones contadas por jornada'});
@@ -1246,10 +1241,10 @@ function vPendientes(m){
   var univ=universoTotal(),pendAlt=PEND?PEND.filas.length:0;
   var sel=pendFiltradas(),pas=porPasillo(sel);
   $('tiles-pend').innerHTML=[
-    tile('Avance del inventario',univ?fm1.format(100*TOT.contadas/univ)+' %':'—',n0(TOT.contadas)+' de '+n0(univ)+' ubicaciones','s1'),
-    tile('Ubicaciones pendientes',n0(pendAlt),PEND?esc(PEND.archivo):'sin archivo cargado','warn'),
-    tile('Pasillos',n0(porPasillo(PEND?PEND.filas:[]).length),'con ubicaciones pendientes'),
-    tile('Ubicaciones contadas',n0(TOT.contadas),n0(TOT.ubis)+' en el archivo de conteos','good')
+    tile('Avance del inventario',univ?fm1.format(100*TOT.contadas/univ)+' %':'—','navy'),
+    tile('Total de ubicaciones',n0(univ),'s1'),
+    tile('Pendientes',n0(pendAlt),'warn'),
+    tile('Pasillos',n0(porPasillo(PEND?PEND.filas:[]).length),'s1')
   ].join('');
   donaAvance('d-avance2','d-avance2-leg');
   barras('g-pasillos',pas.map(function(p){
@@ -1363,10 +1358,10 @@ function vMapa(m){
     lpa.map(function(x){return {n:x.n,racks:x.racks,c:x.c,p:x.p,t:x.c+x.p,a:pct(x.c,x.c+x.p,0)}}),null);
   var univ=universoTotal();
   $('tiles-mapa').innerHTML=[
-    tile('Avance del depósito',univ?fm1.format(100*TOT.contadas/univ)+' %':'—',n0(TOT.contadas)+' de '+n0(univ)+' ubicaciones','s1'),
-    tile('Gavetas',n0(g.cont)+'/'+n0(g.cont+g.pend),g.pend?n0(g.pend)+' sin contar':'todas contadas',g.pend?'warn':'good'),
-    tile('Altura',n0(a.cont)+'/'+n0(a.cont+a.pend),a.pend?n0(a.pend)+' sin contar':'todas contadas',a.pend?'warn':'good'),
-    tile('Posiciones del mapa',n0(g.celdas+a.celdas),n0(g.celdas)+' calles de gavetas + '+n0(a.celdas)+' racks de altura')
+    tile('Avance del depósito',univ?fm1.format(100*TOT.contadas/univ)+' %':'—','navy'),
+    tile('Gavetas contadas',n0(g.cont)+' / '+n0(g.cont+g.pend),g.pend?'warn':'good'),
+    tile('Altura contada',n0(a.cont)+' / '+n0(a.cont+a.pend),a.pend?'warn':'good'),
+    tile('Posiciones del mapa',n0(g.celdas+a.celdas),'s1')
   ].join('');
   $('sub-mapa-g').textContent='Avance de cada calle: contadas sobre el total de la calle. El mapa muestra el depósito completo, no la selección de los filtros.';
   $('sub-mapa-a').textContent='Avance de cada rack por pasillo, con las posiciones pendientes de inventariar. Tocá una celda para filtrar por ese pasillo.';
@@ -1408,14 +1403,14 @@ function vOperadores(m){
 function vValorizado(m){
   var exact=m.valTeo?100*(1-m.absVal/m.valTeo):null;
   $('tiles-fin').innerHTML=[
-    tile('Valorizado teórico',mon(m.valTeo),n0(m.costeadas)+' filas con costo','s1'),
-    tile('Valorizado contado',mon(m.valCont),'sobre '+n0(m.contadas)+' ubicaciones'),
-    tile('Diferencia valorizada',monFirma(m.difVal),m.difVal?'impacto neto':'inventario conciliado',m.difVal?(m.difVal<0?'crit':'warn'):'good'),
-    tile('Diferencia absoluta',mon(m.absVal),'faltantes más sobrantes'),
-    tile('Exactitud valorizada',exact===null?'—':fm2.format(exact)+' %','meta '+fm1.format(+CFG.metaVal||0)+' %',exact===null?null:(exact>=(+CFG.metaVal||0)?'good':'crit')),
-    tile('Faltante',mon(Math.abs(m.faltVal)),n0(m.faltantes)+' ubicaciones','crit'),
-    tile('Sobrante',mon(m.sobVal),n0(m.sobrantes)+' ubicaciones','warn'),
-    tile('Valor promedio',mon(m.contadas?m.valCont/m.contadas:0),'por ubicación contada')
+    tile('Valorizado teórico',mon(m.valTeo),'s1'),
+    tile('Valorizado contado',mon(m.valCont),'s1'),
+    tile('Diferencia valorizada',monFirma(m.difVal),m.difVal?(m.difVal<0?'crit':'warn'):'good'),
+    tile('Diferencia absoluta',mon(m.absVal),'navy'),
+    tile('Exactitud valorizada',exact===null?'—':fm2.format(exact)+' %',exact===null?null:(exact>=(+CFG.metaVal||0)?'good':'crit')),
+    tile('Faltante',mon(Math.abs(m.faltVal)),'crit'),
+    tile('Sobrante',mon(m.sobVal),'warn'),
+    tile('Valor promedio por ubicación',mon(m.contadas?m.valCont/m.contadas:0),'s1')
   ].join('');
   var porCalle={},calles=[];
   SEL.forEach(function(r){
@@ -1493,25 +1488,6 @@ function vConteos(m){
 }
 
 /* ================== filmina, logos y configuración ================== */
-function resumenEjecutivo(m,univ){
-  if(!m.filas)return 'La selección no tiene registros.';
-  var ira=m.contadas?100*m.ok/m.contadas:0;
-  var exact=m.valTeo?100*(1-m.absVal/m.valTeo):null;
-  var t=[];
-  t.push('<b>Resumen.</b> Se contaron '+n0(m.contadas)+' ubicaciones'+(univ?' sobre un universo de '+n0(univ):'')+
-    ' ('+n0(m.filas)+' líneas de producto), con '+n0(m.nSkus)+' códigos y '+n0(m.piezasCont)+' unidades, en '+n0(m.nJornadas)+' jornadas'+
-    (m.ultima?' hasta el '+fechaLarga(m.ultima):'')+'.');
-  t.push(' El '+fm1.format(m.contadas?100*m.cierre1/m.contadas:0)+' % cerró en el primer conteo y '+n0(m.recuentos)+' ubicaciones pasaron a segundo conteo.');
-  var pendAlt=PEND?PEND.filas.length:0,uni=universoTotal();
-  if(pendAlt||TOT.pendientes)t.push(' Quedan <b>'+n0(pendAlt+TOT.pendientes)+' ubicaciones pendientes</b> de inventariar'+
-    ', así que el avance sobre el universo de '+n0(uni)+' ubicaciones es del <b>'+fm1.format(uni?100*TOT.contadas/uni:0)+' %</b>.');
-  t.push(' La exactitud de inventario es <b>'+fm1.format(ira)+' %</b> (meta '+fm1.format(+CFG.metaIra||0)+' %)'+
-    (m.faltantes+m.sobrantes?', con '+n0(m.faltantes)+' faltantes y '+n0(m.sobrantes)+' sobrantes':', sin diferencias finales')+'.');
-  t.push(' El valorizado contado es '+mon(m.valCont)+' contra '+mon(m.valTeo)+' teórico, con una diferencia de <b>'+monFirma(m.difVal)+'</b>'+
-    (exact===null?'':' y una exactitud valorizada de '+fm2.format(exact)+' %')+'.');
-  if(m.filas-m.costeadas)t.push(' Atención: '+n0(m.filas-m.costeadas)+' filas ('+pct(m.filas-m.costeadas,m.filas)+') no tienen costo cargado, así que los importes son un piso.');
-  return t.join('');
-}
 function renderFilmina(m,ira,univ){
   var hoy=new Date();
   $('fl-titulo').textContent=CFG.tipo||CFG_DEF.tipo;
@@ -1530,11 +1506,11 @@ function renderFilmina(m,ira,univ){
     k('Valorizado contado',mon(m.valCont),'diferencia '+monFirma(m.difVal)),
     k('Exactitud valorizada',exact===null?'—':fm2.format(exact)+' %','cobertura de costo '+pct(m.costeadas,m.filas,0),exact!==null&&exact>=(+CFG.metaVal||0)?'verde':'rojo')
   ].join('');
-  $('fl-jornada').innerHTML=svgColumnas(porJornada(SEL),560,205,{dos:true,chico:true,mL:34});
+  $('fl-jornada').innerHTML=svgColumnas(porJornada(SEL),560,250,{dos:true,chico:true,mL:34});
   $('fl-tit2').textContent='Avance del inventario';
   var flp=[{t:'Contadas',v:TOT.contadas,color:'#2a78d6'},{t:'Pendientes',v:pendAlt,color:'#eb6834'}];
   if(TOT.pendientes)flp.push({t:'Del archivo sin contar',v:TOT.pendientes,color:'#9aa7b4'});
-  dona('fl-dona','fl-dona-leg',flp,{tam:150,gro:24,centro:uni?fm1.format(100*TOT.contadas/uni)+'%':'—',centroEt:'AVANCE',tamCentro:17});
+  dona('fl-dona','fl-dona-leg',flp,{tam:180,gro:28,centro:uni?fm1.format(100*TOT.contadas/uni)+'%':'—',centroEt:'AVANCE',tamCentro:17});
   var pc={},lista=[];
   SEL.forEach(function(r){
     if(!r.cal)return;
@@ -1557,9 +1533,6 @@ function renderFilmina(m,ira,univ){
   $('fl-atencion').innerHTML=at.length?
     ('<div class="fl-leyenda">'+at.map(function(x){return '<div><b style="min-width:34px;display:inline-block">'+n0(x.q)+'</b><span>'+esc(x.t)+'</span></div>'}).join('')+'</div>')
     :'<p style="font-size:9px">Sin observaciones: el archivo está completo.</p>';
-  $('fl-resumen').innerHTML=resumenEjecutivo(m,univ);
-  $('fl-firma').textContent='Emite: '+(CFG.emisor||'—')+' · '+CFG.area+', '+CFG.operadorLog;
-  $('fl-pie').textContent='Para: '+(CFG.destinatario||'—')+' · '+n0(DATOS.rows.length)+' registros en el archivo';
 }
 function pintarLogos(){
   [['logo-ceva','ceva'],['logo-inv','inv'],['logo-cliente','cliente'],
