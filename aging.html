@@ -228,6 +228,14 @@ table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
 .pastilla.ok{background:var(--verde-suave);color:var(--verde)}
 .pastilla.neutro{background:var(--acero-100);color:var(--acero-700)}
 .vacio-tabla{padding:34px;text-align:center;color:var(--acero-500);font-size:13.5px}
+input.fecha-aging{
+  padding:3px 6px;border-radius:7px;border:1px solid var(--acero-100);
+  font:inherit;font-size:12px;background:transparent;color:var(--acero-900);width:132px;
+}
+input.fecha-aging:hover{border-color:var(--acero-300);background:var(--blanco)}
+input.fecha-aging.ajustada{
+  background:var(--amarillo-suave);border-color:#e8d3a0;color:#6b4700;font-weight:700;
+}
 
 /* ---------- Grafico ---------- */
 .grafico{width:100%;overflow:visible}
@@ -328,7 +336,11 @@ table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
 <section id="v-detalle" hidden>
   <div class="panel">
     <h2>Detalle por linea</h2>
-    <p class="ayuda">Las lineas que ensucian cada area, ordenadas por dias de aging.</p>
+    <p class="ayuda">
+      Las lineas que ensucian cada area, ordenadas por dias de aging.
+      La <b>Fecha Aging</b> se puede editar: el ajuste queda guardado y se vuelve a aplicar
+      cada semana sobre la misma linea. Para volver a la fecha del archivo, borra el campo.
+    </p>
     <div class="filtros">
       <div>
         <label class="campo" for="fArea">Area</label>
@@ -356,6 +368,23 @@ table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
     <p class="pie-tabla" id="pieDetalle"></p>
     <div class="acciones">
       <button class="btn claro" id="btnCsvDetalle" type="button" disabled>Exportar detalle (CSV)</button>
+    </div>
+  </div>
+
+  <div class="panel" id="panelAjustes" hidden>
+    <h2>Fechas ajustadas a mano</h2>
+    <p class="ayuda">
+      Estas fechas pisan lo que diga el archivo y se vuelven a aplicar cada lunes.
+      El WMS no exporta un numero de linea, asi que la linea se reconoce por ubicacion,
+      producto, fecha de ingreso, tipo de stock y cantidad.
+    </p>
+    <div class="marco-alto" style="max-height:340px">
+      <table class="datos" id="tablaAjustes"></table>
+    </div>
+    <div class="acciones">
+      <button class="btn claro" id="btnCsvAjustes" type="button">Exportar (CSV)</button>
+      <button class="btn peligro" id="btnLimpiarHuerfanos" type="button">Borrar los que no coinciden</button>
+      <button class="btn peligro" id="btnBorrarAjustes" type="button">Borrar todos</button>
     </div>
   </div>
 </section>
@@ -580,7 +609,8 @@ const LS = {
   maestro:"aging.maestro.v1",
   hist:   "aging.historico.v1",
   mapeo:  "aging.mapeoMaestro.v1",
-  sembrado:"aging.sembrado.v1"
+  sembrado:"aging.sembrado.v1",
+  ajustes:"aging.ajustes.v1"
 };
 
 /* Configuracion de arranque: las ubicaciones criticas y areas tal como estan en
@@ -729,6 +759,7 @@ const estado = {
   areas: [],            // {area, responsable, proceso, target, descripcion}
   maestro: new Map(),   // claveSku -> costo
   maestroCrudo: [],     // [[sku, costo], ...] tal como se cargo
+  ajustes: {},          // clave de linea -> {fecha, nota, creado}
   lineas: [],           // calculadas
   resumen: [],          // por area
   diag: {},             // diagnosticos
@@ -821,7 +852,8 @@ const COLS = {
   producto:   ["Producto","SKU_ID","Material","Item","Articulo"],
   descProd:   ["Descripción de producto","Descripcion de producto","Descripción producto","Texto breve"],
   cantidad:   ["Ctd.","Ctd","QTY_ON_HAND","Cantidad","Stock"],
-  fechaAging: ["Fecha Aging","MOVE_DSTAMP","Fecha EM"],
+  fechaAging: ["Fecha Aging","MOVE_DSTAMP"],
+  fechaEM:    ["Fecha EM"],
   lote:       ["Lote"],
   tipoStock:  ["Denominación de tipo de stocks","Denominacion de tipo de stocks","Tipo de stock"],
   um:         ["Unidad medida base","UM","Unidad de medida"],
@@ -865,7 +897,7 @@ function ingestarStock(filas){
   const ih = filaEncabezado(filas, COLS.ubicacion);
   const head = filas[ih] || [];
   const c = {};
-  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","lote","tipoStock","um"]) {
+  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","fechaEM","lote","tipoStock","um"]) {
     c[k] = buscarCol(head, COLS[k]);
   }
   const faltan = [];
@@ -885,12 +917,14 @@ function ingestarStock(filas){
       descripcion:c.descProd  > -1 ? f[c.descProd]  : "",
       cantidad:   c.cantidad  > -1 ? f[c.cantidad]  : 0,
       fechaAging: c.fechaAging> -1 ? fecha(f[c.fechaAging]) : null,
+      fechaEM:    c.fechaEM    > -1 ? fecha(f[c.fechaEM])    : null,
       lote:       c.lote      > -1 ? f[c.lote]      : "",
       tipoStock:  c.tipoStock > -1 ? f[c.tipoStock] : "",
       um:         c.um        > -1 ? f[c.um]        : ""
     });
   }
   if (!out.length) throw new Error("La hoja Stock no tiene filas con ubicacion.");
+  if (c.fechaAging < 0 && c.fechaEM > -1) out.forEach((x) => { x.fechaAging = x.fechaEM; });
   estado.stock = out;
   estado.fuentes.stock = { filas: out.length, sinFecha: out.filter((x) => !x.fechaAging).length, cuando: new Date() };
   return out.length;
@@ -999,6 +1033,14 @@ function ingestarMaestro(filas, iSku, iCosto){
 /* ============================================================
    5. CALCULO
    ============================================================ */
+/* El WMS no exporta un id de linea (Unidad manipulacion e Identificacion stock
+   vienen vacias), asi que la identidad se arma con los atributos estables.
+   Aun asi quedan lineas indistinguibles entre si: un ajuste sobre una de ellas
+   se aplica a todas sus gemelas, y la pantalla lo avisa. */
+function claveLinea(f){
+  return [normUbic(f.ubicacion), String(f.producto || "").trim().toUpperCase(),
+          fechaISO(f.fechaEM), String(f.tipoStock || "").trim(), num(f.cantidad)].join("|");
+}
 function calcular(){
   const corte = estado.corte;
   const idxUbic = new Map();
@@ -1017,6 +1059,7 @@ function calcular(){
   const lineas = [];
   const desconocidas = new Map();
   const skusSinCosto = new Set();
+  const usados = new Set();
   let lineasIgnoradas = 0;
 
   for (const f of estado.stock) {
@@ -1033,7 +1076,12 @@ function calcular(){
     const area   = String(cfg.area || "").trim() || "(sin area)";
     const target = Number(cfg.target);
     const tieneTarget = Number.isFinite(target) && target > 0;
-    const aging  = f.fechaAging ? diasHabiles(f.fechaAging, corte) : null;
+
+    const clave = claveLinea(f);
+    const aj = estado.ajustes[clave];
+    const fechaUsada = aj && aj.fecha ? fecha(aj.fecha) : f.fechaAging;
+    if (aj) usados.add(clave);
+    const aging = fechaUsada ? diasHabiles(fechaUsada, corte) : null;
 
     let costo = null;
     for (const k of clavesSku(f.producto)) {
@@ -1045,6 +1093,8 @@ function calcular(){
 
     const cant = num(f.cantidad);
     lineas.push({
+      clave, ajustada: !!aj,
+      fechaArchivo: f.fechaAging,
       area, target: tieneTarget ? target : null,
       ubicacion: f.ubicacion,
       sku: f.producto == null ? "" : String(f.producto).trim(),
@@ -1055,11 +1105,11 @@ function calcular(){
       cantidad: cant,
       costo,
       valorizado: costo == null ? 0 : costo * cant,
-      fechaAging: f.fechaAging,
+      fechaAging: fechaUsada,
       aging,
       fuera: aging != null && tieneTarget && aging >= target,
       sinCosto: costo == null,
-      sinFecha: !f.fechaAging,
+      sinFecha: !fechaUsada,
       sinTarget: !tieneTarget
     });
   }
@@ -1122,6 +1172,13 @@ function calcular(){
     lineasSinCosto: lineas.filter((l) => l.sinCosto).length,
     lineasSinFecha: lineas.filter((l) => l.sinFecha).length,
     areasSinConfig: resumen.filter((r) => !r.enConfig && r.lineas > 0).map((r) => r.area),
+    lineasAjustadas: lineas.filter((l) => l.ajustada).length,
+    ajustesHuerfanos: Object.keys(estado.ajustes).filter((k) => !usados.has(k)),
+    ajustesCompartidos: (function(){
+      const c = {};
+      lineas.forEach((l) => { if (l.ajustada) c[l.clave] = (c[l.clave] || 0) + 1; });
+      return Object.keys(c).filter((k) => c[k] > 1).length;
+    })(),
     valorizadoEnRiesgo: lineas.filter((l) => l.sinCosto).reduce((a, l) => a + num(l.cantidad), 0)
   };
 }
@@ -1145,6 +1202,7 @@ function pintarTodo(){
   pintarGrafico();
   poblarFiltros();
   pintarDetalle();
+  pintarAjustes();
   pintarAreas();
   pintarUbicaciones();
   pintarMaestro();
@@ -1176,6 +1234,19 @@ function pintarAvisos(){
         "<b>" + entero(d.lineasSinFecha) + " lineas sin Fecha Aging</b>. No se les puede calcular antiguedad: " +
         "no cuentan como fuera de aging ni entran en los dias maximos.",
         "Ver cuales", () => { irA("detalle"); $("#fSoloProblemas").checked = true; pintarDetalle(); }));
+    }
+    if (d.lineasAjustadas) {
+      c.push(aviso("info",
+        "<b>" + entero(d.lineasAjustadas) + " lineas con Fecha Aging ajustada a mano</b>" +
+        (d.ajustesCompartidos ? ", " + entero(d.ajustesCompartidos) + " de ellas sobre lineas identicas entre si" : "") +
+        ". Esas fechas pisan lo que dice el archivo.",
+        "Ver", () => { irA("detalle"); $("#panelAjustes").scrollIntoView({ behavior: "smooth" }); }));
+    }
+    if (d.ajustesHuerfanos && d.ajustesHuerfanos.length) {
+      c.push(aviso("alerta",
+        "<b>" + entero(d.ajustesHuerfanos.length) + " ajustes de fecha no coinciden con ninguna linea</b> " +
+        "de esta base. Puede ser que ese stock ya se haya movido.",
+        "Revisar", () => { irA("detalle"); $("#panelAjustes").scrollIntoView({ behavior: "smooth" }); }));
     }
     if (d.areasSinConfig.length) {
       c.push(aviso("alerta",
@@ -1373,7 +1444,12 @@ function pintarDetalle(){
       '<td class="cifra">' + fmtCant.format(l.cantidad) + "</td>" +
       '<td class="cifra">' + (l.costo == null ? "—" : fmtMoneda.format(l.costo)) + "</td>" +
       '<td class="cifra">' + (l.sinCosto ? "—" : fmtMoneda.format(l.valorizado)) + "</td>" +
-      "<td>" + esc(fechaAR(l.fechaAging)) + "</td>" +
+      '<td><input type="date" class="fecha-aging' + (l.ajustada ? " ajustada" : "") +
+        '" data-clave="' + esc(l.clave) + '" value="' + fechaISO(l.fechaAging) + '" title="' +
+        (l.ajustada ? "Ajustada a mano. En el archivo figura " + (l.fechaArchivo ? fechaAR(l.fechaArchivo) : "vacia") +
+                      ". Borra el campo para volver a esa."
+                    : "Fecha del archivo. Si la cambias, el ajuste se guarda y se vuelve a aplicar cada semana.") +
+        '"></td>' +
       '<td class="cifra"><b>' + (l.aging == null ? "—" : entero(l.aging)) + "</b></td>" +
       '<td class="cifra">' + (l.target == null ? "—" : entero(l.target)) + "</td>" +
       "<td>" + p + av + "</td></tr>";
@@ -1385,6 +1461,37 @@ function pintarDetalle(){
     "Mostrando <b>" + entero(vis.length) + "</b> de <b>" + entero(f.length) + "</b> lineas &middot; " +
     "valorizado filtrado <b>" + plata(tot) + "</b>" +
     (f.length > vis.length ? " &middot; exporta a CSV para ver todas" : "");
+}
+
+/* ---------- fechas ajustadas ---------- */
+function pintarAjustes(){
+  const claves = Object.keys(estado.ajustes);
+  const panel = $("#panelAjustes"), t = $("#tablaAjustes");
+  if (!claves.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  const cuenta = {};
+  estado.lineas.forEach((l) => { if (l.ajustada) cuenta[l.clave] = (cuenta[l.clave] || 0) + 1; });
+
+  let h = "<thead><tr><th>Ubicacion</th><th>SKU</th><th>Fecha aplicada</th>" +
+    '<th>En el archivo</th><th class="cifra">Lineas</th><th>Ajustado el</th><th></th></tr></thead><tbody>';
+  for (const k of claves) {
+    const a = estado.ajustes[k];
+    const l = estado.lineas.find((x) => x.clave === k);
+    const n = cuenta[k] || 0;
+    const partes = k.split("|");
+    h += "<tr>" +
+      '<td class="mono">' + esc(a.ubicacion || partes[0]) + "</td>" +
+      '<td class="mono">' + esc(a.sku || partes[1]) + "</td>" +
+      "<td><b>" + esc(fechaAR(fecha(a.fecha))) + "</b></td>" +
+      "<td>" + (l ? esc(l.fechaArchivo ? fechaAR(l.fechaArchivo) : "(vacia)") : "—") + "</td>" +
+      '<td class="cifra">' + (n === 0 ? '<span class="pastilla mal">no coincide</span>'
+        : n === 1 ? '<span class="pastilla ok">1</span>'
+        : '<span class="pastilla neutro" title="Hay varias lineas identicas: el ajuste se aplica a todas">' + n + " gemelas</span>") + "</td>" +
+      "<td>" + esc(a.creado ? fechaAR(fecha(a.creado)) : "—") + "</td>" +
+      '<td><button class="btn peligro chico" data-delAj="' + esc(k) + '" type="button">Quitar</button></td></tr>';
+  }
+  t.innerHTML = h + "</tbody>";
 }
 
 /* ---------- areas ---------- */
@@ -1582,13 +1689,14 @@ function exportarTablero(){
   bajarCSV("aging_tablero_" + fechaISO(estado.corte) + ".csv", f);
 }
 function exportarDetalle(){
-  const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Costo","Valorizado","Fecha Aging","Dias","Target","Fuera de Aging","Observacion"]];
+  const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Costo","Valorizado","Fecha Aging","Fecha del archivo","Ajustada","Dias","Target","Fuera de Aging","Observacion"]];
   for (const l of lineasFiltradas()) {
     const obs = [l.sinCosto ? "sin costo" : "", l.sinFecha ? "sin fecha aging" : "", l.sinTarget ? "sin target" : ""].filter(Boolean).join(" / ");
     f.push([l.area, l.ubicacion, l.sku, l.descripcion, l.lote, dec(l.cantidad), l.um,
       l.costo == null ? "" : dec(l.costo.toFixed(4)),
       l.sinCosto ? "" : dec(l.valorizado.toFixed(2)),
-      fechaAR(l.fechaAging), l.aging == null ? "" : l.aging, l.target == null ? "" : l.target,
+      fechaAR(l.fechaAging), fechaAR(l.fechaArchivo), l.ajustada ? "X" : "",
+      l.aging == null ? "" : l.aging, l.target == null ? "" : l.target,
       l.fuera ? "X" : "", obs]);
   }
   bajarCSV("aging_detalle_" + fechaISO(estado.corte) + ".csv", f);
@@ -1835,6 +1943,49 @@ $("#btnCsvMaestro").addEventListener("click", () => {
   bajarCSV("maestro_valorizado.csv", f);
 });
 
+/* --- ajustes de fecha --- */
+$("#tablaDetalle").addEventListener("change", (e) => {
+  const clave = e.target.dataset.clave;
+  if (clave == null) return;
+  const v = e.target.value;
+  const l = estado.lineas.find((x) => x.clave === clave);
+  if (!v) delete estado.ajustes[clave];
+  else estado.ajustes[clave] = {
+    fecha: v,
+    ubicacion: l ? l.ubicacion : "",
+    sku: l ? l.sku : "",
+    creado: fechaISO(new Date())
+  };
+  guardar(LS.ajustes, estado.ajustes);
+  pintarTodo();
+});
+$("#tablaAjustes").addEventListener("click", (e) => {
+  const k = e.target.dataset.delaj;
+  if (k == null) return;
+  delete estado.ajustes[k];
+  guardar(LS.ajustes, estado.ajustes);
+  pintarTodo();
+});
+$("#btnBorrarAjustes").addEventListener("click", () => {
+  if (!confirm("Borrar las " + Object.keys(estado.ajustes).length + " fechas ajustadas?\n\nTodas vuelven a la fecha del archivo.")) return;
+  estado.ajustes = {}; guardar(LS.ajustes, {}); pintarTodo();
+});
+$("#btnLimpiarHuerfanos").addEventListener("click", () => {
+  const h = estado.diag.ajustesHuerfanos || [];
+  if (!h.length) { alert("Todos los ajustes coinciden con alguna linea."); return; }
+  if (!confirm("Borrar " + h.length + " ajustes que no coinciden con ninguna linea de esta base?")) return;
+  h.forEach((k) => delete estado.ajustes[k]);
+  guardar(LS.ajustes, estado.ajustes); pintarTodo();
+});
+$("#btnCsvAjustes").addEventListener("click", () => {
+  const f = [["Ubicacion","SKU","Fecha aplicada","Ajustado el","Clave"]];
+  Object.keys(estado.ajustes).forEach((k) => {
+    const a = estado.ajustes[k];
+    f.push([a.ubicacion || "", a.sku || "", fechaAR(fecha(a.fecha)), a.creado ? fechaAR(fecha(a.creado)) : "", k]);
+  });
+  bajarCSV("aging_fechas_ajustadas.csv", f);
+});
+
 /* --- detalle --- */
 ["#fArea","#fResp","#fProceso","#fBuscar","#fSoloFuera","#fSoloProblemas"]
   .forEach((s) => $(s).addEventListener("input", pintarDetalle));
@@ -1914,6 +2065,7 @@ $("#btnRestaurar").addEventListener("click", () => {
     sembrarConfig();
     guardar(LS.sembrado, true);
   }
+  estado.ajustes    = leer(LS.ajustes, {});
   const m = leer(LS.maestro, []);
   if (m.length) indexarMaestro(m);
   $("#fCorte").value = fechaISO(estado.corte);

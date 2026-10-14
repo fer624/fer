@@ -28,7 +28,10 @@ Reemplaza el calculo manual del libro `Aging_ddmmaa.xlsx`. Replica sus formulas:
 2. **Datos** → arrastrar `Base Item Valorizados.xlsx` una sola vez: queda guardado en el
    navegador. Espera el SKU en la columna A y el costo en la H; si cambia, se remapea ahi mismo.
 3. **Tablero** → el reporte. Clic en un area abre su detalle.
-4. **Guardar corte** → agrega una columna al historico.
+4. **Detalle** → la `Fecha Aging` de cada linea se puede editar. El ajuste queda guardado y
+   se vuelve a aplicar cada semana sobre la misma linea; para volver a la del archivo, se
+   borra el campo. Abajo hay un panel con todos los ajustes vigentes.
+5. **Guardar corte** → agrega una columna al historico.
 
 Las 199 ubicaciones criticas y las 9 areas vienen cargadas de fabrica, asi que no hace falta
 el libro grande para arrancar. Se editan en la solapa **Ubicaciones criticas**, que tiene
@@ -46,3 +49,13 @@ otra maquina, exportar los CSV desde cada solapa.
   en $0 sin ningun cartel.
 - Las areas con stock pero sin responsable cargado aparecen marcadas como "sin configurar".
   En el Excel directamente no salen en el reporte.
+- Pisar la `Fecha Aging` de una linea no se pierde al pegar la base de la semana siguiente.
+
+### Sobre los ajustes de fecha
+
+El export del WMS no trae un numero de linea: `Unidad manipulacion` e `Identificacion stock`
+vienen vacias. La linea se reconoce entonces por ubicacion + producto + fecha de ingreso +
+tipo de stock + cantidad. Con la base del 13-oct quedan 41 grupos de lineas indistinguibles
+entre si; un ajuste sobre una de ellas se aplica a todo el grupo y la pantalla lo avisa
+("N gemelas"). Los ajustes que dejan de coincidir con alguna linea se marcan como
+"no coincide" y se pueden limpiar de a uno o todos juntos.
