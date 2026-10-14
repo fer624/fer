@@ -371,9 +371,10 @@ table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
     <div class="zonas">
 
       <div class="zona" id="zonaLibro">
-        <h3>1. Libro de aging</h3>
-        <p>El <span class="mono">Aging_ddmmaa.xlsx</span> que ya usas. Leo las hojas
-           <b>Stock</b>, <b>Depositos Virtuales</b> y <b>Resp. Alm.</b></p>
+        <h3>1. Base del WMS</h3>
+        <p>El <span class="mono">Base_Aging_ddmmaa.XLSX</span> que actualizas los lunes.
+           Tambien acepta el libro completo <span class="mono">Aging_ddmmaa.xlsx</span>,
+           del que ademas lee las hojas de configuracion.</p>
         <button class="btn" type="button" data-abre="inLibro">Elegir archivo</button>
         <input type="file" id="inLibro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
         <div class="estado vacio" id="estLibro">Sin cargar</div>
@@ -473,6 +474,7 @@ table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
         <input type="search" id="fUbicBuscar" placeholder="Nombre de ubicacion" size="24">
       </div>
       <button class="btn claro" id="btnCsvUbic" type="button">Exportar (CSV)</button>
+      <button class="btn claro" id="btnRestaurar" type="button">Restaurar originales</button>
       <button class="btn peligro" id="btnBorrarUbic" type="button">Vaciar lista</button>
     </div>
     <div class="marco-alto">
@@ -555,7 +557,18 @@ table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
 </main>
 
 <div id="tip" role="status" aria-live="polite"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- SheetJS lee los .xlsx. Copia local primero; si falta, se intenta el CDN. -->
+<script src="lib/xlsx.full.min.js"></script>
+<script>
+if (typeof XLSX === "undefined") {
+  var s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  s.integrity = "sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==";
+  s.crossOrigin = "anonymous";
+  s.referrerPolicy = "no-referrer";
+  document.head.appendChild(s);
+}
+</script>
 <script>
 "use strict";
 /* ============================================================
@@ -566,7 +579,16 @@ const LS = {
   areas:  "aging.areas.v1",
   maestro:"aging.maestro.v1",
   hist:   "aging.historico.v1",
-  mapeo:  "aging.mapeoMaestro.v1"
+  mapeo:  "aging.mapeoMaestro.v1",
+  sembrado:"aging.sembrado.v1"
+};
+
+/* Configuracion de arranque: las ubicaciones criticas y areas tal como estan en
+   Depositos Virtuales y Resp. Alm. Se siembra una sola vez; despues manda lo que
+   el usuario tenga guardado, que puede editar y borrar desde la solapa Ubicaciones. */
+const CONFIG_INICIAL = {
+  ubicaciones: [["0081-ACOM-CDR", "0081", 2], ["0900-CONTRAPARTIDA", "0900", 90], ["0900-EMPAQUE ROTO", "0900", 90], ["0900-GARANTIAS", "0900", 90], ["0900-NAC-DANADOS", "0900", 90], ["0900-NAC-MERMAS", "0900", 90], ["0900-PERITAR MOTOR", "0900", 90], ["0900-RECLAMOS CEVA", "0900", 90], ["0900-TRANSPORTE", "0900", 90], ["0902-IMP-DANADOS", "0902", 90], ["0902-IMP-ERROR.EMB", "0902", 90], ["0902-IMP-MERMAS", "0902", 90], ["8010-DECO-01", "8010", 3], ["8010-DECO-02", "8010", 3], ["8010-DECO-03", "8010", 3], ["8010-DECO-04", "8010", 3], ["8010-DECO-05", "8010", 3], ["8010-DECO-06", "8010", 3], ["8010-DECO-07", "8010", 3], ["8010-DECO-08", "8010", 3], ["8010-DECO-09", "8010", 3], ["8010-DECO-CAT", "8010", 3], ["8010-DECO-DIREXA-1", "8010", 3], ["8010-DECO-DIREXA-2", "8010", 3], ["8030-AEREO", "8030", 2], ["8030-AEREO-EXT", "8030", 2], ["8030-ALUMBRERA", "8030", 2], ["8030-ALUMBRERA-EXT", "8030", 2], ["8030-ANULACIÓN.PED", "8030", 2], ["8030-ARDESA", "8030", 2], ["8030-ARDESA-EXT", "8030", 2], ["8030-ARDESP", "8030", 2], ["8030-ARDESP-EX", "8030", 2], ["8030-BAHIA BLANCA", "8030", 2], ["8030-BAHIABLANCAE", "8030", 2], ["8030-CAT", "8030", 2], ["8030-CAT-EXT", "8030", 2], ["8030-COMODORO", "8030", 2], ["8030-COMODORO-EXT", "8030", 2], ["8030-COMPACTO", "8030", 2], ["8030-CORDOBA", "8030", 2], ["8030-CORDOBA-EXT", "8030", 2], ["8030-DELIVERY", "8030", 2], ["8030-DELIVERY-EXT", "8030", 2], ["8030-EXPORTACION", "8030", 2], ["8030-EXPORTACIONEX", "8030", 2], ["8030-INTERB", "8030", 2], ["8030-INTERB-EXT", "8030", 2], ["8030-INTERIOR", "8030", 2], ["8030-INTERIOR2", "8030", 2], ["8030-MAR DEL PLATA", "8030", 2], ["8030-MAR PLATA-EXT", "8030", 2], ["8030-MENDOZA", "8030", 2], ["8030-MENDOZA-EXT", "8030", 2], ["8030-MIN ALTIPLANO", "8030", 2], ["8030-MOSTRADOR", "8030", 2], ["8030-MOSTRADOR-EX", "8030", 2], ["8030-NEUQUEN", "8030", 2], ["8030-NEUQUEN-EXT", "8030", 2], ["8030-OLAVARRIA", "8030", 2], ["8030-OLAVARRIA-EXT", "8030", 2], ["8030-ORDENSERV-EXT", "8030", 2], ["8030-ORDENSERVICIO", "8030", 2], ["8030-PICKHU", "8030", 2], ["8030-POSADAS", "8030", 2], ["8030-POSADAS-EXT", "8030", 2], ["8030-RENTAL", "8030", 2], ["8030-RESISTENCIA", "8030", 2], ["8030-RESISTENCIA-E", "8030", 2], ["8030-RETIRA", "8030", 2], ["8030-RETIRA-EX", "8030", 2], ["8030-RIO GALLEGOS", "8030", 2], ["8030-RIOGALLEGOSE", "8030", 2], ["8030-ROSARIO", "8030", 2], ["8030-ROSARIO-EXT", "8030", 2], ["8030-SALTA", "8030", 2], ["8030-SALTA-EXT", "8030", 2], ["8030-SUC-MINERA", "8030", 2], ["8030-SUC-MINERA-EX", "8030", 2], ["8030-TESPECIAL", "8030", 2], ["8030-TESPECIAL-EXT", "8030", 2], ["8030-TIERRA FUEGO", "8030", 2], ["8030-TIERRAFUEGOE", "8030", 2], ["8030-TUCUMAN", "8030", 2], ["8030-TUCUMAN-EXT", "8030", 2], ["8030-VARIOS FLETES", "8030", 2], ["8030-VARIOS MICROS", "8030", 2], ["8030-VARIOSFLETESE", "8030", 2], ["8040-DAÑO CEVA", "8040", 90], ["8040-DAÑO FINNING", "8040", 90], ["8040-MANGUERAS", "8040", 90], ["8040-SCRAP", "8040", 90], ["9010-DEVOLUCION", "9010", 3], ["9010-RECEP-CAT-05", "9010", 3], ["9010-RECEP-DIRE-01", "9010", 3], ["9010-RECEP-DIRE-02", "9010", 3], ["9010-RECEP-EQU-01", "9010", 3], ["9010-RECEP-EXT-01", "9010", 3], ["9010-RECEP-INT-01", "9010", 3], ["9010-RECEP-INT-02", "9010", 3], ["9010-RECEP-INT-03", "9010", 3], ["9010-RECEP-INT-04", "9010", 3], ["9020-AEREO", "9020", 3], ["9020-ALUMBRERA", "9020", 3], ["9020-BAHIA BLANCA", "9020", 3], ["9020-CAT", "9020", 3], ["9020-COMODORO", "9020", 3], ["9020-COMPACTO", "9020", 3], ["9020-CORDOBA", "9020", 3], ["9020-DELIVERY", "9020", 3], ["9020-DEVOLUCION", "9020", 3], ["9020-EQUIPOS", "9020", 3], ["9020-EXPORTACION", "9020", 3], ["9020-EXTERIOR", "9020", 3], ["9020-INTERB", "9020", 3], ["9020-INTERIOR", "9020", 3], ["9020-INTERIOR2", "9020", 3], ["9020-MAR DEL PLATA", "9020", 3], ["9020-MENDOZA", "9020", 3], ["9020-MOSTRADOR", "9020", 3], ["9020-NEUQUEN", "9020", 3], ["9020-OLAVARRIA", "9020", 3], ["9020-ORDENSERVICIO", "9020", 3], ["9020-POSADAS", "9020", 3], ["9020-RENTAL", "9020", 3], ["9020-RESISTENCIA", "9020", 3], ["9020-RETIRA", "9020", 3], ["9020-RIO GALLEGOS", "9020", 3], ["9020-ROSARIO", "9020", 3], ["9020-SALTA", "9020", 3], ["9020-TECHINT", "9020", 3], ["9020-TERRENO", "9020", 3], ["9020-TESPECIAL", "9020", 3], ["9020-TIERRA FUEGO", "9020", 3], ["9020-TUCUMAN", "9020", 3], ["9020-VARIOS FLETES", "9020", 3], ["9020-VARIOS MICROS", "9020", 3], ["9030-DESARGA CAT", "9030", 3], ["9030-DESCARGA", "9030", 3], ["GI-ZONE", "9020", 3], ["8030-NACIONAL", "8030", 2], ["9020-NACIONAL", "9020", 3], ["8035-AEREO", "8035", 3], ["8035-AEREO-EXT", "8035", 3], ["8035-ALUMBRERA", "8035", 3], ["8035-ALUMBRERA-EXT", "8035", 3], ["8035-ARDESA", "8035", 3], ["8035-ARDESA-EXT", "8035", 3], ["8035-ARDESP", "8035", 3], ["8035-ARDESP-EX", "8035", 3], ["8035-BAHIA BLANCA", "8035", 3], ["8035-BAHIABLANCAE", "8035", 3], ["8035-CAT", "8035", 3], ["8035-CAT-EXT", "8035", 3], ["8035-COMODORO", "8035", 3], ["8035-COMODOROEXT", "8035", 3], ["8035-CORDOBA", "8035", 3], ["8035-CORDOBA-EXT", "8035", 3], ["8035-DELIVERY", "8035", 3], ["8035-DELIVERY-EXT", "8035", 3], ["8035-EXPORTACION", "8035", 3], ["8035-EXPORTACIONEX", "8035", 3], ["8035-MAR DEL PLATA", "8035", 3], ["8035-MAR PLATA-EXT", "8035", 3], ["8035-MENDOZA", "8035", 3], ["8035-MENDOZA-EXT", "8035", 3], ["8035-MOSTRADOR", "8035", 3], ["8035-MOSTRADOR-EX", "8035", 3], ["8035-NEUQUEN", "8035", 3], ["8035-NEUQUEN-EXT", "8035", 3], ["8035-OLAVARRIA", "8035", 3], ["8035-OLAVARRIA-EXT", "8035", 3], ["8035-ORDENSERV-EXT", "8035", 3], ["8035-ORDENSERVICIO", "8035", 3], ["8035-POSADAS", "8035", 3], ["8035-POSADAS-EXT", "8035", 3], ["8035-RESISTENCIA", "8035", 3], ["8035-RESISTENCIA-E", "8035", 3], ["8035-RETIRA", "8035", 3], ["8035-RETIRA-EX", "8035", 3], ["8035-RIO GALLEGOS", "8035", 3], ["8035-RIOGALLEGOSE", "8035", 3], ["8035-ROSARIO", "8035", 3], ["8035-ROSARIO-EXT", "8035", 3], ["8035-SALTA", "8035", 3], ["8035-SALTA-EXT", "8035", 3], ["8035-SUC-MINERA", "8035", 3], ["8035-SUC-MINERA-EX", "8035", 3], ["8035-TESPECIAL", "8035", 3], ["8035-TESPECIAL-EXT", "8035", 3], ["8035-TIERRA FUEGO", "8035", 3], ["8035-TIERRAFUEGOE", "8035", 3], ["8035-TUCUMAN", "8035", 3], ["8035-TUCUMAN-EXT", "8035", 3], ["8035-VARIOS FLETES", "8035", 3], ["8035-VARIOSFLETESE", "8035", 3], ["0900-SLOTTING", "0900", 1], ["9020-MINALTIPLANO", "9020", 3], ["0902-APROBACIÓN WO", "0902", 90]],
+  areas: [["0081", "Demerith Guillen", "INBOUND", 2, "0081-ACOM-CDR"], ["0900", "Demerith Guillen", "INBOUND", 90, "0900-CONTRAPARTIDA\n0900-EMPAQUE ROTO\n0900-GARANTIAS\n0900-NAC-DANADOS\n0900-NAC-MERMAS\n0900-PERITAR MOTOR\n0900-RECLAMOS CEVA\n0900-TRANSPORTE"], ["0902", "Demerith Guillen", "INBOUND", 90, "0902-IMP-DANADOS\n0902-IMP-ERROR.EMB\n0902-IMP-MERMAS"], ["8010", "Demerith Guillen", "INBOUND", 3, "8010-DECO-01\n8010-DECO-02\n8010-DECO-03\n8010-DECO-04"], ["9010", "Demerith Guillen", "INBOUND", 3, "9010-RECEP-INT-01\n9010-RECEP-INT-02\n9010-RECEP-INT-03\n9010-RECEP-INT-04"], ["9030", "Demerith Guillen", "INBOUND", 3, "9030-DESCARGA CAT\n9030-DESCARGA"], ["8030", "Mariana Sacchi", "OUTBOND", 2, "Ubicaciones Pre-Control"], ["9020", "Mariana Sacchi", "OUTBOND", 3, "Ubicaciones Post-Control"], ["8040", "Fernando Cuitiño", "Gestion de Stock", 90, "8040-DAÑO CEVA\n8040-DAÑO FINNING\n8040-MANGUERAS\n8040-SCRAP"]]
 };
 
 const $  = (s) => document.querySelector(s);
@@ -814,6 +836,21 @@ const COLS = {
   raTarget:   ["Target (Dias)","Target (Días)","Target"]
 };
 
+/* El export semanal del WMS viene en una sola hoja (Sheet1) sin las columnas de
+   formula. El libro completo trae la hoja Stock. Aceptamos los dos. */
+function tieneColumnasStock(filas){
+  if (!filas || !filas.length) return false;
+  const head = filas[filaEncabezado(filas, COLS.ubicacion)] || [];
+  return buscarCol(head, COLS.ubicacion) > -1 &&
+         buscarCol(head, COLS.producto)  > -1 &&
+         buscarCol(head, COLS.cantidad)  > -1;
+}
+function hojaDeStock(res){
+  const porNombre = hojaPorNombre(res, ["Stock"]);
+  if (tieneColumnasStock(porNombre)) return porNombre;
+  for (const n of res.nombres) if (tieneColumnasStock(res.hojas[n])) return res.hojas[n];
+  return null;
+}
 function hojaPorNombre(res, claves){
   if (!res.nombres) return null;
   for (const k of claves) {
@@ -1584,13 +1621,16 @@ async function cargarLibro(file){
     const res = await leerArchivo(file);
     let msg = [];
     if (res.tipo === "excel") {
-      const hStock = hojaPorNombre(res, ["Stock"]);
+      const hStock = hojaDeStock(res);
       const hDep   = hojaPorNombre(res, ["Depositos Virtuales","Depositos","Depósitos"]);
       const hResp  = hojaPorNombre(res, ["Resp. Alm","Resp Alm","Responsables"]);
       if (hDep)  { const n = ingestarDepositos(hDep);  if (n) msg.push(n + " ubicaciones criticas"); }
       if (hResp) { const n = ingestarAreas(hResp);     if (n) msg.push(n + " areas"); }
-      if (!hStock) throw new Error("El libro no tiene una hoja llamada Stock.");
+      if (!hStock) throw new Error(
+        "Ninguna hoja tiene las columnas Ubicacion, Producto y Ctd. Hojas encontradas: " +
+        res.nombres.join(", "));
       msg.unshift(ingestarStock(hStock) + " filas de stock");
+      if (!hDep && !hResp) msg.push("config: se mantiene la guardada");
     } else {
       msg.push(ingestarStock(res.filas) + " filas de stock");
     }
@@ -1850,12 +1890,30 @@ $("#btnCsvHist").addEventListener("click", () => {
   bajarCSV("aging_historico.csv", f);
 });
 
+function sembrarConfig(){
+  estado.ubicaciones = CONFIG_INICIAL.ubicaciones.map(([u, a, t]) => ({ ubicacion: u, area: a, target: t }));
+  estado.areas       = CONFIG_INICIAL.areas.map(([a, r, p, t, d]) =>
+    ({ area: a, responsable: r, proceso: p, target: t, descripcion: d }));
+  guardar(LS.ubic, estado.ubicaciones);
+  guardar(LS.areas, estado.areas);
+}
+$("#btnRestaurar").addEventListener("click", () => {
+  if (!confirm("Restaurar las " + CONFIG_INICIAL.ubicaciones.length + " ubicaciones y " +
+               CONFIG_INICIAL.areas.length + " areas originales?\n\nSe pierden los cambios que hayas hecho.")) return;
+  sembrarConfig();
+  pintarTodo();
+});
+
 /* ============================================================
    9. ARRANQUE
    ============================================================ */
 (function init(){
   estado.ubicaciones = leer(LS.ubic, []);
   estado.areas       = leer(LS.areas, []);
+  if (!estado.ubicaciones.length && !estado.areas.length && !leer(LS.sembrado, false)) {
+    sembrarConfig();
+    guardar(LS.sembrado, true);
+  }
   const m = leer(LS.maestro, []);
   if (m.length) indexarMaestro(m);
   $("#fCorte").value = fechaISO(estado.corte);

@@ -22,14 +22,21 @@ Reemplaza el calculo manual del libro `Aging_ddmmaa.xlsx`. Replica sus formulas:
 
 ### Como se usa
 
-1. **Datos** → arrastrar el `Aging_ddmmaa.xlsx`. Lee las hojas `Stock`, `Depositos Virtuales` y `Resp. Alm.`.
-2. **Datos** → arrastrar `Base Item Valorizados.xlsx` una sola vez: queda guardado en el navegador.
+1. **Datos** → arrastrar el `Base_Aging_ddmmaa.XLSX` del lunes. Es el export crudo del WMS,
+   con la columna `Fecha Aging` ya completada. Tambien acepta el libro completo
+   `Aging_ddmmaa.xlsx`, del que ademas lee las hojas de configuracion.
+2. **Datos** → arrastrar `Base Item Valorizados.xlsx` una sola vez: queda guardado en el
+   navegador. Espera el SKU en la columna A y el costo en la H; si cambia, se remapea ahi mismo.
 3. **Tablero** → el reporte. Clic en un area abre su detalle.
 4. **Guardar corte** → agrega una columna al historico.
 
-La configuracion (ubicaciones criticas, areas, maestro de costos e historico) vive en el
-LocalStorage del navegador: es por equipo y por navegador, no se comparte entre personas.
-Para moverla a otra maquina, exportar los CSV desde cada solapa.
+Las 199 ubicaciones criticas y las 9 areas vienen cargadas de fabrica, asi que no hace falta
+el libro grande para arrancar. Se editan en la solapa **Ubicaciones criticas**, que tiene
+ademas un boton para restaurar las originales.
+
+La configuracion (ubicaciones, areas, maestro de costos e historico) vive en el LocalStorage
+del navegador: es por equipo y por navegador, no se comparte entre personas. Para moverla a
+otra maquina, exportar los CSV desde cada solapa.
 
 ### Diferencias con el Excel
 
