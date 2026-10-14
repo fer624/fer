@@ -249,6 +249,8 @@ tbody tr.click:hover td{background:var(--sup-2)}
 tbody tr.sel td{background:color-mix(in oklab, var(--s1) 12%, var(--sup))}
 td.n,th.n{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
 tfoot td{padding:8px 11px; font-weight:700; background:var(--sup-2); border-top:1px solid var(--eje); font-variant-numeric:tabular-nums}
+.solo-print{display:none}
+.anota{display:inline-block; width:62px; height:13px; border-bottom:1px dotted var(--borde-2)}
 .pill{display:inline-block; font-size:11px; padding:1px 8px; border-radius:99px; border:1px solid var(--borde-2); color:var(--tinta-2); white-space:nowrap}
 .pill.v{color:var(--s2); border-color:color-mix(in oklab,var(--s2) 40%, transparent)}
 .pill.f{color:var(--s1); border-color:color-mix(in oklab,var(--s1) 40%, transparent)}
@@ -343,9 +345,28 @@ tfoot td{padding:8px 11px; font-weight:700; background:var(--sup-2); border-top:
     --plano:#fff; --sup:#fff; --sup-2:#f1f4fa; --sup-3:#e6ebf5; --tinta:#051039;
     --tinta-2:#45516d; --tinta-3:#6d7890; --borde:#c4ccdc; --grilla:#dde2ec; --eje:#9aa5bb;
   }
-  .cab,.tabs,.filtros,.no-print,.globo,main>section:not(#pReporte){display:none !important}
+  .cab,.tabs,.filtros,.no-print,.globo{display:none !important}
   main{max-width:none; padding:0; margin:0}
+  main>section{display:none !important}
   #pReporte,#pReporte[hidden]{display:block !important}
+  /* Imprimir lista de conteo: sale la filmina y entra la pestaña Análisis. */
+  body.pr-lista #pReporte,body.pr-lista #pReporte[hidden]{display:none !important}
+  body.pr-lista #pAnalisis,body.pr-lista #pAnalisis[hidden]{display:block !important}
+  body.pr-lista #kpiAna,body.pr-lista .rej.c2,body.pr-lista #cjAnaAlm,
+  body.pr-lista #cjAnaLista>header{display:none !important}
+  body.pr-lista .solo-print{display:block !important}
+  body.pr-lista .tj{border:0; box-shadow:none}
+  body.pr-lista .tj>.cuerpo{padding:0}
+  body.pr-lista .tbl{max-height:none; overflow:visible; border:0; border-radius:0}
+  body.pr-lista thead{display:table-header-group}
+  /* El total va una sola vez, al final, y no repetido en cada hoja. */
+  body.pr-lista tfoot{display:table-row-group}
+  body.pr-lista tr{break-inside:avoid}
+  body.pr-lista table{font-size:7.4pt}
+  body.pr-lista thead th{padding:4px 6px; font-size:6.6pt}
+  body.pr-lista tbody td{padding:2.5px 6px}
+  body.pr-lista tfoot td{padding:4px 6px}
+  body.pr-lista .anota{width:64px; height:9px; border-bottom:1px solid var(--eje)}
   .fil{border:0; border-radius:0; box-shadow:none; break-inside:avoid}
   .fil-cab{padding:8px 12px}
   .fil-cab h2{font-size:14pt}
@@ -384,6 +405,7 @@ const LOGO_COLOR  = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOUAAABYCAMAA
   </div>
   <nav class="tabs" role="tablist" aria-label="Secciones">
     <button role="tab" data-p="pOcup"     aria-selected="true">Ocupación</button>
+    <button role="tab" data-p="pAnalisis" aria-selected="false">Análisis</button>
     <button role="tab" data-p="pTransito" aria-selected="false">Tránsito</button>
     <button role="tab" data-p="pValor"    aria-selected="false">Valorizado</button>
     <button role="tab" data-p="pConsol"   aria-selected="false">Consolidación</button>
@@ -502,6 +524,40 @@ const LOGO_COLOR  = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOUAAABYCAMAA
       </div>
     </div>
 
+  </div>
+</section>
+
+<!-- =========================== ANÁLISIS =========================== -->
+<section class="panel" id="pAnalisis" role="tabpanel" hidden>
+  <div id="anaVacio"></div>
+  <div id="anaCuerpo" hidden>
+    <div class="aviso info no-print" id="anaIntro"></div>
+    <div class="rej kpi" id="kpiAna" style="margin-bottom:14px"></div>
+    <div class="rej c2" style="margin-bottom:14px">
+      <div class="tj"><header><h3>Plata a verificar por almacén</h3>
+        <p>Valor de las líneas de clase A de cada almacén.</p></header>
+        <div class="cuerpo"><div id="gAnaVal"></div></div></div>
+      <div class="tj"><header><h3>Esfuerzo por almacén</h3>
+        <p>Qué parte de las líneas hay que contar para cubrir ese valor.</p></header>
+        <div class="cuerpo"><div id="gAnaEsf"></div></div></div>
+    </div>
+    <div class="tj" id="cjAnaAlm" style="margin-bottom:14px">
+      <header><h3>Resumen por almacén</h3>
+        <p>Elija un almacén para ver sólo sus líneas en la lista de abajo.</p></header>
+      <div class="cuerpo"><div id="tAnaAlm"></div></div>
+    </div>
+    <div class="tj" id="cjAnaLista">
+      <div class="solo-print" id="anaCabImp"></div>
+      <header><h3 id="tiAnaLista">Lista de conteo</h3><p id="suAnaLista"></p></header>
+      <div class="cuerpo">
+        <div class="no-print" style="margin-bottom:10px;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+          <button class="btn sec chico" id="btnCsvAna">Exportar lista a Excel</button>
+          <button class="btn sec chico" id="btnImpAna">Imprimir lista</button>
+          <span style="font-size:12px;color:var(--tinta-3)" id="anaPie"></span>
+        </div>
+        <div id="tAnaLista"></div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -1962,8 +2018,8 @@ function tabla(cont, cols, filas, op = {}) {
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-const PANELES = ['pOcup', 'pTransito', 'pValor', 'pConsol', 'pTend', 'pCalidad', 'pDetalle', 'pReporte', 'pDatos'];
-const CON_FILTRO = new Set(['pOcup', 'pValor', 'pConsol', 'pDetalle']);
+const PANELES = ['pOcup', 'pAnalisis', 'pTransito', 'pValor', 'pConsol', 'pTend', 'pCalidad', 'pDetalle', 'pReporte', 'pDatos'];
+const CON_FILTRO = new Set(['pOcup', 'pAnalisis', 'pValor', 'pConsol', 'pDetalle']);
 let panelActivo = 'pOcup';
 
 function irA(id) {
@@ -2042,6 +2098,7 @@ function pintar() {
     ? `${U.pl(v.fis.length, 'posición física', 'posiciones físicas')} · ${U.pl(v.vir.length, 'virtual', 'virtuales')}`
     : '';
   if (panelActivo === 'pOcup') pintarOcupacion(v);
+  else if (panelActivo === 'pAnalisis') pintarAnalisis(v);
   else if (panelActivo === 'pTransito') pintarTransito(v);
   else if (panelActivo === 'pValor') pintarValor(v);
   else if (panelActivo === 'pConsol') pintarConsol(v);
@@ -2271,6 +2328,228 @@ function ordNat(a, b) {
 </script>
 <script>
 "use strict";
+/* ===========================================================================
+   ANÁLISIS · LISTA DE CONTEO PREVIA AL WALL TO WALL
+   La idea es no salir a contar todo a ciegas. Por cada almacén se ordenan las
+   líneas de mayor a menor valor y se marcan como clase A las que hacen falta
+   para llegar al 80% del valor de ese almacén. Son pocas líneas y es casi toda
+   la plata: si esas cierran, una diferencia posterior difícilmente mueva el
+   número lo suficiente como para terminar en el analyzer.
+   El corte es por almacén y no global, para que un almacén chico pero caro no
+   quede sin lista por culpa de uno grande.
+   =========================================================================== */
+const CORTE_A = 0.80;
+let almSelAna = null;
+// En pantalla la lista se corta en 400 filas para que la página no se vuelva
+// inmanejable. Al imprimir se dibujan todas: una lista de conteo recortada
+// sin avisar es peor que no tenerla.
+let anaTodas = false;
+
+function calcAnalisis(v) {
+  const porAlm = new Map();
+  for (const l of v.lineas) {
+    let a = porAlm.get(l.tipo);
+    if (!a) { a = { k: l.tipo, cl: l.cl, lin: [], val: 0 }; porAlm.set(l.tipo, a); }
+    a.lin.push(l); a.val += l.val;
+  }
+  const alms = [];
+  let lineasA = [];
+  for (const a of porAlm.values()) {
+    const ord = a.lin.slice().sort((x, y) => y.val - x.val);
+    const meta = a.val * CORTE_A;
+    let acum = 0;
+    const A = [];
+    for (const l of ord) {
+      if (acum >= meta || l.val <= 0) break;
+      acum += l.val;
+      A.push({ ...l, acum, acumPct: a.val ? acum / a.val * 100 : 0, alm: a.k });
+    }
+    alms.push({
+      k: a.k, cl: a.cl, nLin: a.lin.length, val: a.val,
+      nA: A.length, valA: acum,
+      cobertura: a.val ? acum / a.val * 100 : 0,
+      esfuerzo: a.lin.length ? A.length / a.lin.length * 100 : 0,
+      ubis: new Set(A.map(l => l.u)).size,
+      mats: new Set(A.map(l => l.mat)).size
+    });
+    lineasA = lineasA.concat(A);
+  }
+  alms.sort((x, y) => y.valA - x.valA);
+  lineasA.sort((x, y) => y.val - x.val);
+  const valTot = alms.reduce((s, a) => s + a.val, 0);
+  const valA = alms.reduce((s, a) => s + a.valA, 0);
+  const sinPrecio = v.lineas.filter(l => l.val <= 0);
+  return {
+    alms, lineasA, valTot, valA,
+    nLin: v.lineas.length,
+    cobertura: valTot ? valA / valTot * 100 : 0,
+    esfuerzo: v.lineas.length ? lineasA.length / v.lineas.length * 100 : 0,
+    ubis: new Set(lineasA.map(l => l.u)).size,
+    mats: new Set(lineasA.map(l => l.mat)).size,
+    sinPrecio
+  };
+}
+
+// Valor unitario que surge de la propia línea. Se calcula así y no desde el
+// maestro para que siempre cierre con la columna Valor que se muestra al lado.
+const unitario = l => (l.ctd ? l.val / l.ctd : 0);
+// El rotulo completo del tipo no entra en el margen del grafico y se corta.
+const rotCorto = t => { const r = rotTipo(t); return r.length > 24 ? r.slice(0, 23) + '…' : r; };
+
+function pintarAnalisis(v) {
+  if (!faltanDatos('anaVacio', 'anaCuerpo')) return;
+  const a = calcAnalisis(v);
+  if (almSelAna && !a.alms.some(x => x.k === almSelAna)) almSelAna = null;
+
+  $('#anaIntro').innerHTML = `<span class="ic">i</span><div>
+    <b>Lista de conteo previa al inventario general.</b> Por cada almacén se listan las líneas
+    que acumulan el <b>${U.pct(CORTE_A * 100, 0)} de su valor</b>, de mayor a menor. Son
+    <b>${U.ent(a.lineasA.length)}</b> de ${U.ent(a.nLin)} líneas
+    (${U.pct(a.esfuerzo)}) y cubren <b>${U.usdX(a.valA)}</b>.
+    <div style="margin-top:7px">Para contar por partes, elija un almacén en la tabla de resumen
+      o use los filtros de <b>pasillo</b> y <b>área</b> de la barra de arriba: la lista, el Excel
+      y la impresión siguen lo que esté filtrado.</div>
+    ${a.sinPrecio.length ? `<div style="margin-top:7px"><b>Ojo:</b> hay
+      ${U.pl(a.sinPrecio.length, 'línea sin precio', 'líneas sin precio')} que esta lista no puede
+      ordenar. Cargue el maestro valorizado en <b>Datos</b> o revíselas en <b>Calidad</b>.</div>` : ''}
+  </div>`;
+
+  $('#kpiAna').innerHTML = `
+    <div class="k destacado"><div class="rot">Líneas a contar</div>
+      <div class="v">${U.ent(a.lineasA.length)}</div>
+      <div class="d">de ${U.ent(a.nLin)} líneas del corte</div>
+      <div class="d" style="margin-top:6px">es el ${U.pct(a.esfuerzo)} del trabajo</div></div>
+    <div class="k"><div class="rot">Plata que cubren</div>
+      <div class="v chico">${U.usd(a.valA)}</div>
+      <div class="d">${U.usdX(a.valA)}</div>
+      <div class="d" style="margin-top:6px">de ${U.usd(a.valTot)} en el corte</div></div>
+    <div class="k"><div class="rot">Cobertura del valor</div>
+      <div class="v">${U.pct(a.cobertura)}</div>
+      <div class="d">lo que queda afuera son ${U.usdX(a.valTot - a.valA)}</div></div>
+    <div class="k gris"><div class="rot">Ubicaciones a recorrer</div>
+      <div class="v">${U.ent(a.ubis)}</div>
+      <div class="d">${U.pl(a.mats, 'material distinto', 'materiales distintos')}</div></div>
+    <div class="k gris"><div class="rot">Almacenes con lista</div>
+      <div class="v">${U.ent(a.alms.filter(x => x.nA).length)}</div>
+      <div class="d">de ${U.ent(a.alms.length)} con stock en el corte</div></div>`;
+
+  const conA = a.alms.filter(x => x.nA);
+  G.barrasH($('#gAnaVal'), conA.slice(0, 12).map(d => ({
+    k: d.k, et: rotCorto(d.k), v: d.valA,
+    globo: `<b>${U.esc(rotTipo(d.k))}</b><table>
+      <tr><td>Líneas a contar</td><td>${U.ent(d.nA)} de ${U.ent(d.nLin)}</td></tr>
+      <tr><td>Valor que cubren</td><td>${U.usdX(d.valA)}</td></tr>
+      <tr><td>Valor del almacén</td><td>${U.usdX(d.val)}</td></tr>
+      <tr><td>Cobertura</td><td>${U.pct(d.cobertura)}</td></tr></table>`
+  })), {
+    fmt: x => U.usd(x).replace('USD ', ''), mI: 150, sel: almSelAna,
+    alClic: k => { almSelAna = almSelAna === k ? null : k; pintar(); },
+    aria: 'Valor de las líneas de clase A por almacén',
+    vacio: 'No hay líneas con valor en este corte.'
+  });
+
+  G.barrasH($('#gAnaEsf'), conA.slice(0, 12).map(d => ({
+    k: d.k, et: rotCorto(d.k), v: d.esfuerzo,
+    globo: `<b>${U.esc(rotTipo(d.k))}</b><table>
+      <tr><td>Líneas a contar</td><td>${U.ent(d.nA)} de ${U.ent(d.nLin)}</td></tr>
+      <tr><td>Es el</td><td>${U.pct(d.esfuerzo)} de las líneas</td></tr>
+      <tr><td>Y cubre</td><td>${U.pct(d.cobertura)} del valor</td></tr></table>`
+  })), {
+    fmt: x => U.dec(x, 0), suf: '%', max: 100, mI: 150, sel: almSelAna,
+    alClic: k => { almSelAna = almSelAna === k ? null : k; pintar(); },
+    aria: 'Porcentaje de líneas a contar por almacén',
+    vacio: 'No hay líneas con valor en este corte.'
+  });
+
+  tabla($('#tAnaAlm'), [
+    { t: 'Almacén', v: f => f.k, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.k)}</b>
+      <span style="color:var(--tinta-3)"> ${U.esc(rotTipo(f.k).replace(f.k, '').replace(/^\s*·\s*/, ''))}</span>` },
+    { t: 'Clase', v: f => f.cl, h: f => `<span class="pill${f.cl === 'F' ? '' : ' v'}">${U.esc(CLASES[f.cl] || f.cl)}</span>` },
+    { t: 'Líneas a contar', n: true, v: f => f.nA, h: f => `<b>${U.ent(f.nA)}</b> <span style="color:var(--tinta-3)">de ${U.ent(f.nLin)}</span>` },
+    { t: '% de líneas', n: true, v: f => f.esfuerzo, h: f => U.pct(f.esfuerzo) },
+    { t: 'Ubicaciones', n: true, v: f => f.ubis, h: f => U.ent(f.ubis) },
+    { t: 'Valor a verificar', n: true, v: f => f.valA, h: f => `<b>${U.usdX(f.valA)}</b>` },
+    { t: 'Valor del almacén', n: true, v: f => f.val, h: f => U.usdX(f.val) },
+    { t: 'Cobertura', n: true, v: f => f.cobertura, h: f => U.pct(f.cobertura) }
+  ], a.alms, {
+    orden: 5, dir: -1, clave: f => f.k, sel: f => f.k === almSelAna,
+    alClic: k => { almSelAna = almSelAna === k ? null : k; pintar(); },
+    vacio: 'No hay líneas en este corte.',
+    pie: [{ t: 'Total' }, { t: '' }, { t: U.ent(a.lineasA.length), n: true },
+    { t: U.pct(a.esfuerzo), n: true }, { t: U.ent(a.ubis), n: true },
+    { t: U.usdX(a.valA), n: true }, { t: U.usdX(a.valTot), n: true }, { t: U.pct(a.cobertura), n: true }]
+  });
+
+  const lista = almSelAna ? a.lineasA.filter(l => l.alm === almSelAna) : a.lineasA;
+  const valLista = lista.reduce((s, l) => s + l.val, 0);
+  $('#tiAnaLista').textContent = almSelAna ? 'Lista de conteo · almacén ' + almSelAna : 'Lista de conteo';
+  $('#suAnaLista').innerHTML = `${U.pl(lista.length, 'línea', 'líneas')} ·
+    <b>${U.usdX(valLista)}</b> · ${U.pl(new Set(lista.map(l => l.u)).size, 'ubicación', 'ubicaciones')}
+    ${almSelAna ? ` · <button class="btn sec chico no-print" onclick="almSelAna=null;pintar()">Ver todos los almacenes</button>` : ''}`;
+  // Encabezado de la hoja impresa: en la mano de quien cuenta tiene que decir
+  // de qué corte sale y qué alcance tiene, o la planilla no sirve de prueba.
+  const alc = [almSelAna ? 'almacén ' + almSelAna : '', F.tipo ? 'tipo ' + F.tipo : '',
+    F.area ? 'área ' + F.area : '', F.pas ? 'pasillo ' + F.pas : '', F.niv ? 'nivel ' + F.niv : '']
+    .filter(Boolean).join(' · ');
+  $('#anaCabImp').innerHTML = `
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+      border-bottom:1px solid var(--borde);padding-bottom:5px;margin-bottom:7px">
+      <b style="font-size:11pt">Lista de conteo · clase A</b>
+      <span style="font-size:8pt;color:var(--tinta-2)">Site: <b>Finning CAT</b> ·
+        corte ${U.esc(U.fecha(M.fecha))} · ${alc ? U.esc(alc) : 'todos los almacenes'} ·
+        ${U.ent(lista.length)} líneas · ${U.usdX(valLista)}</span>
+      <span style="margin-left:auto;font-size:8pt;color:var(--tinta-3)">
+        Contó: ____________________ Fecha: ____ / ____ / ______</span>
+    </div>`;
+  $('#anaPie').innerHTML = 'La columna <b>Contado</b> queda en blanco para anotar a mano. '
+    + 'Lo que se exporta e imprime es la lista completa de lo que se ve acá: '
+    + 'filtre por almacén, pasillo o área para sacarla por partes.';
+
+  tabla($('#tAnaLista'), [
+    { t: 'Almacén', v: f => f.alm, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.alm)}</span>` },
+    { t: 'Ubicación', v: f => f.u, h: f => `<b style="font-variant-numeric:tabular-nums">${U.esc(f.u)}</b>` },
+    { t: 'Material', v: f => f.mat, h: f => `<span style="font-variant-numeric:tabular-nums">${U.esc(f.mat)}</span>` },
+    { t: 'Descripción', v: f => f.desc, h: f => U.esc((f.desc || '').slice(0, 42)) },
+    { t: 'Cantidad', n: true, v: f => f.ctd, h: f => U.ent(f.ctd) },
+    { t: 'UM', v: f => f.um },
+    { t: 'USD/UM', n: true, v: f => unitario(f), h: f => U.usdX(unitario(f)).replace('USD ', '') },
+    { t: 'Valor', n: true, v: f => f.val, h: f => `<b>${U.usdX(f.val)}</b>` },
+    // El acumulado se cuenta dentro de cada almacén: sólo tiene sentido leerlo
+    // cuando la lista está filtrada por uno.
+    ...(almSelAna ? [{ t: '% acum.', n: true, v: f => f.acumPct, h: f => U.pct(f.acumPct, 0) }] : []),
+    { t: 'Contado', v: () => '', h: () => '<span class="anota"></span>' }
+  ], lista, {
+    orden: 7, dir: -1, limite: anaTodas ? 0 : 400,
+    vacio: 'No hay líneas de clase A con este filtro.',
+    pie: [{ t: 'Total' }, { t: '' }, { t: '' }, { t: '' }, { t: '' }, { t: '' }, { t: '' },
+    { t: U.usdX(valLista), n: true }].concat(almSelAna ? [{ t: '' }, { t: '' }] : [{ t: '' }])
+  });
+}
+
+$('#btnCsvAna').addEventListener('click', () => {
+  const a = calcAnalisis(vista());
+  const lista = almSelAna ? a.lineasA.filter(l => l.alm === almSelAna) : a.lineasA;
+  U.bajar(`conteo_clase_a_${M.fecha}.csv`, U.csv(
+    ['Almacén', 'Clase', 'Ubicación', 'Material', 'Descripción', 'Cantidad', 'UM',
+      'USD por UM', 'Valor USD', '% acumulado del almacén', 'Tipo de stock', 'Entrada', 'Contado'],
+    lista.map(l => [l.alm, CLASES[l.cl] || l.cl, l.u, l.mat, l.desc, l.ctd, l.um,
+      unitario(l).toFixed(2), Math.round(l.val), U.dec(l.acumPct, 1), l.ts, l.fem, ''])));
+});
+$('#btnImpAna').addEventListener('click', () => {
+  const a = calcAnalisis(vista());
+  const n = (almSelAna ? a.lineasA.filter(l => l.alm === almSelAna) : a.lineasA).length;
+  const hojas = Math.ceil(n / 34);
+  if (hojas > 8 && !confirm(`La lista tiene ${U.ent(n)} líneas: son unas ${U.ent(hojas)} hojas.\n\n`
+    + 'Para sacarla por partes, elija un almacén en la tabla de arriba o use los filtros '
+    + 'de pasillo y área de la barra superior.\n\n¿Imprime igual?')) return;
+  G.ocultar();
+  anaTodas = true;
+  document.body.classList.add('pr-lista');
+  pintar();
+  print();
+  setTimeout(() => { anaTodas = false; document.body.classList.remove('pr-lista'); pintar(); }, 600);
+});
+
 /* ===========================================================================
    TRÁNSITO
    =========================================================================== */

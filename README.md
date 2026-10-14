@@ -35,8 +35,31 @@ se quitan de a uno o todos juntos. No hay barras de desplazamiento: todo entra e
 Los gráficos van en azul marino, sin semáforo de colores. El umbral se marca con una línea de
 referencia al 90%, y el estado aparece como palabra sobria en la tabla.
 
-El resto del análisis está detrás, en pestañas: Tránsito, Valorizado, Consolidación, Tendencia,
-Calidad, Detalle y Reporte.
+El resto del análisis está detrás, en pestañas: Análisis, Tránsito, Valorizado, Consolidación,
+Tendencia, Calidad, Detalle y Reporte.
+
+### Análisis: la lista de conteo previa al inventario general
+
+Pensada para el wall to wall, donde una diferencia obliga a mandar el caso al analyzer. En vez de
+salir a contar todo a ciegas, arma la lista de lo que hay que verificar sí o sí.
+
+Por **cada almacén** ordena sus líneas de mayor a menor valor y marca como **clase A** las que hacen
+falta para llegar al **80% del valor de ese almacén**. El corte es por almacén y no global, para que
+un almacén chico pero caro no se quede sin lista por culpa de uno grande.
+
+- **Valor de la línea** = precio × cantidad en esa ubicación, que es la plata que se juega en ese
+  conteo. El precio unitario va como columna (`USD/UM`) y sale de la propia línea, así siempre
+  cierra con la columna Valor de al lado.
+- El **resumen por almacén** muestra cuántas líneas hay que contar, qué porcentaje del trabajo son y
+  qué porcentaje del valor cubren. Se hace clic en un almacén para ver sólo sus líneas.
+- La lista respeta los **filtros de la barra superior**: se puede sacar por pasillo o por área para
+  contar por partes.
+- **Exportar a Excel** baja todo lo que esté a la vista, con una columna `Contado` en blanco.
+  **Imprimir lista** saca la planilla en hojas apaisadas con el encabezado repetido, el corte, el
+  alcance y un renglón para firmar. Avisa antes si son muchas hojas.
+
+Las líneas **sin precio** no se pueden ordenar y quedan afuera de la lista: si las hay, la pantalla
+lo avisa arriba.
 
 ### La tabla de tipos manda
 
