@@ -376,7 +376,7 @@ input.fecha-aging.ajustada{
     <p class="ayuda">
       Estas fechas pisan lo que diga el archivo y se vuelven a aplicar cada lunes.
       El WMS no exporta un numero de linea, asi que la linea se reconoce por ubicacion,
-      producto, fecha de ingreso, tipo de stock y cantidad.
+      producto, la Fecha Aging del archivo, tipo de stock y cantidad.
     </p>
     <div class="marco-alto" style="max-height:340px">
       <table class="datos" id="tablaAjustes"></table>
@@ -853,7 +853,6 @@ const COLS = {
   descProd:   ["Descripción de producto","Descripcion de producto","Descripción producto","Texto breve"],
   cantidad:   ["Ctd.","Ctd","QTY_ON_HAND","Cantidad","Stock"],
   fechaAging: ["Fecha Aging","MOVE_DSTAMP"],
-  fechaEM:    ["Fecha EM"],
   lote:       ["Lote"],
   tipoStock:  ["Denominación de tipo de stocks","Denominacion de tipo de stocks","Tipo de stock"],
   um:         ["Unidad medida base","UM","Unidad de medida"],
@@ -897,14 +896,18 @@ function ingestarStock(filas){
   const ih = filaEncabezado(filas, COLS.ubicacion);
   const head = filas[ih] || [];
   const c = {};
-  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","fechaEM","lote","tipoStock","um"]) {
+  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","lote","tipoStock","um"]) {
     c[k] = buscarCol(head, COLS[k]);
   }
   const faltan = [];
-  if (c.ubicacion < 0) faltan.push("Ubicacion");
-  if (c.producto  < 0) faltan.push("Producto");
-  if (c.cantidad  < 0) faltan.push("Ctd.");
-  if (faltan.length) throw new Error("No encontre estas columnas en la hoja Stock: " + faltan.join(", "));
+  if (c.ubicacion  < 0) faltan.push("Ubicacion");
+  if (c.producto   < 0) faltan.push("Producto");
+  if (c.cantidad   < 0) faltan.push("Ctd.");
+  if (c.fechaAging < 0) faltan.push("Fecha Aging");
+  if (faltan.length) {
+    throw new Error("Faltan estas columnas: " + faltan.join(", ") +
+      ". El aging se cuenta desde Fecha Aging; Fecha EM no sirve de reemplazo.");
+  }
 
   const out = [];
   for (let i = ih + 1; i < filas.length; i++) {
@@ -917,14 +920,12 @@ function ingestarStock(filas){
       descripcion:c.descProd  > -1 ? f[c.descProd]  : "",
       cantidad:   c.cantidad  > -1 ? f[c.cantidad]  : 0,
       fechaAging: c.fechaAging> -1 ? fecha(f[c.fechaAging]) : null,
-      fechaEM:    c.fechaEM    > -1 ? fecha(f[c.fechaEM])    : null,
       lote:       c.lote      > -1 ? f[c.lote]      : "",
       tipoStock:  c.tipoStock > -1 ? f[c.tipoStock] : "",
       um:         c.um        > -1 ? f[c.um]        : ""
     });
   }
   if (!out.length) throw new Error("La hoja Stock no tiene filas con ubicacion.");
-  if (c.fechaAging < 0 && c.fechaEM > -1) out.forEach((x) => { x.fechaAging = x.fechaEM; });
   estado.stock = out;
   estado.fuentes.stock = { filas: out.length, sinFecha: out.filter((x) => !x.fechaAging).length, cuando: new Date() };
   return out.length;
@@ -1035,11 +1036,14 @@ function ingestarMaestro(filas, iSku, iCosto){
    ============================================================ */
 /* El WMS no exporta un id de linea (Unidad manipulacion e Identificacion stock
    vienen vacias), asi que la identidad se arma con los atributos estables.
+   Usa la Fecha Aging del archivo, no la ajustada, para que el ajuste se vuelva
+   a aplicar la semana siguiente. Si la base corrige esa fecha, la clave cambia
+   y el ajuste queda marcado como "no coincide": ya no hace falta.
    Aun asi quedan lineas indistinguibles entre si: un ajuste sobre una de ellas
    se aplica a todas sus gemelas, y la pantalla lo avisa. */
 function claveLinea(f){
   return [normUbic(f.ubicacion), String(f.producto || "").trim().toUpperCase(),
-          fechaISO(f.fechaEM), String(f.tipoStock || "").trim(), num(f.cantidad)].join("|");
+          fechaISO(f.fechaAging), String(f.tipoStock || "").trim(), num(f.cantidad)].join("|");
 }
 function calcular(){
   const corte = estado.corte;

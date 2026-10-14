@@ -54,8 +54,14 @@ otra maquina, exportar los CSV desde cada solapa.
 ### Sobre los ajustes de fecha
 
 El export del WMS no trae un numero de linea: `Unidad manipulacion` e `Identificacion stock`
-vienen vacias. La linea se reconoce entonces por ubicacion + producto + fecha de ingreso +
-tipo de stock + cantidad. Con la base del 13-oct quedan 41 grupos de lineas indistinguibles
-entre si; un ajuste sobre una de ellas se aplica a todo el grupo y la pantalla lo avisa
-("N gemelas"). Los ajustes que dejan de coincidir con alguna linea se marcan como
-"no coincide" y se pueden limpiar de a uno o todos juntos.
+vienen vacias. La linea se reconoce entonces por ubicacion + producto + la `Fecha Aging` del
+archivo + tipo de stock + cantidad. Con la base del 13-oct quedan 45 grupos de lineas
+indistinguibles entre si; un ajuste sobre una de ellas se aplica a todo el grupo y la pantalla
+lo avisa ("N gemelas").
+
+Si en una base posterior se corrige la `Fecha Aging` de una linea ajustada, su clave cambia
+y el ajuste queda marcado como "no coincide": ya no hace falta, porque el archivo trae el
+dato bien. Esos ajustes se limpian de a uno o todos juntos.
+
+`Fecha EM` no se usa para nada: no es la fecha desde la que se cuenta el aging. Si la base
+no trae la columna `Fecha Aging`, la herramienta la rechaza en vez de calcular con otra cosa.
