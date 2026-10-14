@@ -2,7 +2,8 @@
 
 | Archivo | Que es |
 |---|---|
-| `xlsx.full.min.js` | SheetJS 0.18.5, lee y escribe archivos Excel. Apache-2.0, licencia en `LICENSE-xlsx.txt`. |
+| `LICENSE-xlsx.txt` | Licencia Apache-2.0 de SheetJS. |
 
-`aging.html` lo carga desde aca. Si falta, cae al CDN; si tampoco hay internet, queda
-la opcion de pegar los datos desde Excel con Ctrl+V.
+SheetJS 0.18.5 (build `mini`) va **embebido dentro de `aging.html`**, no como archivo
+aparte: la pagina tiene que funcionar sin internet y siendo un unico archivo que se abre
+con doble clic. Esta carpeta queda solo para la licencia.

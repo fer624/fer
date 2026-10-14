@@ -4,7 +4,7 @@ Herramientas internas, sin dependencias ni backend. Se abren con doble clic o se
 
 | Archivo | Para que sirve |
 |---|---|
-| `aging.html` | Monitoreo de aging en ubicaciones criticas |
+| `aging.html` | Monitoreo de aging en ubicaciones criticas. Un unico archivo, funciona sin internet. |
 | `operador.html` | Carga de turnos del mostrador |
 | `monitor.html` | Tablero de espera para la TV del mostrador |
 
@@ -42,6 +42,15 @@ ademas un boton para restaurar las originales.
 La configuracion (ubicaciones, areas, maestro de costos e historico) vive en el LocalStorage
 del navegador: es por equipo y por navegador, no se comparte entre personas. Para moverla a
 otra maquina, exportar los CSV desde cada solapa.
+
+### Offline
+
+Es **un solo archivo de 428 KB que se abre con doble clic**. No necesita internet, ni
+instalar nada, ni que ningun otro archivo este al lado: SheetJS (el que lee los `.xlsx`)
+va embebido adentro. Verificado con toda la red bloqueada: cero llamadas salientes.
+
+Tampoco sube nada a ningun lado. Los archivos se procesan en el navegador y los datos
+no salen de la maquina.
 
 ### Diferencias con el Excel
 
