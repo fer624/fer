@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitoreo Aging</title>
+<style>
+/* ============================================================
+   AGING.HTML — Monitoreo de aging en ubicaciones criticas
+   Replica el calculo del libro Excel:
+     Aging           = NETWORKDAYS(Fecha Aging; corte)  lun-vie, sin feriados
+     Valorizado      = Costo x Cantidad
+     Fuera de Target = Aging >= Target
+   Sin backend. La configuracion vive en LocalStorage.
+   ============================================================ */
+
+:root{
+  --acero-900:#182029;
+  --acero-700:#2b3742;
+  --acero-500:#5a6a78;
+  --acero-300:#a9b6c1;
+  --acero-100:#e6ebef;
+  --papel:#f4f6f8;
+  --blanco:#ffffff;
+  --navy:#101f49;
+
+  --verde:#18794e;
+  --verde-suave:#e2f4ea;
+  --verde-semaforo:#7cb342;
+  --verde-tinta:#17320a;
+
+  --amarillo:#9a6700;
+  --amarillo-suave:#fdf3d7;
+
+  --rojo:#c0261f;
+  --rojo-suave:#fbe5e3;
+  --rojo-semaforo:#d32f2f;
+
+  --azul:#1f5c9e;
+  --azul-suave:#e8f0f9;
+
+  --inbound:#bfe6f7;
+  --inbound-tinta:#0b4a66;
+  --outbound:#f7b733;
+  --outbound-tinta:#5a3b00;
+  --gestion:#f6d9ea;
+  --gestion-tinta:#6b2b4e;
+
+  --radio:14px;
+  --sombra:0 1px 2px rgba(24,32,41,.08), 0 8px 24px rgba(24,32,41,.06);
+  --borde:1px solid var(--acero-100);
+  --fuente:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:var(--fuente);
+  background:var(--papel);
+  color:var(--acero-900);
+  font-size:14px;
+  line-height:1.45;
+}
+:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+
+/* ---------- Encabezado ---------- */
+.barra{
+  background:var(--acero-900);
+  color:var(--blanco);
+  padding:14px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  flex-wrap:wrap;
+}
+.barra h1{margin:0;font-size:19px;letter-spacing:.3px}
+.barra p{margin:2px 0 0;font-size:12.5px;color:var(--acero-300)}
+.corte{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.corte label{font-size:12px;color:var(--acero-300);display:block;margin-bottom:3px}
+.corte input[type=date]{
+  padding:7px 10px;border-radius:9px;border:1px solid var(--acero-700);
+  background:var(--acero-700);color:var(--blanco);font:inherit;font-size:13px;
+}
+
+/* ---------- Solapas ---------- */
+.solapas{
+  display:flex;gap:2px;background:var(--acero-700);
+  padding:0 14px;overflow-x:auto;
+}
+.solapa{
+  appearance:none;border:0;background:transparent;color:var(--acero-300);
+  font:inherit;font-size:13.5px;padding:11px 16px;cursor:pointer;
+  border-bottom:3px solid transparent;white-space:nowrap;
+}
+.solapa:hover{color:var(--blanco)}
+.solapa[aria-selected=true]{color:var(--blanco);border-bottom-color:var(--azul);font-weight:600}
+.conteo-solapa{
+  display:inline-block;margin-left:6px;background:var(--rojo);color:#fff;
+  border-radius:20px;padding:0 6px;font-size:11px;font-weight:700;
+}
+
+/* ---------- Layout ---------- */
+main{padding:20px 22px 60px;max-width:1500px;margin:0 auto}
+section[hidden]{display:none}
+.panel{
+  background:var(--blanco);border:var(--borde);border-radius:var(--radio);
+  box-shadow:var(--sombra);padding:18px;margin-bottom:18px;
+}
+.panel h2{margin:0 0 4px;font-size:16px}
+.panel h2 + .ayuda{margin:0 0 14px}
+.ayuda{font-size:12.5px;color:var(--acero-500);margin:0 0 12px}
+.fila{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+
+/* ---------- Botones ---------- */
+.btn{
+  appearance:none;border:0;border-radius:10px;padding:9px 15px;
+  font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
+  background:var(--acero-900);color:var(--blanco);
+}
+.btn:hover{background:var(--acero-700)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.claro{background:var(--acero-100);color:var(--acero-900)}
+.btn.claro:hover{background:var(--acero-300)}
+.btn.peligro{background:var(--rojo-suave);color:var(--rojo)}
+.btn.peligro:hover{background:#f6cfcb}
+.btn.chico{padding:5px 10px;font-size:12.5px;border-radius:8px}
+
+/* ---------- Formularios ---------- */
+label.campo{display:block;font-size:12.5px;color:var(--acero-700);margin-bottom:5px;font-weight:600}
+textarea{
+  padding:7px 9px;border-radius:9px;border:1px solid var(--acero-300);
+  font:inherit;font-size:12.5px;background:var(--blanco);color:var(--acero-900);
+  resize:vertical;width:240px;line-height:1.35;
+}
+input[type=text],input[type=number],input[type=search],select{
+  padding:8px 10px;border-radius:9px;border:1px solid var(--acero-300);
+  font:inherit;font-size:13.5px;background:var(--blanco);color:var(--acero-900);
+}
+input::placeholder{color:var(--acero-300)}
+
+/* ---------- Zona de carga ---------- */
+.zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
+.zona{
+  border:2px dashed var(--acero-300);border-radius:var(--radio);
+  padding:16px;text-align:center;background:var(--papel);transition:.15s;
+}
+.zona.encima{border-color:var(--azul);background:var(--azul-suave)}
+.zona.listo{border-style:solid;border-color:var(--verde);background:var(--verde-suave)}
+.zona h3{margin:0 0 4px;font-size:14px}
+.zona p{margin:0 0 10px;font-size:12.5px;color:var(--acero-500)}
+.zona .estado{font-size:12.5px;font-weight:600;margin-top:9px;color:var(--verde)}
+.zona .estado.vacio{color:var(--acero-500);font-weight:400}
+.zona .estado.error{color:var(--rojo)}
+input[type=file]{display:none}
+
+/* ---------- KPI ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin-bottom:18px}
+.kpi{
+  background:var(--blanco);border:var(--borde);border-radius:var(--radio);
+  box-shadow:var(--sombra);padding:15px 17px;
+}
+.kpi .valor{font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.15}
+.kpi .rotulo{font-size:12.5px;color:var(--acero-500);margin-top:3px}
+.kpi .pie{font-size:11.5px;color:var(--acero-300);margin-top:5px}
+.kpi.r .valor{color:var(--rojo)}
+.kpi.v .valor{color:var(--verde)}
+.kpi.a .valor{color:var(--amarillo)}
+
+/* ---------- Avisos ---------- */
+.aviso{
+  border-radius:11px;padding:11px 14px;margin-bottom:11px;font-size:13px;
+  display:flex;gap:10px;align-items:flex-start;
+}
+.aviso.alerta{background:var(--amarillo-suave);color:#6b4700;border:1px solid #f0dca8}
+.aviso.malo{background:var(--rojo-suave);color:var(--rojo);border:1px solid #f3c6c2}
+.aviso.ok{background:var(--verde-suave);color:var(--verde);border:1px solid #bfe4d1}
+.aviso.info{background:var(--azul-suave);color:#13456f;border:1px solid #c6daf0}
+.aviso b{font-weight:700}
+.aviso .btn{margin-left:auto;flex:none}
+
+/* ---------- Tabla tablero ---------- */
+.marco{overflow-x:auto;border-radius:var(--radio);border:var(--borde);background:var(--blanco)}
+table.tablero{border-collapse:collapse;width:100%;font-size:12.5px;min-width:1050px}
+table.tablero th{
+  background:var(--navy);color:#fff;font-weight:600;padding:9px 8px;
+  text-align:center;font-size:11.5px;letter-spacing:.3px;border:1px solid #2a3c6b;
+}
+table.tablero td{border:1px solid var(--acero-100);padding:7px 8px;vertical-align:middle;text-align:center}
+td.area{
+  background:var(--navy);color:#fff;font-weight:700;font-size:15px;
+  letter-spacing:.5px;border-color:#2a3c6b;
+}
+td.resp,td.desc{text-align:left;font-weight:600;color:var(--acero-700)}
+td.desc{font-size:11px;white-space:pre-line;color:var(--acero-500);font-weight:500;max-width:230px}
+td.proceso{font-weight:700;font-size:11.5px;letter-spacing:.3px}
+td.proceso.inbound{background:var(--inbound);color:var(--inbound-tinta)}
+td.proceso.outbound{background:var(--outbound);color:var(--outbound-tinta)}
+td.proceso.gestion{background:var(--gestion);color:var(--gestion-tinta)}
+td.proceso.otro{background:var(--acero-100);color:var(--acero-700)}
+td.target{font-weight:700;font-size:14px}
+td.rotulo-fila{font-weight:600;text-align:left;color:var(--acero-700)}
+td.cifra{text-align:right;font-variant-numeric:tabular-nums}
+tr.fuera td.cifra,tr.fuera td.rotulo-fila{color:var(--rojo);font-weight:700}
+td.semaforo{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+td.semaforo.ok{background:var(--verde-semaforo);color:var(--verde-tinta)}
+td.semaforo.mal{background:var(--rojo-semaforo);color:#fff}
+td.semaforo.nulo{background:var(--acero-100);color:var(--acero-500)}
+td.semaforo small{display:block;font-size:9.5px;font-weight:700;letter-spacing:.6px;opacity:.85}
+tr.grupo-fin td{border-bottom:3px solid var(--acero-300)}
+tr.clicable{cursor:pointer}
+tr.clicable:hover td:not(.area):not(.proceso):not(.semaforo){background:var(--azul-suave)}
+
+/* ---------- Tablas genericas ---------- */
+table.datos{border-collapse:collapse;width:100%;font-size:12.5px}
+table.datos th{
+  background:var(--acero-100);color:var(--acero-700);text-align:left;
+  padding:8px 9px;font-size:11.5px;letter-spacing:.3px;position:sticky;top:0;z-index:2;
+}
+table.datos td{border-top:1px solid var(--acero-100);padding:6px 9px;vertical-align:middle}
+table.datos tbody tr:hover{background:var(--papel)}
+table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
+.marco-alto{max-height:560px;overflow:auto;border:var(--borde);border-radius:var(--radio);background:var(--blanco)}
+.pastilla{
+  display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700;
+}
+.pastilla.mal{background:var(--rojo-suave);color:var(--rojo)}
+.pastilla.ok{background:var(--verde-suave);color:var(--verde)}
+.pastilla.neutro{background:var(--acero-100);color:var(--acero-700)}
+.vacio-tabla{padding:34px;text-align:center;color:var(--acero-500);font-size:13.5px}
+
+/* ---------- Grafico ---------- */
+.grafico{width:100%;overflow:visible}
+.grafico .barra-dato{transition:opacity .12s}
+.grafico .barra-dato:hover{opacity:.82}
+.eje{stroke:var(--acero-100);stroke-width:1}
+.rotulo-eje{font-size:11.5px;fill:var(--acero-700);font-weight:600}
+.valor-barra{font-size:11.5px;fill:var(--acero-500);font-variant-numeric:tabular-nums}
+#tip{
+  position:fixed;pointer-events:none;background:var(--acero-900);color:#fff;
+  padding:7px 10px;border-radius:8px;font-size:12px;z-index:60;opacity:0;
+  transition:opacity .1s;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,.25);
+}
+#tip b{display:block;margin-bottom:2px}
+
+/* ---------- Filtros ---------- */
+.filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:13px}
+.filtros > div{display:flex;flex-direction:column}
+.check{display:flex;align-items:center;gap:7px;font-size:13px;padding-bottom:9px;cursor:pointer}
+.check input{width:16px;height:16px;cursor:pointer}
+
+/* ---------- Varios ---------- */
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:12px}
+.sep{height:1px;background:var(--acero-100);margin:16px 0}
+.pie-tabla{font-size:12px;color:var(--acero-500);margin-top:9px}
+.acciones{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+.tag-fuente{font-size:11.5px;color:var(--acero-500);margin-top:5px}
+
+/* ---------- Impresion ---------- */
+@media print{
+  body{background:#fff;font-size:11px}
+  .barra{background:#fff;color:#000;border-bottom:2px solid #000;padding:8px 0}
+  .barra p,.corte,.solapas,.acciones,.filtros,.no-imprimir{display:none !important}
+  main{padding:0;max-width:none}
+  .panel{box-shadow:none;border:0;padding:0;margin:0 0 10px}
+  .marco{border:0;overflow:visible}
+  table.tablero{min-width:0;font-size:9.5px}
+  td.area,table.tablero th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  td.semaforo,td.proceso{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  .kpi{box-shadow:none;border:1px solid #999}
+}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div>
+    <h1>Monitoreo Aging</h1>
+    <p>Ubicaciones criticas &middot; dias habiles lun-vie, sin feriados &middot; fuera de aging cuando dias &ge; target</p>
+  </div>
+  <div class="corte">
+    <div>
+      <label for="fCorte">Fecha de corte</label>
+      <input type="date" id="fCorte">
+    </div>
+    <button class="btn claro" id="btnHoy" type="button">Hoy</button>
+    <button class="btn" id="btnGuardarCorte" type="button" disabled>Guardar corte</button>
+  </div>
+</header>
+
+<nav class="solapas" role="tablist">
+  <button class="solapa" role="tab" aria-selected="true"  data-vista="tablero">Tablero</button>
+  <button class="solapa" role="tab" aria-selected="false" data-vista="detalle">Detalle</button>
+  <button class="solapa" role="tab" aria-selected="false" data-vista="datos">Datos</button>
+  <button class="solapa" role="tab" aria-selected="false" data-vista="ubicaciones">Ubicaciones criticas</button>
+  <button class="solapa" role="tab" aria-selected="false" data-vista="maestro">Maestro valorizado</button>
+  <button class="solapa" role="tab" aria-selected="false" data-vista="historico">Historico</button>
+</nav>
+
+<main>
+
+<!-- ===================== TABLERO ===================== -->
+<section id="v-tablero">
+  <div id="avisos"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="panel no-imprimir" id="panelGrafico" hidden>
+    <h2>Valorizado fuera de aging por area</h2>
+    <p class="ayuda">Solo areas con lineas vencidas. Pasa el mouse para ver el detalle.</p>
+    <svg class="grafico" id="grafico" role="img" aria-label="Valorizado fuera de aging por area"></svg>
+  </div>
+
+  <div class="panel">
+    <h2 id="tituloTablero">Tablero</h2>
+    <p class="ayuda" id="subtituloTablero">Carga el libro de aging para ver el tablero.</p>
+    <div class="marco">
+      <table class="tablero" id="tablaTablero"></table>
+    </div>
+    <div class="acciones no-imprimir">
+      <button class="btn claro" id="btnCsvTablero" type="button" disabled>Exportar tablero (CSV)</button>
+      <button class="btn claro" id="btnImprimir" type="button">Imprimir / PDF</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DETALLE ===================== -->
+<section id="v-detalle" hidden>
+  <div class="panel">
+    <h2>Detalle por linea</h2>
+    <p class="ayuda">Las lineas que ensucian cada area, ordenadas por dias de aging.</p>
+    <div class="filtros">
+      <div>
+        <label class="campo" for="fArea">Area</label>
+        <select id="fArea"><option value="">Todas</option></select>
+      </div>
+      <div>
+        <label class="campo" for="fResp">Responsable</label>
+        <select id="fResp"><option value="">Todos</option></select>
+      </div>
+      <div>
+        <label class="campo" for="fProceso">Proceso</label>
+        <select id="fProceso"><option value="">Todos</option></select>
+      </div>
+      <div>
+        <label class="campo" for="fBuscar">Buscar</label>
+        <input type="search" id="fBuscar" placeholder="SKU, descripcion o ubicacion" size="26">
+      </div>
+      <label class="check"><input type="checkbox" id="fSoloFuera"> Solo fuera de aging</label>
+      <label class="check"><input type="checkbox" id="fSoloProblemas"> Solo con problemas</label>
+      <button class="btn claro" id="btnLimpiar" type="button">Limpiar</button>
+    </div>
+    <div class="marco-alto">
+      <table class="datos" id="tablaDetalle"></table>
+    </div>
+    <p class="pie-tabla" id="pieDetalle"></p>
+    <div class="acciones">
+      <button class="btn claro" id="btnCsvDetalle" type="button" disabled>Exportar detalle (CSV)</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DATOS ===================== -->
+<section id="v-datos" hidden>
+  <div class="panel">
+    <h2>Cargar datos</h2>
+    <p class="ayuda">
+      Arrastra los archivos o hace clic para elegirlos. Nada se sube a ningun servidor:
+      todo el procesamiento ocurre en este navegador.
+    </p>
+    <div class="zonas">
+
+      <div class="zona" id="zonaLibro">
+        <h3>1. Libro de aging</h3>
+        <p>El <span class="mono">Aging_ddmmaa.xlsx</span> que ya usas. Leo las hojas
+           <b>Stock</b>, <b>Depositos Virtuales</b> y <b>Resp. Alm.</b></p>
+        <button class="btn" type="button" data-abre="inLibro">Elegir archivo</button>
+        <input type="file" id="inLibro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
+        <div class="estado vacio" id="estLibro">Sin cargar</div>
+      </div>
+
+      <div class="zona" id="zonaMaestro">
+        <h3>2. Maestro de items valorizados</h3>
+        <p><span class="mono">Base Item Valorizados.xlsx</span>. Se guarda en este navegador,
+           asi que solo lo volves a cargar cuando cambien los costos.</p>
+        <button class="btn" type="button" data-abre="inMaestro">Elegir archivo</button>
+        <input type="file" id="inMaestro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
+        <div class="estado vacio" id="estMaestro">Sin cargar</div>
+      </div>
+
+    </div>
+
+    <div id="mapeoMaestro" hidden>
+      <div class="sep"></div>
+      <h2>Columnas del maestro</h2>
+      <p class="ayuda">En el libro original el SKU esta en la columna A y el costo en la H. Corregilo si tu archivo cambio.</p>
+      <div class="fila">
+        <div>
+          <label class="campo" for="mSku">Columna del SKU</label>
+          <select id="mSku"></select>
+        </div>
+        <div>
+          <label class="campo" for="mCosto">Columna del costo</label>
+          <select id="mCosto"></select>
+        </div>
+        <div>
+          <label class="campo" for="mHoja">Hoja</label>
+          <select id="mHoja"></select>
+        </div>
+        <button class="btn" id="btnAplicarMaestro" type="button">Aplicar</button>
+      </div>
+      <p class="tag-fuente" id="vistaMaestro"></p>
+    </div>
+
+    <div class="sep"></div>
+    <h2>Pegar desde Excel</h2>
+    <p class="ayuda">
+      Alternativa sin archivo: copia el rango en Excel (con encabezados) y pegalo aca.
+      Sirve para la hoja Stock cuando no tenes el libro completo a mano.
+    </p>
+    <div class="fila">
+      <textarea id="pegado" rows="4" style="flex:1;min-width:300px;padding:9px;border-radius:9px;border:1px solid var(--acero-300);font:inherit;font-size:12.5px" placeholder="Pega aca el rango copiado de la hoja Stock..."></textarea>
+      <button class="btn" id="btnPegar" type="button">Procesar pegado</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Estado de las fuentes</h2>
+    <div class="marco-alto" style="max-height:none">
+      <table class="datos" id="tablaFuentes"></table>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== UBICACIONES ===================== -->
+<section id="v-ubicaciones" hidden>
+  <div class="panel">
+    <h2>Areas</h2>
+    <p class="ayuda">Responsable, proceso y target por area. Equivale a la hoja <b>Resp. Alm.</b></p>
+    <div class="marco-alto" style="max-height:none">
+      <table class="datos" id="tablaAreas"></table>
+    </div>
+    <div class="sep"></div>
+    <h2>Agregar area</h2>
+    <div class="fila">
+      <div><label class="campo" for="nArea">Area</label><input type="text" id="nArea" size="8" placeholder="8035"></div>
+      <div><label class="campo" for="nResp">Responsable</label><input type="text" id="nResp" size="20" placeholder="Nombre"></div>
+      <div><label class="campo" for="nProceso">Proceso</label>
+        <select id="nProceso">
+          <option>INBOUND</option><option>OUTBOND</option><option>Gestion de Stock</option>
+        </select>
+      </div>
+      <div><label class="campo" for="nTargetA">Target (dias)</label><input type="number" id="nTargetA" size="5" min="0" value="3"></div>
+      <div><label class="campo" for="nDescA">Descripcion</label><input type="text" id="nDescA" size="24" placeholder="(opcional: si la dejas vacia lista las ubicaciones)"></div>
+      <button class="btn" id="btnAddArea" type="button">Agregar</button>
+    </div>
+    <p class="error" id="errArea" style="color:var(--rojo);font-size:12.5px;min-height:17px;margin:8px 0 0"></p>
+  </div>
+
+  <div class="panel">
+    <h2>Ubicaciones criticas</h2>
+    <p class="ayuda">
+      Equivale a la hoja <b>Depositos Virtuales</b>. Una ubicacion que no este en esta lista
+      no entra al calculo: su stock se ignora, igual que hoy.
+    </p>
+    <div class="filtros">
+      <div>
+        <label class="campo" for="fUbicArea">Area</label>
+        <select id="fUbicArea"><option value="">Todas</option></select>
+      </div>
+      <div>
+        <label class="campo" for="fUbicBuscar">Buscar</label>
+        <input type="search" id="fUbicBuscar" placeholder="Nombre de ubicacion" size="24">
+      </div>
+      <button class="btn claro" id="btnCsvUbic" type="button">Exportar (CSV)</button>
+      <button class="btn peligro" id="btnBorrarUbic" type="button">Vaciar lista</button>
+    </div>
+    <div class="marco-alto">
+      <table class="datos" id="tablaUbic"></table>
+    </div>
+    <p class="pie-tabla" id="pieUbic"></p>
+    <div class="sep"></div>
+    <h2>Agregar ubicacion</h2>
+    <div class="fila">
+      <div><label class="campo" for="nUbic">Ubicacion</label><input type="text" id="nUbic" size="26" placeholder="8035-PENDIENTE"></div>
+      <div><label class="campo" for="nUbicArea">Area</label><input type="text" id="nUbicArea" size="8" placeholder="8035"></div>
+      <div><label class="campo" for="nTargetU">Target (dias)</label><input type="number" id="nTargetU" size="5" min="0" value="3"></div>
+      <button class="btn" id="btnAddUbic" type="button">Agregar</button>
+    </div>
+    <p class="error" id="errUbic" style="color:var(--rojo);font-size:12.5px;min-height:17px;margin:8px 0 0"></p>
+  </div>
+</section>
+
+<!-- ===================== MAESTRO ===================== -->
+<section id="v-maestro" hidden>
+  <div class="panel">
+    <h2>Maestro de items valorizados</h2>
+    <p class="ayuda">
+      El costo unitario con el que se valoriza cada linea. Queda guardado en este navegador;
+      cargar un archivo nuevo lo actualiza.
+    </p>
+    <div class="filtros">
+      <div>
+        <label class="campo" for="fSku">Buscar SKU</label>
+        <input type="search" id="fSku" placeholder="Numero de parte" size="22">
+      </div>
+      <label class="check"><input type="checkbox" id="fSoloUsados"> Solo los SKU del stock actual</label>
+      <label class="check"><input type="checkbox" id="fSoloSinCosto"> Solo los que faltan</label>
+      <button class="btn claro" id="btnCsvMaestro" type="button">Exportar (CSV)</button>
+      <button class="btn peligro" id="btnBorrarMaestro" type="button">Vaciar maestro</button>
+    </div>
+    <div class="marco-alto">
+      <table class="datos" id="tablaMaestro"></table>
+    </div>
+    <p class="pie-tabla" id="pieMaestro"></p>
+    <div class="sep"></div>
+    <h2>Cargar o corregir un costo</h2>
+    <div class="fila">
+      <div><label class="campo" for="nSku">SKU</label><input type="text" id="nSku" size="20" placeholder="3969703"></div>
+      <div><label class="campo" for="nCosto">Costo unitario</label><input type="text" id="nCosto" size="14" placeholder="5151,56"></div>
+      <button class="btn" id="btnAddSku" type="button">Guardar</button>
+    </div>
+    <p class="error" id="errSku" style="color:var(--rojo);font-size:12.5px;min-height:17px;margin:8px 0 0"></p>
+  </div>
+</section>
+
+<!-- ===================== HISTORICO ===================== -->
+<section id="v-historico" hidden>
+  <div class="panel">
+    <h2>Historico de cortes</h2>
+    <p class="ayuda">
+      Cada vez que toques <b>Guardar corte</b> se agrega una columna, como las que hoy pegas a mano en la hoja KPI.
+      Se guarda en este navegador.
+    </p>
+    <div class="fila" style="margin-bottom:13px">
+      <div>
+        <label class="campo" for="hMetrica">Metrica</label>
+        <select id="hMetrica">
+          <option value="diasMax">Dias maximos</option>
+          <option value="lineas">Lineas totales</option>
+          <option value="fueraLineas">Lineas fuera de aging</option>
+          <option value="valorizado">Valorizado total</option>
+          <option value="fueraValorizado">Valorizado fuera de aging</option>
+        </select>
+      </div>
+      <button class="btn claro" id="btnCsvHist" type="button">Exportar (CSV)</button>
+      <button class="btn peligro" id="btnBorrarHist" type="button">Vaciar historico</button>
+    </div>
+    <div class="marco">
+      <table class="datos" id="tablaHist"></table>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<div id="tip" role="status" aria-live="polite"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+"use strict";
+/* ============================================================
+   1. UTILIDADES
+   ============================================================ */
+const LS = {
+  ubic:   "aging.ubicaciones.v1",
+  areas:  "aging.areas.v1",
+  maestro:"aging.maestro.v1",
+  hist:   "aging.historico.v1",
+  mapeo:  "aging.mapeoMaestro.v1"
+};
+
+const $  = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+function guardar(clave, valor){
+  try { localStorage.setItem(clave, JSON.stringify(valor)); return true; }
+  catch(e){ console.warn("No se pudo guardar", clave, e); return false; }
+}
+function leer(clave, porDefecto){
+  try { const t = localStorage.getItem(clave); return t ? JSON.parse(t) : porDefecto; }
+  catch(e){ return porDefecto; }
+}
+
+/* Texto normalizado: sin acentos, minusculas, sin puntuacion sobrante */
+function norm(v){
+  if (v == null) return "";
+  return String(v).trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ").replace(/\.+$/, "");
+}
+/* Clave de ubicacion: mayusculas, sin acentos, sin espacios dobles */
+function normUbic(v){
+  if (v == null) return "";
+  return String(v).trim().toUpperCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/\s+/g, " ");
+}
+/* Variantes de un SKU para cruzar maestro y stock (3969703.000 == 3969703) */
+function clavesSku(v){
+  if (v == null) return [];
+  const s = String(v).trim().toUpperCase();
+  if (!s) return [];
+  const out = new Set([s]);
+  /* el WMS exporta 3969703.000 y 6T0988.000; el maestro suele traerlos sin los decimales */
+  const base = s.replace(/\.0+$/, "");
+  out.add(base);
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (Number.isFinite(n)) out.add(String(n));
+  }
+  out.add(base.replace(/^0+/, ""));
+  out.add(s.replace(/^0+/, ""));
+  out.add(base.replace(/[\s-]/g, ""));
+  out.add(s.replace(/[\s.-]/g, ""));
+  return Array.from(out).filter(Boolean);
+}
+
+/* Numeros en formato es-AR (1.234,56) o ingles (1,234.56) */
+function num(v){
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (v == null) return 0;
+  let s = String(v).trim();
+  if (!s) return 0;
+  const neg = /^\(.*\)$/.test(s) || s.startsWith("-");
+  s = s.replace(/[()\s]/g, "").replace(/^-/, "").replace(/[^0-9.,]/g, "");
+  if (!s) return 0;
+  const ic = s.lastIndexOf(","), ip = s.lastIndexOf(".");
+  if (ic > -1 && ip > -1) {
+    s = ic > ip ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  } else if (ic > -1) {
+    s = /^\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, "") : s.replace(",", ".");
+  } else if (ip > -1) {
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? (neg ? -n : n) : 0;
+}
+
+/* Fechas: Date, serial de Excel, dd/mm/aaaa, aaaa-mm-dd */
+function fecha(v){
+  if (v == null || v === "") return null;
+  if (v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  const s = String(v).trim();
+  if (!s) return null;
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = parseFloat(s);
+    if (n > 20000 && n < 80000) {
+      const d = new Date(Math.round((n - 25569) * 86400000));
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+  }
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+  if (m) { let a = +m[3]; if (a < 100) a += a < 70 ? 2000 : 1900; return new Date(a, +m[2] - 1, +m[1]); }
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/* NETWORKDAYS: lun a vie, cuenta ambos extremos, sin feriados */
+function diasHabiles(desde, hasta){
+  if (!desde || !hasta) return null;
+  const MS = 86400000;
+  const a = Math.floor(new Date(desde.getFullYear(), desde.getMonth(), desde.getDate()).getTime() / MS);
+  const b = Math.floor(new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate()).getTime() / MS);
+  if (b < a) return 0;
+  const total = b - a + 1;
+  const semanas = Math.floor(total / 7);
+  let n = semanas * 5;
+  const resto = total - semanas * 7;
+  const w0 = desde.getDay();
+  for (let i = 0; i < resto; i++) { const w = (w0 + i) % 7; if (w !== 0 && w !== 6) n++; }
+  return n;
+}
+
+const fmtMoneda = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtEntero = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const fmtCant   = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 });
+const plata  = (n) => "$ " + fmtMoneda.format(n || 0);
+const entero = (n) => fmtEntero.format(n || 0);
+
+function fechaCorta(d){
+  if (!d) return "";
+  const mes = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"][d.getMonth()];
+  return d.getDate() + "-" + mes;
+}
+function fechaISO(d){
+  if (!d) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+function fechaAR(d){
+  if (!d) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear();
+}
+const DIAS = ["DOMINGO","LUNES","MARTES","MIERCOLES","JUEVES","VIERNES","SABADO"];
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+/* ============================================================
+   2. ESTADO
+   ============================================================ */
+const estado = {
+  corte: new Date(),
+  stock: [],            // filas crudas de la hoja Stock
+  ubicaciones: [],      // {ubicacion, area, target}
+  areas: [],            // {area, responsable, proceso, target, descripcion}
+  maestro: new Map(),   // claveSku -> costo
+  maestroCrudo: [],     // [[sku, costo], ...] tal como se cargo
+  lineas: [],           // calculadas
+  resumen: [],          // por area
+  diag: {},             // diagnosticos
+  libroHojas: null,     // workbook crudo para re-mapear el maestro
+  fuentes: {}           // trazabilidad de cada carga
+};
+estado.corte.setHours(0, 0, 0, 0);
+
+/* ============================================================
+   3. LECTURA DE ARCHIVOS
+   ============================================================ */
+function detectarSep(linea){
+  const cands = ["\t", ";", "|", ","];
+  let mejor = ",", max = -1;
+  for (const c of cands) {
+    const n = linea.split(c).length - 1;
+    if (n > max) { max = n; mejor = c; }
+  }
+  return mejor;
+}
+function parseDelimitado(texto, sep){
+  sep = sep || detectarSep((texto.split(/\r?\n/).find((l) => l.trim()) || ""));
+  const filas = []; let fila = [], campo = "", comillas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (comillas) {
+      if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else comillas = false; }
+      else campo += c;
+    } else if (c === '"') comillas = true;
+    else if (c === sep) { fila.push(campo); campo = ""; }
+    else if (c === "\n") { fila.push(campo); filas.push(fila); fila = []; campo = ""; }
+    else if (c !== "\r") campo += c;
+  }
+  if (campo !== "" || fila.length) { fila.push(campo); filas.push(fila); }
+  return filas.filter((f) => f.some((x) => String(x).trim() !== ""));
+}
+function leerArchivo(file){
+  return new Promise((resolve, reject) => {
+    const nom = file.name.toLowerCase();
+    const esExcel = /\.(xlsx|xlsm|xlsb|xls)$/.test(nom);
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error("No se pudo leer el archivo."));
+    if (esExcel) {
+      if (typeof XLSX === "undefined") {
+        reject(new Error("La libreria para leer Excel no cargo (falta internet). Guarda la hoja como CSV o usa 'Pegar desde Excel'."));
+        return;
+      }
+      fr.onload = () => {
+        try {
+          const wb = XLSX.read(new Uint8Array(fr.result), { type: "array", cellDates: true });
+          const hojas = {};
+          wb.SheetNames.forEach((n) => {
+            hojas[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null, blankrows: false });
+          });
+          resolve({ tipo: "excel", hojas, nombres: wb.SheetNames });
+        } catch (e) { reject(new Error("El archivo Excel no se pudo abrir: " + e.message)); }
+      };
+      fr.readAsArrayBuffer(file);
+    } else {
+      fr.onload = () => resolve({ tipo: "texto", filas: parseDelimitado(fr.result) });
+      fr.readAsText(file, "UTF-8");
+    }
+  });
+}
+
+/* Busca una columna por alias tolerando acentos y variantes */
+function buscarCol(encabezados, alias){
+  const h = encabezados.map(norm);
+  for (const a of alias) { const i = h.indexOf(norm(a)); if (i > -1) return i; }
+  for (const a of alias) {
+    const na = norm(a);
+    const i = h.findIndex((x) => x && (x === na || x.startsWith(na) || x.includes(na)));
+    if (i > -1) return i;
+  }
+  return -1;
+}
+/* Encuentra la fila de encabezados dentro de las primeras filas */
+function filaEncabezado(filas, alias){
+  for (let i = 0; i < Math.min(filas.length, 12); i++) {
+    if (buscarCol(filas[i] || [], alias) > -1) return i;
+  }
+  return 0;
+}
+
+/* ============================================================
+   4. INGESTA
+   ============================================================ */
+const COLS = {
+  ubicacion:  ["Ubicación","Ubicacion","LOCATION_ID","Deposito","Depósito","Almacen"],
+  producto:   ["Producto","SKU_ID","Material","Item","Articulo"],
+  descProd:   ["Descripción de producto","Descripcion de producto","Descripción producto","Texto breve"],
+  cantidad:   ["Ctd.","Ctd","QTY_ON_HAND","Cantidad","Stock"],
+  fechaAging: ["Fecha Aging","MOVE_DSTAMP","Fecha EM"],
+  lote:       ["Lote"],
+  tipoStock:  ["Denominación de tipo de stocks","Denominacion de tipo de stocks","Tipo de stock"],
+  um:         ["Unidad medida base","UM","Unidad de medida"],
+  dvDeposito: ["Deposito","Depósito","Ubicación","Ubicacion","LOCATION_ID"],
+  dvArea:     ["General","Area","Área"],
+  dvEsta:     ["Esta","Está"],
+  dvTarget:   ["Aging","Target","Target (Dias)"],
+  raArea:     ["Area","Área"],
+  raResp:     ["Responsables","Responsable"],
+  raDesc:     ["Descripción","Descripcion"],
+  raProceso:  ["Proceso"],
+  raTarget:   ["Target (Dias)","Target (Días)","Target"]
+};
+
+function hojaPorNombre(res, claves){
+  if (!res.nombres) return null;
+  for (const k of claves) {
+    const n = res.nombres.find((x) => norm(x).includes(norm(k)));
+    if (n) return res.hojas[n];
+  }
+  return null;
+}
+
+function ingestarStock(filas){
+  if (!filas || !filas.length) throw new Error("La hoja Stock esta vacia.");
+  const ih = filaEncabezado(filas, COLS.ubicacion);
+  const head = filas[ih] || [];
+  const c = {};
+  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","lote","tipoStock","um"]) {
+    c[k] = buscarCol(head, COLS[k]);
+  }
+  const faltan = [];
+  if (c.ubicacion < 0) faltan.push("Ubicacion");
+  if (c.producto  < 0) faltan.push("Producto");
+  if (c.cantidad  < 0) faltan.push("Ctd.");
+  if (faltan.length) throw new Error("No encontre estas columnas en la hoja Stock: " + faltan.join(", "));
+
+  const out = [];
+  for (let i = ih + 1; i < filas.length; i++) {
+    const f = filas[i] || [];
+    const ubic = f[c.ubicacion];
+    if (ubic == null || String(ubic).trim() === "") continue;
+    out.push({
+      ubicacion:  String(ubic).trim(),
+      producto:   c.producto  > -1 ? f[c.producto]  : null,
+      descripcion:c.descProd  > -1 ? f[c.descProd]  : "",
+      cantidad:   c.cantidad  > -1 ? f[c.cantidad]  : 0,
+      fechaAging: c.fechaAging> -1 ? fecha(f[c.fechaAging]) : null,
+      lote:       c.lote      > -1 ? f[c.lote]      : "",
+      tipoStock:  c.tipoStock > -1 ? f[c.tipoStock] : "",
+      um:         c.um        > -1 ? f[c.um]        : ""
+    });
+  }
+  if (!out.length) throw new Error("La hoja Stock no tiene filas con ubicacion.");
+  estado.stock = out;
+  estado.fuentes.stock = { filas: out.length, sinFecha: out.filter((x) => !x.fechaAging).length, cuando: new Date() };
+  return out.length;
+}
+
+function ingestarDepositos(filas){
+  if (!filas || !filas.length) return 0;
+  const ih = filaEncabezado(filas, COLS.dvDeposito);
+  const head = filas[ih] || [];
+  const iDep = buscarCol(head, COLS.dvDeposito);
+  const iAre = buscarCol(head, COLS.dvArea);
+  const iEst = buscarCol(head, COLS.dvEsta);
+  const iTar = buscarCol(head, COLS.dvTarget);
+  if (iDep < 0) return 0;
+
+  const filtrar = iEst > -1 && filas.slice(ih + 1).some((f) => norm(f && f[iEst]) === "x");
+  const out = [];
+  const vistos = new Set();
+  for (let i = ih + 1; i < filas.length; i++) {
+    const f = filas[i] || [];
+    const dep = f[iDep];
+    if (dep == null || String(dep).trim() === "") continue;
+    if (filtrar && norm(f[iEst]) !== "x") continue;
+    const clave = normUbic(dep);
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    out.push({
+      ubicacion: String(dep).trim(),
+      area:      iAre > -1 && f[iAre] != null ? String(f[iAre]).trim() : "",
+      target:    iTar > -1 ? num(f[iTar]) : 0
+    });
+  }
+  if (!out.length) return 0;
+  estado.ubicaciones = out;
+  guardar(LS.ubic, out);
+  estado.fuentes.ubicaciones = { filas: out.length, cuando: new Date() };
+  return out.length;
+}
+
+function ingestarAreas(filas){
+  if (!filas || !filas.length) return 0;
+  const ih = filaEncabezado(filas, COLS.raArea);
+  const head = filas[ih] || [];
+  const iA = buscarCol(head, COLS.raArea);
+  const iR = buscarCol(head, COLS.raResp);
+  const iD = buscarCol(head, COLS.raDesc);
+  const iP = buscarCol(head, COLS.raProceso);
+  const iT = buscarCol(head, COLS.raTarget);
+  if (iA < 0) return 0;
+
+  const out = [];
+  const vistos = new Set();
+  for (let i = ih + 1; i < filas.length; i++) {
+    const f = filas[i] || [];
+    const a = f[iA];
+    if (a == null || String(a).trim() === "") continue;
+    const clave = String(a).trim();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    out.push({
+      area:        clave,
+      responsable: iR > -1 && f[iR] != null ? String(f[iR]).trim() : "",
+      descripcion: iD > -1 && f[iD] != null ? String(f[iD]).trim() : "",
+      proceso:     iP > -1 && f[iP] != null ? String(f[iP]).trim() : "",
+      target:      iT > -1 ? num(f[iT]) : null
+    });
+  }
+  if (!out.length) return 0;
+  estado.areas = out;
+  guardar(LS.areas, out);
+  estado.fuentes.areas = { filas: out.length, cuando: new Date() };
+  return out.length;
+}
+
+function indexarMaestro(pares){
+  const m = new Map();
+  for (const [sku, costo] of pares) {
+    for (const k of clavesSku(sku)) if (!m.has(k)) m.set(k, costo);
+  }
+  estado.maestro = m;
+  estado.maestroCrudo = pares;
+  guardar(LS.maestro, pares);
+  estado.fuentes.maestro = { filas: pares.length, cuando: new Date() };
+}
+
+function ingestarMaestro(filas, iSku, iCosto){
+  const pares = [];
+  const vistos = new Set();
+  for (const f of filas) {
+    if (!f) continue;
+    const sku = f[iSku];
+    if (sku == null || String(sku).trim() === "") continue;
+    const crudo = f[iCosto];
+    if (crudo == null || crudo === "") continue;
+    if (typeof crudo === "string" && !/\d/.test(crudo)) continue;   // fila de encabezado
+    const clave = String(sku).trim().toUpperCase();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    pares.push([String(sku).trim(), num(crudo)]);
+  }
+  if (!pares.length) throw new Error("No encontre pares SKU / costo con esas columnas.");
+  indexarMaestro(pares);
+  return pares.length;
+}
+
+/* ============================================================
+   5. CALCULO
+   ============================================================ */
+function calcular(){
+  const corte = estado.corte;
+  const idxUbic = new Map();
+  for (const u of estado.ubicaciones) idxUbic.set(normUbic(u.ubicacion), u);
+
+  const cfgArea = new Map();
+  for (const a of estado.areas) cfgArea.set(String(a.area).trim(), a);
+
+  const ubicPorArea = new Map();
+  for (const u of estado.ubicaciones) {
+    const a = String(u.area || "").trim();
+    if (!ubicPorArea.has(a)) ubicPorArea.set(a, []);
+    ubicPorArea.get(a).push(u);
+  }
+
+  const lineas = [];
+  const desconocidas = new Map();
+  const skusSinCosto = new Set();
+  let lineasIgnoradas = 0;
+
+  for (const f of estado.stock) {
+    const cu = normUbic(f.ubicacion);
+    if (!cu) continue;
+    const cfg = idxUbic.get(cu);
+    if (!cfg) {
+      lineasIgnoradas++;
+      const e = desconocidas.get(cu) || { ubicacion: f.ubicacion, lineas: 0 };
+      e.lineas++;
+      desconocidas.set(cu, e);
+      continue;
+    }
+    const area   = String(cfg.area || "").trim() || "(sin area)";
+    const target = Number(cfg.target);
+    const tieneTarget = Number.isFinite(target) && target > 0;
+    const aging  = f.fechaAging ? diasHabiles(f.fechaAging, corte) : null;
+
+    let costo = null;
+    for (const k of clavesSku(f.producto)) {
+      if (estado.maestro.has(k)) { costo = estado.maestro.get(k); break; }
+    }
+    if (costo == null && f.producto != null && String(f.producto).trim() !== "") {
+      skusSinCosto.add(String(f.producto).trim());
+    }
+
+    const cant = num(f.cantidad);
+    lineas.push({
+      area, target: tieneTarget ? target : null,
+      ubicacion: f.ubicacion,
+      sku: f.producto == null ? "" : String(f.producto).trim(),
+      descripcion: f.descripcion || "",
+      lote: f.lote || "",
+      tipoStock: f.tipoStock || "",
+      um: f.um || "",
+      cantidad: cant,
+      costo,
+      valorizado: costo == null ? 0 : costo * cant,
+      fechaAging: f.fechaAging,
+      aging,
+      fuera: aging != null && tieneTarget && aging >= target,
+      sinCosto: costo == null,
+      sinFecha: !f.fechaAging,
+      sinTarget: !tieneTarget
+    });
+  }
+
+  /* --- resumen por area --- */
+  const mapa = new Map();
+  const slot = (area) => {
+    if (!mapa.has(area)) mapa.set(area, {
+      area, lineas: 0, valorizado: 0, fueraLineas: 0, fueraValorizado: 0,
+      diasMax: 0, sinCosto: 0, sinFecha: 0, enConfig: cfgArea.has(area)
+    });
+    return mapa.get(area);
+  };
+  for (const a of estado.areas) slot(String(a.area).trim());
+  for (const l of lineas) {
+    const s = slot(l.area);
+    s.lineas++;
+    s.valorizado += l.valorizado;
+    if (l.fuera) { s.fueraLineas++; s.fueraValorizado += l.valorizado; }
+    if (l.aging != null && l.aging > s.diasMax) s.diasMax = l.aging;
+    if (l.sinCosto) s.sinCosto++;
+    if (l.sinFecha) s.sinFecha++;
+  }
+
+  const resumen = Array.from(mapa.values()).map((s) => {
+    const cfg = cfgArea.get(s.area);
+    let target = cfg && Number.isFinite(Number(cfg.target)) && Number(cfg.target) > 0 ? Number(cfg.target) : null;
+    if (target == null) {
+      const us = ubicPorArea.get(s.area) || [];
+      const cuenta = {};
+      us.forEach((u) => { const t = num(u.target); if (t > 0) cuenta[t] = (cuenta[t] || 0) + 1; });
+      const mejor = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
+      if (mejor) target = Number(mejor);
+    }
+    const us = (ubicPorArea.get(s.area) || []).map((u) => u.ubicacion);
+    return Object.assign(s, {
+      responsable: cfg ? cfg.responsable : "",
+      proceso:     cfg ? cfg.proceso : "",
+      descripcion: cfg && cfg.descripcion ? cfg.descripcion : us.join("\n"),
+      target,
+      ubicaciones: us,
+      rojo: target != null && s.lineas > 0 && s.diasMax >= target
+    });
+  });
+
+  /* orden: primero como vienen en Resp. Alm., despues las que aparecieron solas */
+  const orden = new Map(estado.areas.map((a, i) => [String(a.area).trim(), i]));
+  resumen.sort((a, b) => {
+    const oa = orden.has(a.area) ? orden.get(a.area) : 9999;
+    const ob = orden.has(b.area) ? orden.get(b.area) : 9999;
+    return oa !== ob ? oa - ob : a.area.localeCompare(b.area);
+  });
+
+  estado.lineas = lineas;
+  estado.resumen = resumen;
+  estado.diag = {
+    lineasIgnoradas,
+    desconocidas: Array.from(desconocidas.values()).sort((a, b) => b.lineas - a.lineas),
+    skusSinCosto: Array.from(skusSinCosto),
+    lineasSinCosto: lineas.filter((l) => l.sinCosto).length,
+    lineasSinFecha: lineas.filter((l) => l.sinFecha).length,
+    areasSinConfig: resumen.filter((r) => !r.enConfig && r.lineas > 0).map((r) => r.area),
+    valorizadoEnRiesgo: lineas.filter((l) => l.sinCosto).reduce((a, l) => a + num(l.cantidad), 0)
+  };
+}
+
+/* ============================================================
+   6. RENDER
+   ============================================================ */
+function claseProceso(p){
+  const n = norm(p);
+  if (n.includes("inbound")) return "inbound";
+  if (n.includes("outbo"))   return "outbound";
+  if (n.includes("gestion")) return "gestion";
+  return "otro";
+}
+
+function pintarTodo(){
+  if (estado.stock.length) calcular();
+  pintarAvisos();
+  pintarKpis();
+  pintarTablero();
+  pintarGrafico();
+  poblarFiltros();
+  pintarDetalle();
+  pintarAreas();
+  pintarUbicaciones();
+  pintarMaestro();
+  pintarHistorico();
+  pintarFuentes();
+  const hay = estado.lineas.length > 0;
+  $("#btnCsvTablero").disabled = !hay;
+  $("#btnCsvDetalle").disabled = !hay;
+  $("#btnGuardarCorte").disabled = !hay;
+}
+
+/* ---------- avisos ---------- */
+function pintarAvisos(){
+  const d = estado.diag, c = [];
+  if (!estado.stock.length) {
+    c.push(aviso("info", "Para empezar, carga el libro de aging en la solapa <b>Datos</b>."));
+  } else {
+    if (!estado.maestro.size) {
+      c.push(aviso("malo", "No hay maestro de costos cargado: <b>todo el valorizado da $0</b>. Cargalo en la solapa Datos."));
+    } else if (d.lineasSinCosto) {
+      c.push(aviso("malo",
+        "<b>" + entero(d.lineasSinCosto) + " lineas sin costo en el maestro</b> (" +
+        entero(d.skusSinCosto.length) + " SKU distintos). Su valorizado cuenta como $0, " +
+        "asi que el total esta subestimado.",
+        "Ver cuales", () => { irA("maestro"); $("#fSoloSinCosto").checked = true; $("#fSoloUsados").checked = true; pintarMaestro(); }));
+    }
+    if (d.lineasSinFecha) {
+      c.push(aviso("alerta",
+        "<b>" + entero(d.lineasSinFecha) + " lineas sin Fecha Aging</b>. No se les puede calcular antiguedad: " +
+        "no cuentan como fuera de aging ni entran en los dias maximos.",
+        "Ver cuales", () => { irA("detalle"); $("#fSoloProblemas").checked = true; pintarDetalle(); }));
+    }
+    if (d.areasSinConfig.length) {
+      c.push(aviso("alerta",
+        "<b>Area sin configurar: " + d.areasSinConfig.map(esc).join(", ") + "</b>. " +
+        "Tiene stock en ubicaciones criticas pero no tiene responsable ni proceso cargado, " +
+        "asi que en el Excel no aparece en el reporte.",
+        "Configurar", () => irA("ubicaciones")));
+    }
+    if (!c.length) c.push(aviso("ok", "Sin inconsistencias: todas las lineas tienen fecha, costo y area configurada."));
+  }
+  $("#avisos").innerHTML = "";
+  c.forEach((n) => $("#avisos").appendChild(n));
+}
+function aviso(tipo, html, textoBtn, accion){
+  const d = document.createElement("div");
+  d.className = "aviso " + tipo;
+  d.innerHTML = "<div>" + html + "</div>";
+  if (textoBtn) {
+    const b = document.createElement("button");
+    b.className = "btn claro chico no-imprimir";
+    b.type = "button";
+    b.textContent = textoBtn;
+    b.addEventListener("click", accion);
+    d.appendChild(b);
+  }
+  return d;
+}
+
+/* ---------- KPIs ---------- */
+function pintarKpis(){
+  const r = estado.resumen;
+  if (!estado.stock.length) { $("#kpis").innerHTML = ""; return; }
+  const val    = r.reduce((a, x) => a + x.valorizado, 0);
+  const fVal   = r.reduce((a, x) => a + x.fueraValorizado, 0);
+  const lin    = r.reduce((a, x) => a + x.lineas, 0);
+  const fLin   = r.reduce((a, x) => a + x.fueraLineas, 0);
+  const rojas  = r.filter((x) => x.rojo).length;
+  const conDatos = r.filter((x) => x.lineas > 0).length;
+  const pct    = val > 0 ? (fVal / val) * 100 : 0;
+
+  const tarjeta = (clase, valor, rotulo, pie) =>
+    '<div class="kpi ' + clase + '"><div class="valor">' + valor + '</div>' +
+    '<div class="rotulo">' + rotulo + '</div>' +
+    (pie ? '<div class="pie">' + pie + "</div>" : "") + "</div>";
+
+  $("#kpis").innerHTML =
+    tarjeta("", plata(val), "Valorizado inmovilizado", entero(lin) + " lineas en ubicaciones criticas") +
+    tarjeta(fVal > 0 ? "r" : "v", plata(fVal), "Valorizado fuera de aging", fmtMoneda.format(pct) + " % del total") +
+    tarjeta(fLin > 0 ? "r" : "v", entero(fLin), "Lineas fuera de aging", "sobre " + entero(lin) + " lineas") +
+    tarjeta(rojas > 0 ? "r" : "v", entero(rojas), "Areas en rojo", "sobre " + entero(conDatos) + " areas con stock");
+}
+
+/* ---------- tablero ---------- */
+function pintarTablero(){
+  const t = $("#tablaTablero");
+  if (!estado.stock.length) {
+    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin datos cargados.</td></tr></tbody>';
+    $("#subtituloTablero").textContent = "Carga el libro de aging para ver el tablero.";
+    return;
+  }
+  const d = estado.corte;
+  $("#tituloTablero").textContent = "Monitoreo Aging";
+  $("#subtituloTablero").innerHTML =
+    "Corte al <b>" + fechaAR(d) + "</b> &middot; " + entero(estado.lineas.length) +
+    " lineas en " + entero(estado.ubicaciones.length) + " ubicaciones criticas";
+
+  let h = "<thead><tr>" +
+    "<th>Area</th><th>Responsables</th><th>Descripcion</th><th>Proceso</th><th>Target</th>" +
+    '<th colspan="2">Valorizado</th><th>Lineas</th><th>Indicador</th><th>UM</th>' +
+    "<th>ACTUAL<br>" + DIAS[d.getDay()] + "<br>" + fechaCorta(d) + "</th>" +
+    "</tr></thead><tbody>";
+
+  for (const r of estado.resumen) {
+    const cp = claseProceso(r.proceso);
+    const sem = r.target == null ? "nulo" : (r.lineas === 0 ? "ok" : (r.diasMax >= r.target ? "mal" : "ok"));
+    const etiq = sem === "mal" ? "FUERA" : (sem === "nulo" ? "S/T" : "OK");
+    const marca = r.enConfig ? "" : ' <span class="pastilla mal">sin configurar</span>';
+    h += '<tr class="clicable" data-area="' + esc(r.area) + '">' +
+      '<td class="area" rowspan="2">' + esc(r.area) + "</td>" +
+      '<td class="resp" rowspan="2">' + esc(r.responsable || "—") + marca + "</td>" +
+      '<td class="desc" rowspan="2">' + esc(r.descripcion || "—") + "</td>" +
+      '<td class="proceso ' + cp + '" rowspan="2">' + esc(r.proceso || "—") + "</td>" +
+      '<td class="target" rowspan="2">' + (r.target == null ? "—" : entero(r.target)) + "</td>" +
+      '<td class="rotulo-fila">Total</td>' +
+      '<td class="cifra">' + plata(r.valorizado) + "</td>" +
+      '<td class="cifra">' + entero(r.lineas) + "</td>" +
+      "<td>Lineas Totales</td><td>Lineas</td>" +
+      '<td class="cifra"><b>' + entero(r.lineas) + "</b></td></tr>" +
+      '<tr class="clicable fuera grupo-fin" data-area="' + esc(r.area) + '">' +
+      '<td class="rotulo-fila">Fuera Aging</td>' +
+      '<td class="cifra">' + plata(r.fueraValorizado) + "</td>" +
+      '<td class="cifra">' + entero(r.fueraLineas) + "</td>" +
+      "<td>Aging</td><td>Dias Max.</td>" +
+      '<td class="semaforo ' + sem + '">' + entero(r.diasMax) + "<small>" + etiq + "</small></td></tr>";
+  }
+  h += "</tbody>";
+  t.innerHTML = h;
+  t.querySelectorAll("tr.clicable").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      irA("detalle");
+      $("#fArea").value = tr.dataset.area;
+      $("#fSoloFuera").checked = true;
+      pintarDetalle();
+    });
+  });
+}
+
+/* ---------- grafico ---------- */
+function pintarGrafico(){
+  const datos = estado.resumen.filter((r) => r.fueraValorizado > 0)
+    .sort((a, b) => b.fueraValorizado - a.fueraValorizado);
+  const panel = $("#panelGrafico"), svg = $("#grafico");
+  if (!datos.length) { panel.hidden = true; svg.innerHTML = ""; return; }
+  panel.hidden = false;
+
+  const W = 900, izq = 86, der = 128, alto = 30, gap = 8, top = 10;
+  const H = top + datos.length * (alto + gap) + 24;
+  const max = Math.max.apply(null, datos.map((d) => d.fueraValorizado));
+  const ancho = W - izq - der;
+
+  let s = "";
+  s += '<line class="eje" x1="' + izq + '" y1="' + top + '" x2="' + izq + '" y2="' + (H - 20) + '"/>';
+  datos.forEach((d, i) => {
+    const y = top + i * (alto + gap);
+    const w = Math.max(3, (d.fueraValorizado / max) * ancho);
+    s += '<text class="rotulo-eje" x="' + (izq - 9) + '" y="' + (y + alto / 2 + 4) + '" text-anchor="end">' + esc(d.area) + "</text>";
+    s += '<rect class="barra-dato" x="' + izq + '" y="' + y + '" width="' + w + '" height="' + alto +
+         '" rx="4" fill="var(--azul)" data-i="' + i + '"><title>' + esc(d.area) + ": " + plata(d.fueraValorizado) +
+         " en " + entero(d.fueraLineas) + " lineas</title></rect>";
+    s += '<text class="valor-barra" x="' + (izq + w + 8) + '" y="' + (y + alto / 2 + 4) + '">' +
+         plata(d.fueraValorizado) + "</text>";
+  });
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("height", H);
+  svg.innerHTML = s;
+}
+
+/* ---------- detalle ---------- */
+function poblarFiltros(){
+  const sel = (id, vals, actual) => {
+    const e = $(id), v = actual != null ? actual : e.value;
+    e.innerHTML = '<option value="">' + (id === "#fArea" ? "Todas" : "Todos") + "</option>" +
+      vals.map((x) => '<option value="' + esc(x) + '">' + esc(x) + "</option>").join("");
+    if (vals.indexOf(v) > -1) e.value = v;
+  };
+  sel("#fArea",    Array.from(new Set(estado.resumen.map((r) => r.area))));
+  sel("#fResp",    Array.from(new Set(estado.resumen.map((r) => r.responsable).filter(Boolean))));
+  sel("#fProceso", Array.from(new Set(estado.resumen.map((r) => r.proceso).filter(Boolean))));
+  const areas = Array.from(new Set(estado.ubicaciones.map((u) => String(u.area || "").trim()).filter(Boolean))).sort();
+  const e = $("#fUbicArea"), v = e.value;
+  e.innerHTML = '<option value="">Todas</option>' + areas.map((x) => '<option value="' + esc(x) + '">' + esc(x) + "</option>").join("");
+  if (areas.indexOf(v) > -1) e.value = v;
+}
+
+function lineasFiltradas(){
+  const a = $("#fArea").value, r = $("#fResp").value, p = $("#fProceso").value;
+  const q = norm($("#fBuscar").value);
+  const soloF = $("#fSoloFuera").checked, soloP = $("#fSoloProblemas").checked;
+  const resp = new Map(estado.resumen.map((x) => [x.area, x]));
+  return estado.lineas.filter((l) => {
+    if (a && l.area !== a) return false;
+    const rr = resp.get(l.area) || {};
+    if (r && rr.responsable !== r) return false;
+    if (p && rr.proceso !== p) return false;
+    if (soloF && !l.fuera) return false;
+    if (soloP && !(l.sinCosto || l.sinFecha || l.sinTarget)) return false;
+    if (q && !(norm(l.sku).includes(q) || norm(l.descripcion).includes(q) || norm(l.ubicacion).includes(q))) return false;
+    return true;
+  }).sort((x, y) => (y.aging == null ? -1 : y.aging) - (x.aging == null ? -1 : x.aging));
+}
+
+const TOPE_DETALLE = 600;
+function pintarDetalle(){
+  const t = $("#tablaDetalle");
+  if (!estado.lineas.length) {
+    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin datos cargados.</td></tr></tbody>';
+    $("#pieDetalle").textContent = "";
+    return;
+  }
+  const f = lineasFiltradas();
+  const vis = f.slice(0, TOPE_DETALLE);
+  let h = "<thead><tr><th>Area</th><th>Ubicacion</th><th>SKU</th><th>Descripcion</th>" +
+    '<th class="cifra">Cant.</th><th class="cifra">Costo</th><th class="cifra">Valorizado</th>' +
+    '<th>Fecha Aging</th><th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
+  for (const l of vis) {
+    const p = l.fuera ? '<span class="pastilla mal">FUERA</span>'
+            : (l.aging == null ? '<span class="pastilla neutro">sin fecha</span>'
+            : '<span class="pastilla ok">OK</span>');
+    const av = l.sinCosto ? ' <span class="pastilla neutro" title="SKU sin costo en el maestro">sin costo</span>' : "";
+    h += "<tr>" +
+      "<td><b>" + esc(l.area) + "</b></td>" +
+      '<td class="mono">' + esc(l.ubicacion) + "</td>" +
+      '<td class="mono">' + esc(l.sku) + "</td>" +
+      "<td>" + esc(l.descripcion) + "</td>" +
+      '<td class="cifra">' + fmtCant.format(l.cantidad) + "</td>" +
+      '<td class="cifra">' + (l.costo == null ? "—" : fmtMoneda.format(l.costo)) + "</td>" +
+      '<td class="cifra">' + (l.sinCosto ? "—" : fmtMoneda.format(l.valorizado)) + "</td>" +
+      "<td>" + esc(fechaAR(l.fechaAging)) + "</td>" +
+      '<td class="cifra"><b>' + (l.aging == null ? "—" : entero(l.aging)) + "</b></td>" +
+      '<td class="cifra">' + (l.target == null ? "—" : entero(l.target)) + "</td>" +
+      "<td>" + p + av + "</td></tr>";
+  }
+  h += "</tbody>";
+  t.innerHTML = h;
+  const tot = f.reduce((a, l) => a + l.valorizado, 0);
+  $("#pieDetalle").innerHTML =
+    "Mostrando <b>" + entero(vis.length) + "</b> de <b>" + entero(f.length) + "</b> lineas &middot; " +
+    "valorizado filtrado <b>" + plata(tot) + "</b>" +
+    (f.length > vis.length ? " &middot; exporta a CSV para ver todas" : "");
+}
+
+/* ---------- areas ---------- */
+function pintarAreas(){
+  const t = $("#tablaAreas");
+  if (!estado.areas.length) {
+    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin areas cargadas. Carga el libro o agregalas abajo.</td></tr></tbody>';
+    return;
+  }
+  const conStock = new Map(estado.resumen.map((r) => [r.area, r]));
+  let h = "<thead><tr><th>Area</th><th>Responsable</th><th>Proceso</th>" +
+    '<th class="cifra">Target</th><th>Descripcion</th><th class="cifra">Ubicaciones</th><th></th></tr></thead><tbody>';
+  estado.areas.forEach((a, i) => {
+    const n = estado.ubicaciones.filter((u) => String(u.area).trim() === String(a.area).trim()).length;
+    const r = conStock.get(String(a.area).trim());
+    h += "<tr>" +
+      "<td><b>" + esc(a.area) + "</b>" + (r && r.lineas ? ' <span class="pastilla neutro">' + entero(r.lineas) + " lineas</span>" : "") + "</td>" +
+      '<td><input type="text" data-ar="' + i + '" data-campo="responsable" value="' + esc(a.responsable) + '" size="18"></td>' +
+      '<td><select data-ar="' + i + '" data-campo="proceso">' +
+        ["INBOUND","OUTBOND","Gestion de Stock"].map((p) =>
+          '<option' + (norm(p) === norm(a.proceso) ? " selected" : "") + ">" + p + "</option>").join("") +
+        (["inbound","outbond","gestion de stock"].indexOf(norm(a.proceso)) < 0 && a.proceso
+          ? '<option selected>' + esc(a.proceso) + "</option>" : "") +
+      "</select></td>" +
+      '<td class="cifra"><input type="number" min="0" data-ar="' + i + '" data-campo="target" value="' + (a.target == null ? "" : a.target) + '" size="4" style="width:64px"></td>' +
+      '<td><textarea data-ar="' + i + '" data-campo="descripcion" rows="2" placeholder="(vacio: lista las ubicaciones)">' + esc(a.descripcion) + "</textarea></td>" +
+      '<td class="cifra">' + entero(n) + "</td>" +
+      '<td><button class="btn peligro chico" data-delAr="' + i + '" type="button">Eliminar</button></td></tr>';
+  });
+  t.innerHTML = h + "</tbody>";
+}
+
+/* ---------- ubicaciones ---------- */
+function ubicFiltradas(){
+  const a = $("#fUbicArea").value, q = norm($("#fUbicBuscar").value);
+  return estado.ubicaciones
+    .map((u, i) => ({ u, i }))
+    .filter(({ u }) => {
+      if (a && String(u.area).trim() !== a) return false;
+      if (q && !norm(u.ubicacion).includes(q)) return false;
+      return true;
+    });
+}
+function pintarUbicaciones(){
+  const t = $("#tablaUbic");
+  if (!estado.ubicaciones.length) {
+    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin ubicaciones criticas. Carga el libro o agregalas abajo.</td></tr></tbody>';
+    $("#pieUbic").textContent = "";
+    return;
+  }
+  const f = ubicFiltradas();
+  const conStock = new Map();
+  estado.lineas.forEach((l) => conStock.set(normUbic(l.ubicacion), (conStock.get(normUbic(l.ubicacion)) || 0) + 1));
+  let h = "<thead><tr><th>Ubicacion</th><th>Area</th><th class=\"cifra\">Target</th>" +
+    '<th class="cifra">Lineas hoy</th><th></th></tr></thead><tbody>';
+  f.slice(0, 500).forEach(({ u, i }) => {
+    const n = conStock.get(normUbic(u.ubicacion)) || 0;
+    h += "<tr>" +
+      '<td class="mono">' + esc(u.ubicacion) + "</td>" +
+      '<td><input type="text" data-ub="' + i + '" data-campo="area" value="' + esc(u.area) + '" size="7" style="width:76px"></td>' +
+      '<td class="cifra"><input type="number" min="0" data-ub="' + i + '" data-campo="target" value="' + (u.target == null ? "" : u.target) + '" style="width:64px"></td>' +
+      '<td class="cifra">' + (n ? "<b>" + entero(n) + "</b>" : "—") + "</td>" +
+      '<td><button class="btn peligro chico" data-delUb="' + i + '" type="button">Eliminar</button></td></tr>';
+  });
+  t.innerHTML = h + "</tbody>";
+  $("#pieUbic").innerHTML = "Mostrando <b>" + entero(Math.min(f.length, 500)) + "</b> de <b>" +
+    entero(estado.ubicaciones.length) + "</b> ubicaciones criticas";
+}
+
+/* ---------- maestro ---------- */
+function pintarMaestro(){
+  const t = $("#tablaMaestro");
+  if (!estado.maestroCrudo.length) {
+    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin maestro cargado. Cargalo en la solapa Datos.</td></tr></tbody>';
+    $("#pieMaestro").textContent = "";
+    return;
+  }
+  const q = norm($("#fSku").value);
+  const soloUsados = $("#fSoloUsados").checked;
+  const soloFaltan = $("#fSoloSinCosto").checked;
+  const usados = new Set();
+  estado.lineas.forEach((l) => { if (l.sku) usados.add(String(l.sku).trim().toUpperCase()); });
+  const faltan = new Set(estado.diag.skusSinCosto ? estado.diag.skusSinCosto.map((s) => s.toUpperCase()) : []);
+
+  let filas;
+  if (soloFaltan) {
+    filas = Array.from(faltan).map((s) => [s, null]);
+  } else {
+    filas = estado.maestroCrudo.filter(([sku]) => {
+      if (soloUsados && !usados.has(String(sku).trim().toUpperCase())) return false;
+      if (q && !norm(sku).includes(q)) return false;
+      return true;
+    });
+  }
+  if (q && soloFaltan) filas = filas.filter(([sku]) => norm(sku).includes(q));
+
+  let h = '<thead><tr><th>SKU</th><th class="cifra">Costo unitario</th><th>Estado</th><th></th></tr></thead><tbody>';
+  filas.slice(0, 400).forEach(([sku, costo]) => {
+    const usado = usados.has(String(sku).trim().toUpperCase());
+    h += "<tr>" +
+      '<td class="mono"><b>' + esc(sku) + "</b></td>" +
+      '<td class="cifra"><input type="text" data-sku="' + esc(sku) + '" value="' +
+        (costo == null ? "" : fmtMoneda.format(costo)) + '" style="width:120px;text-align:right" placeholder="sin costo"></td>' +
+      "<td>" + (costo == null ? '<span class="pastilla mal">falta</span>' :
+                (usado ? '<span class="pastilla ok">en uso</span>' : '<span class="pastilla neutro">sin stock</span>')) + "</td>" +
+      '<td><button class="btn peligro chico" data-delSku="' + esc(sku) + '" type="button">Eliminar</button></td></tr>';
+  });
+  t.innerHTML = h + "</tbody>";
+  if (!filas.length) t.innerHTML = '<tbody><tr><td class="vacio-tabla">Nada que mostrar con ese filtro.</td></tr></tbody>';
+  $("#pieMaestro").innerHTML = "Mostrando <b>" + entero(Math.min(filas.length, 400)) + "</b> de <b>" +
+    entero(filas.length) + "</b> &middot; maestro completo: <b>" + entero(estado.maestroCrudo.length) + "</b> SKU" +
+    (estado.diag.skusSinCosto && estado.diag.skusSinCosto.length
+      ? ' &middot; <span style="color:var(--rojo)"><b>' + entero(estado.diag.skusSinCosto.length) + "</b> SKU del stock sin costo</span>" : "");
+}
+
+/* ---------- historico ---------- */
+function pintarHistorico(){
+  const hist = leer(LS.hist, []);
+  const t = $("#tablaHist");
+  if (!hist.length) {
+    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin cortes guardados. Calcula un corte y toca <b>Guardar corte</b>.</td></tr></tbody>';
+    return;
+  }
+  const metrica = $("#hMetrica").value;
+  const esPlata = metrica === "valorizado" || metrica === "fueraValorizado";
+  const areas = [];
+  hist.forEach((c) => c.areas.forEach((a) => { if (areas.indexOf(a.area) < 0) areas.push(a.area); }));
+  areas.sort();
+
+  let h = "<thead><tr><th>Area</th>" +
+    hist.map((c) => "<th>" + esc(fechaCorta(new Date(c.fecha + "T00:00:00"))) + "</th>").join("") +
+    "<th></th></tr></thead><tbody>";
+  for (const a of areas) {
+    h += "<tr><td><b>" + esc(a) + "</b></td>";
+    for (const c of hist) {
+      const r = c.areas.find((x) => x.area === a);
+      const v = r ? r[metrica] : null;
+      h += '<td class="cifra">' + (v == null ? "—" : (esPlata ? fmtMoneda.format(v) : entero(v))) + "</td>";
+    }
+    h += "<td></td></tr>";
+  }
+  h += "<tr><td></td>" + hist.map((c, i) =>
+    '<td class="cifra"><button class="btn peligro chico" data-delCorte="' + i + '" type="button">Borrar</button></td>').join("") +
+    "<td></td></tr></tbody>";
+  t.innerHTML = h;
+}
+
+/* ---------- fuentes ---------- */
+function pintarFuentes(){
+  const f = estado.fuentes;
+  const fila = (nom, ok, detalle) =>
+    "<tr><td><b>" + nom + "</b></td><td>" +
+    (ok ? '<span class="pastilla ok">cargado</span>' : '<span class="pastilla mal">falta</span>') +
+    "</td><td>" + detalle + "</td></tr>";
+  const cuando = (x) => x && x.cuando ? new Date(x.cuando).toLocaleString("es-AR") : "—";
+  $("#tablaFuentes").innerHTML =
+    "<thead><tr><th>Fuente</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>" +
+    fila("Hoja Stock", !!f.stock, f.stock
+      ? entero(f.stock.filas) + " filas, " + entero(f.stock.sinFecha) + " sin Fecha Aging &middot; " + cuando(f.stock)
+      : "Carga el libro de aging") +
+    fila("Ubicaciones criticas", estado.ubicaciones.length > 0,
+      entero(estado.ubicaciones.length) + " ubicaciones" + (f.ubicaciones ? " &middot; " + cuando(f.ubicaciones) : " (guardadas en este navegador)")) +
+    fila("Areas", estado.areas.length > 0,
+      entero(estado.areas.length) + " areas" + (f.areas ? " &middot; " + cuando(f.areas) : " (guardadas en este navegador)")) +
+    fila("Maestro valorizado", estado.maestroCrudo.length > 0,
+      entero(estado.maestroCrudo.length) + " SKU" + (f.maestro ? " &middot; " + cuando(f.maestro) : " (guardado en este navegador)")) +
+    "</tbody>";
+}
+
+/* ============================================================
+   7. EXPORTACION
+   ============================================================ */
+function bajarCSV(nombre, filas){
+  const csv = filas.map((f) => f.map((c) => {
+    const s = c == null ? "" : String(c);
+    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(";")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+const dec = (n) => String(n == null ? "" : n).replace(".", ",");
+
+function exportarTablero(){
+  const f = [["Monitoreo Aging - corte " + fechaAR(estado.corte)], []];
+  f.push(["Area","Responsables","Descripcion","Proceso","Target","Concepto","Valorizado","Lineas","Indicador","UM","Actual"]);
+  for (const r of estado.resumen) {
+    const d = (r.descripcion || "").replace(/\n/g, " / ");
+    f.push([r.area, r.responsable, d, r.proceso, r.target, "Total", dec(r.valorizado.toFixed(2)), r.lineas, "Lineas Totales", "Lineas", r.lineas]);
+    f.push(["", "", "", "", "", "Fuera Aging", dec(r.fueraValorizado.toFixed(2)), r.fueraLineas, "Aging", "Dias Max.", r.diasMax]);
+  }
+  bajarCSV("aging_tablero_" + fechaISO(estado.corte) + ".csv", f);
+}
+function exportarDetalle(){
+  const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Costo","Valorizado","Fecha Aging","Dias","Target","Fuera de Aging","Observacion"]];
+  for (const l of lineasFiltradas()) {
+    const obs = [l.sinCosto ? "sin costo" : "", l.sinFecha ? "sin fecha aging" : "", l.sinTarget ? "sin target" : ""].filter(Boolean).join(" / ");
+    f.push([l.area, l.ubicacion, l.sku, l.descripcion, l.lote, dec(l.cantidad), l.um,
+      l.costo == null ? "" : dec(l.costo.toFixed(4)),
+      l.sinCosto ? "" : dec(l.valorizado.toFixed(2)),
+      fechaAR(l.fechaAging), l.aging == null ? "" : l.aging, l.target == null ? "" : l.target,
+      l.fuera ? "X" : "", obs]);
+  }
+  bajarCSV("aging_detalle_" + fechaISO(estado.corte) + ".csv", f);
+}
+
+/* ============================================================
+   8. EVENTOS
+   ============================================================ */
+function irA(vista){
+  $$(".solapa").forEach((b) => {
+    const act = b.dataset.vista === vista;
+    b.setAttribute("aria-selected", act ? "true" : "false");
+    $("#v-" + b.dataset.vista).hidden = !act;
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+$$(".solapa").forEach((b) => b.addEventListener("click", () => irA(b.dataset.vista)));
+
+/* --- carga de archivos --- */
+function estadoZona(idZona, idEst, clase, texto){
+  $(idZona).className = "zona" + (clase === "listo" ? " listo" : "");
+  const e = $(idEst);
+  e.className = "estado" + (clase === "error" ? " error" : clase === "listo" ? "" : " vacio");
+  e.innerHTML = texto;
+}
+
+async function cargarLibro(file){
+  estadoZona("#zonaLibro", "#estLibro", "", "Leyendo " + esc(file.name) + "...");
+  try {
+    const res = await leerArchivo(file);
+    let msg = [];
+    if (res.tipo === "excel") {
+      const hStock = hojaPorNombre(res, ["Stock"]);
+      const hDep   = hojaPorNombre(res, ["Depositos Virtuales","Depositos","Depósitos"]);
+      const hResp  = hojaPorNombre(res, ["Resp. Alm","Resp Alm","Responsables"]);
+      if (hDep)  { const n = ingestarDepositos(hDep);  if (n) msg.push(n + " ubicaciones criticas"); }
+      if (hResp) { const n = ingestarAreas(hResp);     if (n) msg.push(n + " areas"); }
+      if (!hStock) throw new Error("El libro no tiene una hoja llamada Stock.");
+      msg.unshift(ingestarStock(hStock) + " filas de stock");
+    } else {
+      msg.push(ingestarStock(res.filas) + " filas de stock");
+    }
+    estadoZona("#zonaLibro", "#estLibro", "listo", esc(file.name) + "<br>" + msg.join(" &middot; "));
+    pintarTodo();
+    irA("tablero");
+  } catch (e) {
+    estadoZona("#zonaLibro", "#estLibro", "error", esc(e.message));
+  }
+}
+
+async function cargarMaestro(file){
+  estadoZona("#zonaMaestro", "#estMaestro", "", "Leyendo " + esc(file.name) + "...");
+  try {
+    const res = await leerArchivo(file);
+    estado.libroHojas = res;
+    const mapeo = leer(LS.mapeo, { hoja: null, iSku: 0, iCosto: 7 });
+    if (res.tipo === "excel") {
+      const sel = $("#mHoja");
+      sel.innerHTML = res.nombres.map((n) => '<option value="' + esc(n) + '">' + esc(n) + "</option>").join("");
+      sel.value = mapeo.hoja && res.nombres.indexOf(mapeo.hoja) > -1 ? mapeo.hoja : res.nombres[0];
+    } else {
+      $("#mHoja").innerHTML = '<option value="">(archivo plano)</option>';
+    }
+    $("#mapeoMaestro").hidden = false;
+    poblarColumnasMaestro(mapeo.iSku, mapeo.iCosto);
+    aplicarMaestro(file.name);
+  } catch (e) {
+    estadoZona("#zonaMaestro", "#estMaestro", "error", esc(e.message));
+  }
+}
+
+function filasMaestroActuales(){
+  const res = estado.libroHojas;
+  if (!res) return [];
+  if (res.tipo === "excel") return res.hojas[$("#mHoja").value] || [];
+  return res.filas || [];
+}
+function poblarColumnasMaestro(iSku, iCosto){
+  const filas = filasMaestroActuales();
+  const head = filas[0] || [];
+  const ancho = Math.max(head.length, 10);
+  const letra = (i) => { let s = "", n = i; do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0); return s; };
+  const ops = [];
+  for (let i = 0; i < ancho; i++) {
+    const m = head[i] == null ? "" : String(head[i]).slice(0, 20);
+    ops.push('<option value="' + i + '">' + letra(i) + (m ? " — " + esc(m) : "") + "</option>");
+  }
+  $("#mSku").innerHTML = ops.join("");
+  $("#mCosto").innerHTML = ops.join("");
+  $("#mSku").value   = Math.min(iSku, ancho - 1);
+  $("#mCosto").value = Math.min(iCosto, ancho - 1);
+}
+function aplicarMaestro(nombreArchivo){
+  try {
+    const filas = filasMaestroActuales();
+    const iSku = +$("#mSku").value, iCosto = +$("#mCosto").value;
+    const n = ingestarMaestro(filas, iSku, iCosto);
+    guardar(LS.mapeo, { hoja: $("#mHoja").value || null, iSku, iCosto });
+    const muestra = estado.maestroCrudo.slice(0, 3).map(([s, c]) => esc(s) + " = " + fmtMoneda.format(c)).join(" &middot; ");
+    $("#vistaMaestro").innerHTML = "Primeros registros leidos: " + muestra;
+    estadoZona("#zonaMaestro", "#estMaestro", "listo",
+      esc(nombreArchivo || "maestro") + "<br>" + entero(n) + " SKU valorizados");
+    pintarTodo();
+  } catch (e) {
+    estadoZona("#zonaMaestro", "#estMaestro", "error", esc(e.message));
+  }
+}
+
+$$("[data-abre]").forEach((b) => b.addEventListener("click", () => $("#" + b.dataset.abre).click()));
+$("#inLibro").addEventListener("change", (e) => { if (e.target.files[0]) cargarLibro(e.target.files[0]); e.target.value = ""; });
+$("#inMaestro").addEventListener("change", (e) => { if (e.target.files[0]) cargarMaestro(e.target.files[0]); e.target.value = ""; });
+[["#zonaLibro", cargarLibro], ["#zonaMaestro", cargarMaestro]].forEach(([sel, fn]) => {
+  const z = $(sel);
+  ["dragenter","dragover"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add("encima"); }));
+  ["dragleave","drop"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.remove("encima"); }));
+  z.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) fn(f); });
+});
+$("#mHoja").addEventListener("change", () => poblarColumnasMaestro(+$("#mSku").value, +$("#mCosto").value));
+$("#btnAplicarMaestro").addEventListener("click", () => aplicarMaestro());
+$("#btnPegar").addEventListener("click", () => {
+  const txt = $("#pegado").value.trim();
+  if (!txt) return;
+  try { ingestarStock(parseDelimitado(txt, "\t")); pintarTodo(); irA("tablero"); }
+  catch (e) { alert(e.message); }
+});
+
+/* --- fecha de corte --- */
+$("#fCorte").addEventListener("change", (e) => {
+  const d = fecha(e.target.value);
+  if (d) { estado.corte = d; pintarTodo(); }
+});
+$("#btnHoy").addEventListener("click", () => {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  estado.corte = d; $("#fCorte").value = fechaISO(d); pintarTodo();
+});
+
+/* --- ABM delegado --- */
+$("#tablaAreas").addEventListener("input", (e) => {
+  const i = e.target.dataset.ar;
+  if (i == null) return;
+  const c = e.target.dataset.campo;
+  estado.areas[i][c] = c === "target" ? (e.target.value === "" ? null : num(e.target.value)) : e.target.value;
+  guardar(LS.areas, estado.areas);
+  calcular(); pintarTablero(); pintarKpis(); pintarGrafico(); pintarAvisos();
+});
+$("#tablaAreas").addEventListener("click", (e) => {
+  const i = e.target.dataset.delar;
+  if (i == null) return;
+  if (!confirm("Eliminar el area " + estado.areas[i].area + " del reporte?\n\nLas ubicaciones siguen cargadas: el area va a aparecer como 'sin configurar'.")) return;
+  estado.areas.splice(i, 1);
+  guardar(LS.areas, estado.areas);
+  pintarTodo();
+});
+$("#btnAddArea").addEventListener("click", () => {
+  const a = $("#nArea").value.trim();
+  if (!a) { $("#errArea").textContent = "Pone el codigo de area."; return; }
+  if (estado.areas.some((x) => String(x.area).trim() === a)) { $("#errArea").textContent = "Esa area ya existe."; return; }
+  estado.areas.push({
+    area: a, responsable: $("#nResp").value.trim(), proceso: $("#nProceso").value,
+    target: num($("#nTargetA").value), descripcion: $("#nDescA").value.trim()
+  });
+  guardar(LS.areas, estado.areas);
+  $("#nArea").value = $("#nResp").value = $("#nDescA").value = "";
+  $("#errArea").textContent = "";
+  pintarTodo();
+});
+
+$("#tablaUbic").addEventListener("input", (e) => {
+  const i = e.target.dataset.ub;
+  if (i == null) return;
+  const c = e.target.dataset.campo;
+  estado.ubicaciones[i][c] = c === "target" ? num(e.target.value) : e.target.value.trim();
+  guardar(LS.ubic, estado.ubicaciones);
+  calcular(); pintarTablero(); pintarKpis(); pintarGrafico(); pintarAvisos();
+});
+$("#tablaUbic").addEventListener("click", (e) => {
+  const i = e.target.dataset.delub;
+  if (i == null) return;
+  if (!confirm("Eliminar la ubicacion " + estado.ubicaciones[i].ubicacion + "?\n\nSu stock deja de contar en el aging.")) return;
+  estado.ubicaciones.splice(i, 1);
+  guardar(LS.ubic, estado.ubicaciones);
+  pintarTodo();
+});
+$("#btnAddUbic").addEventListener("click", () => {
+  const u = $("#nUbic").value.trim(), a = $("#nUbicArea").value.trim();
+  if (!u) { $("#errUbic").textContent = "Pone el nombre de la ubicacion."; return; }
+  if (!a) { $("#errUbic").textContent = "Pone el area a la que pertenece."; return; }
+  if (estado.ubicaciones.some((x) => normUbic(x.ubicacion) === normUbic(u))) { $("#errUbic").textContent = "Esa ubicacion ya esta cargada."; return; }
+  estado.ubicaciones.push({ ubicacion: u, area: a, target: num($("#nTargetU").value) });
+  guardar(LS.ubic, estado.ubicaciones);
+  $("#nUbic").value = "";
+  $("#errUbic").textContent = "";
+  pintarTodo();
+});
+$("#btnBorrarUbic").addEventListener("click", () => {
+  if (!confirm("Vaciar la lista completa de ubicaciones criticas?\n\nSin ubicaciones no se calcula nada.")) return;
+  estado.ubicaciones = []; guardar(LS.ubic, []); pintarTodo();
+});
+["#fUbicArea","#fUbicBuscar"].forEach((s) => $(s).addEventListener("input", pintarUbicaciones));
+$("#btnCsvUbic").addEventListener("click", () => {
+  const f = [["Ubicacion","Area","Target"]];
+  estado.ubicaciones.forEach((u) => f.push([u.ubicacion, u.area, u.target]));
+  bajarCSV("ubicaciones_criticas.csv", f);
+});
+
+/* --- maestro --- */
+$("#tablaMaestro").addEventListener("change", (e) => {
+  const sku = e.target.dataset.sku;
+  if (sku == null) return;
+  const v = e.target.value.trim();
+  const pares = estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase());
+  if (v !== "") pares.push([sku, num(v)]);
+  indexarMaestro(pares);
+  pintarTodo();
+});
+$("#tablaMaestro").addEventListener("click", (e) => {
+  const sku = e.target.dataset.delsku;
+  if (sku == null) return;
+  indexarMaestro(estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase()));
+  pintarTodo();
+});
+$("#btnAddSku").addEventListener("click", () => {
+  const s = $("#nSku").value.trim(), c = $("#nCosto").value.trim();
+  if (!s) { $("#errSku").textContent = "Pone el SKU."; return; }
+  if (!c) { $("#errSku").textContent = "Pone el costo unitario."; return; }
+  const pares = estado.maestroCrudo.filter(([x]) => String(x).trim().toUpperCase() !== s.toUpperCase());
+  pares.push([s, num(c)]);
+  indexarMaestro(pares);
+  $("#nSku").value = $("#nCosto").value = "";
+  $("#errSku").textContent = "";
+  pintarTodo();
+});
+$("#btnBorrarMaestro").addEventListener("click", () => {
+  if (!confirm("Vaciar el maestro de costos?\n\nTodo el valorizado va a dar $0 hasta que cargues uno nuevo.")) return;
+  indexarMaestro([]); pintarTodo();
+});
+["#fSku","#fSoloUsados","#fSoloSinCosto"].forEach((s) => $(s).addEventListener("input", pintarMaestro));
+$("#btnCsvMaestro").addEventListener("click", () => {
+  const f = [["SKU","Costo"]];
+  estado.maestroCrudo.forEach(([s, c]) => f.push([s, dec(c)]));
+  bajarCSV("maestro_valorizado.csv", f);
+});
+
+/* --- detalle --- */
+["#fArea","#fResp","#fProceso","#fBuscar","#fSoloFuera","#fSoloProblemas"]
+  .forEach((s) => $(s).addEventListener("input", pintarDetalle));
+$("#btnLimpiar").addEventListener("click", () => {
+  ["#fArea","#fResp","#fProceso"].forEach((s) => $(s).value = "");
+  $("#fBuscar").value = "";
+  $("#fSoloFuera").checked = $("#fSoloProblemas").checked = false;
+  pintarDetalle();
+});
+$("#btnCsvDetalle").addEventListener("click", exportarDetalle);
+$("#btnCsvTablero").addEventListener("click", exportarTablero);
+$("#btnImprimir").addEventListener("click", () => window.print());
+
+/* --- historico --- */
+$("#btnGuardarCorte").addEventListener("click", () => {
+  const hist = leer(LS.hist, []);
+  const iso = fechaISO(estado.corte);
+  const corte = {
+    fecha: iso,
+    areas: estado.resumen.map((r) => ({
+      area: r.area, lineas: r.lineas, valorizado: +r.valorizado.toFixed(2),
+      fueraLineas: r.fueraLineas, fueraValorizado: +r.fueraValorizado.toFixed(2), diasMax: r.diasMax
+    }))
+  };
+  const i = hist.findIndex((c) => c.fecha === iso);
+  if (i > -1) {
+    if (!confirm("Ya hay un corte guardado del " + fechaAR(estado.corte) + ". Lo reemplazo?")) return;
+    hist[i] = corte;
+  } else hist.push(corte);
+  hist.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!guardar(LS.hist, hist)) { alert("No se pudo guardar: el almacenamiento del navegador esta lleno."); return; }
+  pintarHistorico();
+  irA("historico");
+});
+$("#hMetrica").addEventListener("change", pintarHistorico);
+$("#tablaHist").addEventListener("click", (e) => {
+  const i = e.target.dataset.delcorte;
+  if (i == null) return;
+  const hist = leer(LS.hist, []);
+  if (!confirm("Borrar el corte del " + fechaCorta(new Date(hist[i].fecha + "T00:00:00")) + "?")) return;
+  hist.splice(i, 1); guardar(LS.hist, hist); pintarHistorico();
+});
+$("#btnBorrarHist").addEventListener("click", () => {
+  if (!confirm("Vaciar todo el historico de cortes?")) return;
+  guardar(LS.hist, []); pintarHistorico();
+});
+$("#btnCsvHist").addEventListener("click", () => {
+  const hist = leer(LS.hist, []);
+  const met = ["lineas","valorizado","fueraLineas","fueraValorizado","diasMax"];
+  const f = [["Area","Corte","Lineas","Valorizado","Lineas fuera","Valorizado fuera","Dias max"]];
+  hist.forEach((c) => c.areas.forEach((a) =>
+    f.push([a.area, c.fecha].concat(met.map((m) => dec(a[m]))))));
+  bajarCSV("aging_historico.csv", f);
+});
+
+/* ============================================================
+   9. ARRANQUE
+   ============================================================ */
+(function init(){
+  estado.ubicaciones = leer(LS.ubic, []);
+  estado.areas       = leer(LS.areas, []);
+  const m = leer(LS.maestro, []);
+  if (m.length) indexarMaestro(m);
+  $("#fCorte").value = fechaISO(estado.corte);
+  if (estado.ubicaciones.length) estadoZona("#zonaLibro", "#estLibro", "", "Config guardada: " + estado.ubicaciones.length + " ubicaciones. Falta el stock del dia.");
+  if (m.length) estadoZona("#zonaMaestro", "#estMaestro", "listo", "Guardado en este navegador<br>" + entero(m.length) + " SKU valorizados");
+  pintarTodo();
+  if (!estado.stock.length) irA("datos");
+})();
+</script>
+</body>
+</html>
