@@ -237,6 +237,58 @@ input.fecha-aging.ajustada{
   background:var(--amarillo-suave);border-color:#e8d3a0;color:#6b4700;font-weight:700;
 }
 
+/* ---------- Panorama ---------- */
+:root{
+  /* rampa ordinal de atraso: un solo hue, validada sobre blanco */
+  --banda-0:#9fb0bd;   /* dentro del target (contexto) */
+  --banda-1:#e89189;   /* hasta 2x */
+  --banda-2:#bf3630;   /* 2 a 5x */
+  --banda-3:#85201b;   /* mas de 5x */
+  --tinta-eje:#898781;
+  --linea-grilla:#e9ecef;
+}
+.hero{
+  display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;
+  padding:4px 2px 2px;
+}
+.hero .cifra-gigante{
+  font-size:46px;font-weight:700;letter-spacing:-1.4px;line-height:1;
+  color:var(--rojo);font-variant-numeric:tabular-nums;
+}
+.hero .cifra-gigante.bien{color:var(--verde)}
+.hero .bajada{font-size:13px;color:var(--acero-500);margin-top:6px;max-width:430px}
+.hero .secundario{display:flex;gap:26px;flex-wrap:wrap}
+.hero .secundario div{min-width:92px}
+.hero .secundario .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.hero .secundario .r{font-size:12px;color:var(--acero-500);margin-top:1px}
+
+.leyenda{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 14px;font-size:12.5px}
+.leyenda span{display:flex;align-items:center;gap:6px;color:var(--acero-700)}
+.leyenda i{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none}
+
+.grafico{width:100%;overflow:visible;display:block}
+.grafico .seg{cursor:pointer;transition:opacity .12s}
+.grafico .seg:hover{opacity:.78}
+.grafico .rot{font-size:12px;fill:var(--acero-700);font-weight:600}
+.grafico .rot-chico{font-size:10.5px;fill:var(--tinta-eje)}
+.grafico .val{font-size:11.5px;fill:var(--acero-500);font-variant-numeric:tabular-nums}
+.grafico .val-fuerte{font-size:12px;fill:var(--acero-900);font-weight:700;font-variant-numeric:tabular-nums}
+.grafico .delta-bien{font-size:12px;fill:var(--verde);font-weight:700;font-variant-numeric:tabular-nums}
+.grafico .delta-mal{font-size:12px;fill:var(--rojo);font-weight:700;font-variant-numeric:tabular-nums}
+.grafico .grilla{stroke:var(--linea-grilla);stroke-width:1}
+.grafico .eje{stroke:#c3c2b7;stroke-width:1}
+.grafico .linea-serie{fill:none;stroke:var(--azul);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.grafico .punto{fill:var(--azul);stroke:#fff;stroke-width:2}
+.selector{display:inline-flex;border:1px solid var(--acero-300);border-radius:10px;overflow:hidden}
+.selector button{
+  appearance:none;border:0;background:var(--blanco);color:var(--acero-700);
+  font:inherit;font-size:12.5px;padding:6px 13px;cursor:pointer;
+}
+.selector button[aria-pressed=true]{background:var(--acero-900);color:#fff;font-weight:600}
+.cabecera-panel{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.nota{font-size:12.5px;color:var(--acero-500);margin:10px 0 0}
+.nota b{color:var(--acero-900)}
+
 /* ---------- Grafico ---------- */
 .grafico{width:100%;overflow:visible}
 .grafico .barra-dato{transition:opacity .12s}
@@ -298,7 +350,8 @@ input.fecha-aging.ajustada{
 </header>
 
 <nav class="solapas" role="tablist">
-  <button class="solapa" role="tab" aria-selected="true"  data-vista="tablero">Tablero</button>
+  <button class="solapa" role="tab" aria-selected="true"  data-vista="panorama">Panorama</button>
+  <button class="solapa" role="tab" aria-selected="false" data-vista="tablero">Tablero</button>
   <button class="solapa" role="tab" aria-selected="false" data-vista="detalle">Detalle</button>
   <button class="solapa" role="tab" aria-selected="false" data-vista="datos">Datos</button>
   <button class="solapa" role="tab" aria-selected="false" data-vista="ubicaciones">Ubicaciones criticas</button>
@@ -308,16 +361,58 @@ input.fecha-aging.ajustada{
 
 <main>
 
-<!-- ===================== TABLERO ===================== -->
-<section id="v-tablero">
+<!-- ===================== PANORAMA ===================== -->
+<section id="v-panorama">
   <div id="avisos"></div>
-  <div class="kpis" id="kpis"></div>
 
-  <div class="panel no-imprimir" id="panelGrafico" hidden>
-    <h2>Valorizado fuera de aging por area</h2>
-    <p class="ayuda">Solo areas con lineas vencidas. Pasa el mouse para ver el detalle.</p>
-    <svg class="grafico" id="grafico" role="img" aria-label="Valorizado fuera de aging por area"></svg>
+  <div class="panel" id="panelHero">
+    <div class="hero">
+      <div>
+        <div class="cifra-gigante" id="heroCifra">—</div>
+        <div class="bajada" id="heroBajada">Carga la base del WMS para ver el panorama.</div>
+      </div>
+      <div class="secundario" id="heroSec"></div>
+    </div>
   </div>
+
+  <div class="panel" id="panelBandas" hidden>
+    <div class="cabecera-panel">
+      <div>
+        <h2>Cuanto se pasa cada area de su target</h2>
+        <p class="ayuda">
+          Cada barra es un area. El color dice cuanto se paso del target propio de esa area,
+          no cuantos dias lleva: asi 8030, con target 2, se compara con 0900, que tiene 90.
+          Toca un tramo para ver esas lineas.
+        </p>
+      </div>
+      <div class="selector" role="group" aria-label="Que medir">
+        <button type="button" data-modo="lineas" aria-pressed="true">Lineas</button>
+        <button type="button" data-modo="valorizado" aria-pressed="false">Valorizado</button>
+      </div>
+    </div>
+    <div class="leyenda" id="leyendaBandas"></div>
+    <svg class="grafico" id="gBandas" role="img"></svg>
+  </div>
+
+  <div class="panel" id="panelPlata" hidden>
+    <h2>Donde esta la plata</h2>
+    <p class="ayuda">
+      Las lineas fuera de aging mas caras, de mayor a menor. Toca una para verla en el detalle.
+    </p>
+    <svg class="grafico" id="gPlata" role="img"></svg>
+    <p class="nota" id="notaPlata"></p>
+  </div>
+
+  <div class="panel" id="panelTendencia" hidden>
+    <h2>Como viene evolucionando</h2>
+    <p class="ayuda" id="ayudaTendencia">Valorizado fuera de aging en cada corte guardado.</p>
+    <svg class="grafico" id="gTendencia" role="img"></svg>
+  </div>
+</section>
+
+<!-- ===================== TABLERO ===================== -->
+<section id="v-tablero" hidden>
+  <div class="kpis" id="kpis"></div>
 
   <div class="panel">
     <h2 id="tituloTablero">Tablero</h2>
@@ -353,6 +448,16 @@ input.fecha-aging.ajustada{
       <div>
         <label class="campo" for="fProceso">Proceso</label>
         <select id="fProceso"><option value="">Todos</option></select>
+      </div>
+      <div>
+        <label class="campo" for="fBanda">Atraso</label>
+        <select id="fBanda">
+          <option value="">Todos</option>
+          <option value="0">Dentro del target</option>
+          <option value="1">Hasta 2x el target</option>
+          <option value="2">2 a 5x el target</option>
+          <option value="3">Mas de 5x el target</option>
+        </select>
       </div>
       <div>
         <label class="campo" for="fBuscar">Buscar</label>
@@ -1243,7 +1348,7 @@ function pintarTodo(){
   pintarAvisos();
   pintarKpis();
   pintarTablero();
-  pintarGrafico();
+  pintarPanorama();
   poblarFiltros();
   pintarDetalle();
   pintarAjustes();
@@ -1408,34 +1513,275 @@ function pintarTablero(){
   });
 }
 
-/* ---------- grafico ---------- */
-function pintarGrafico(){
-  const datos = estado.resumen.filter((r) => r.fueraValorizado > 0)
-    .sort((a, b) => b.fueraValorizado - a.fueraValorizado);
-  const panel = $("#panelGrafico"), svg = $("#grafico");
-  if (!datos.length) { panel.hidden = true; svg.innerHTML = ""; return; }
+/* ---------- panorama ---------- */
+/* Las bandas son ordinales (cuanto se paso del target), asi que van en una sola
+   rampa de un hue, de claro a oscuro. Lo que esta dentro del target es contexto
+   y va en gris, para que la vista hable de lo que esta mal. */
+const BANDAS = [
+  { rot: "Dentro del target", color: "var(--banda-0)", corto: "dentro" },
+  { rot: "Hasta 2x el target", color: "var(--banda-1)", corto: "hasta 2x" },
+  { rot: "2 a 5x el target",   color: "var(--banda-2)", corto: "2 a 5x" },
+  { rot: "Mas de 5x el target",color: "var(--banda-3)", corto: "+5x" }
+];
+function banda(l){
+  if (l.aging == null || l.target == null || l.target <= 0) return null;
+  if (!l.fuera) return 0;
+  const r = l.aging / l.target;
+  return r < 2 ? 1 : (r < 5 ? 2 : 3);
+}
+
+/* ---------- globo de ayuda ---------- */
+function tip(e, html){
+  const t = $("#tip");
+  t.innerHTML = html;
+  t.style.opacity = "1";
+  const m = 16, w = t.offsetWidth, h = t.offsetHeight;
+  let x = e.clientX + m, y = e.clientY + m;
+  if (x + w > window.innerWidth - 8)  x = e.clientX - w - m;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - m;
+  t.style.left = Math.max(8, x) + "px";
+  t.style.top  = Math.max(8, y) + "px";
+}
+function tipOff(){ $("#tip").style.opacity = "0"; }
+
+/* rectangulo con las esquinas de la punta redondeadas, apoyado en la base */
+function barraPath(x, y, w, h, redondaDer){
+  const r = Math.max(0, Math.min(redondaDer ? 4 : 0, w, h / 2));
+  if (!r) return "M" + x + "," + y + "h" + w + "v" + h + "h" + (-w) + "Z";
+  return "M" + x + "," + y + "h" + (w - r) +
+         "a" + r + "," + r + " 0 0 1 " + r + "," + r +
+         "v" + (h - 2 * r) +
+         "a" + r + "," + r + " 0 0 1 " + (-r) + "," + r +
+         "h" + (-(w - r)) + "Z";
+}
+function svgTexto(clase, x, y, txt, anclaje){
+  return '<text class="' + clase + '" x="' + x + '" y="' + y + '"' +
+         (anclaje ? ' text-anchor="' + anclaje + '"' : "") + ">" + esc(txt) + "</text>";
+}
+
+function pintarPanorama(){
+  pintarHero();
+  pintarBandas();
+  pintarPlata();
+  pintarTendencia();
+}
+
+/* ---------- numero principal ---------- */
+function pintarHero(){
+  if (!estado.lineas.length) {
+    $("#heroCifra").textContent = "—";
+    $("#heroCifra").className = "cifra-gigante";
+    $("#heroBajada").textContent = "Carga la base del WMS para ver el panorama.";
+    $("#heroSec").innerHTML = "";
+    return;
+  }
+  const r = estado.resumen;
+  const val  = r.reduce((a, x) => a + x.valorizado, 0);
+  const fVal = r.reduce((a, x) => a + x.fueraValorizado, 0);
+  const lin  = r.reduce((a, x) => a + x.lineas, 0);
+  const fLin = r.reduce((a, x) => a + x.fueraLineas, 0);
+  const rojas = r.filter((x) => x.rojo);
+  const pct = val > 0 ? (fVal / val) * 100 : 0;
+
+  $("#heroCifra").textContent = plata(fVal);
+  $("#heroCifra").className = "cifra-gigante" + (fVal === 0 ? " bien" : "");
+  $("#heroBajada").innerHTML = fVal === 0
+    ? "No hay nada fuera de aging. Las " + entero(lin) + " lineas en ubicaciones criticas estan dentro de su target."
+    : "frenados fuera de aging al <b>" + fechaAR(estado.corte) + "</b>, en <b>" + entero(fLin) +
+      "</b> de " + entero(lin) + " lineas. Es el <b>" + fmtMoneda.format(pct) +
+      " %</b> de todo lo que hay en ubicaciones criticas.";
+
+  const peor = rojas.slice().sort((a, b) => b.fueraValorizado - a.fueraValorizado)[0];
+  const t = (v, rot) => '<div><div class="v">' + v + '</div><div class="r">' + rot + "</div></div>";
+  $("#heroSec").innerHTML =
+    t(plata(val), "Inmovilizado total") +
+    t(entero(rojas.length) + " de " + entero(r.filter((x) => x.lineas > 0).length), "Areas en rojo") +
+    (peor ? t(esc(peor.area), "La que mas pesa") : "") +
+    (peor && peor.responsable ? t(esc(peor.responsable.split(" ")[0]), "A quien reclamarle") : "");
+}
+
+/* ---------- cuanto se pasa cada area de su target ---------- */
+let modoBandas = "lineas";
+function pintarBandas(){
+  const panel = $("#panelBandas"), svg = $("#gBandas");
+  const porArea = new Map();
+  for (const l of estado.lineas) {
+    const b = banda(l);
+    if (b == null) continue;
+    if (!porArea.has(l.area)) porArea.set(l.area,
+      { area: l.area, lineas: [0,0,0,0], valorizado: [0,0,0,0] });
+    const e = porArea.get(l.area);
+    e.lineas[b]++;
+    e.valorizado[b] += l.valorizado;
+  }
+  const datos = Array.from(porArea.values());
+  if (!datos.length) { panel.hidden = true; return; }
   panel.hidden = false;
 
-  const W = 900, izq = 86, der = 128, alto = 30, gap = 8, top = 10;
-  const H = top + datos.length * (alto + gap) + 24;
-  const max = Math.max.apply(null, datos.map((d) => d.fueraValorizado));
-  const ancho = W - izq - der;
+  $("#leyendaBandas").innerHTML = BANDAS.map((b) =>
+    '<span><i style="background:' + b.color + '"></i>' + b.rot + "</span>").join("");
 
-  let s = "";
-  s += '<line class="eje" x1="' + izq + '" y1="' + top + '" x2="' + izq + '" y2="' + (H - 20) + '"/>';
+  const campo = modoBandas === "lineas" ? "lineas" : "valorizado";
+  const fmt = modoBandas === "lineas" ? entero : plata;
+  const total = (d) => d[campo].reduce((a, x) => a + x, 0);
+  const fuera = (d) => d[campo][1] + d[campo][2] + d[campo][3];
+  datos.sort((a, b) => fuera(b) - fuera(a) || total(b) - total(a));
+
+  const W = 900, izq = 76, der = 118, alto = 28, gap = 12, top = 6, hueco = 2;
+  const H = top + datos.length * (alto + gap) + 6;
+  const ancho = W - izq - der;
+  const max = Math.max.apply(null, datos.map(total)) || 1;
+
+  let g = "";
   datos.forEach((d, i) => {
     const y = top + i * (alto + gap);
-    const w = Math.max(3, (d.fueraValorizado / max) * ancho);
-    s += '<text class="rotulo-eje" x="' + (izq - 9) + '" y="' + (y + alto / 2 + 4) + '" text-anchor="end">' + esc(d.area) + "</text>";
-    s += '<rect class="barra-dato" x="' + izq + '" y="' + y + '" width="' + w + '" height="' + alto +
-         '" rx="4" fill="var(--azul)" data-i="' + i + '"><title>' + esc(d.area) + ": " + plata(d.fueraValorizado) +
-         " en " + entero(d.fueraLineas) + " lineas</title></rect>";
-    s += '<text class="valor-barra" x="' + (izq + w + 8) + '" y="' + (y + alto / 2 + 4) + '">' +
-         plata(d.fueraValorizado) + "</text>";
+    g += svgTexto("rot", izq - 10, y + alto / 2 + 4, d.area, "end");
+    let x = izq;
+    const ultima = d[campo].reduce((u, v, j) => (v > 0 ? j : u), -1);
+    d[campo].forEach((v, b) => {
+      if (v <= 0) return;
+      const w = Math.max(2, (v / max) * ancho - (b === ultima ? 0 : hueco));
+      g += '<path class="seg" d="' + barraPath(x, y, w, alto, b === ultima) + '"' +
+           ' fill="' + BANDAS[b].color + '" data-area="' + esc(d.area) + '" data-banda="' + b + '"' +
+           ' data-tip="' + esc("<b>" + d.area + " · " + BANDAS[b].rot + "</b>" +
+             entero(d.lineas[b]) + " lineas · " + plata(d.valorizado[b])) + '"></path>';
+      x += w + hueco;
+    });
+    g += svgTexto("val-fuerte", x + 8, y + alto / 2 + 4, fmt(total(d)));
   });
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
   svg.setAttribute("height", H);
-  svg.innerHTML = s;
+  svg.setAttribute("aria-label", "Lineas por area segun cuanto se pasan del target");
+  svg.innerHTML = g;
+  enganchar(svg, (el) => {
+    irA("detalle");
+    $("#fArea").value = el.dataset.area;
+    $("#fBanda").value = el.dataset.banda;
+    $("#fSoloFuera").checked = false;
+    pintarDetalle();
+  });
+}
+
+/* ---------- donde esta la plata ---------- */
+function pintarPlata(){
+  const panel = $("#panelPlata"), svg = $("#gPlata");
+  const fuera = estado.lineas.filter((l) => l.fuera && l.valorizado > 0)
+    .sort((a, b) => b.valorizado - a.valorizado);
+  if (!fuera.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  const totalFuera = fuera.reduce((a, l) => a + l.valorizado, 0);
+  const top = fuera.slice(0, 15);
+  const W = 900, izq = 196, der = 150, alto = 22, gap = 8, arriba = 6;
+  const H = arriba + top.length * (alto + gap) + 6;
+  const ancho = W - izq - der;
+  const max = top[0].valorizado || 1;
+
+  let acum = 0, g = "";
+  top.forEach((l, i) => {
+    const y = arriba + i * (alto + gap);
+    acum += l.valorizado;
+    const w = Math.max(2, (l.valorizado / max) * ancho);
+    const rotulo = (l.sku || "?").replace(/\.0+$/, "") + "  " + l.ubicacion;
+    g += svgTexto("rot-chico", izq - 10, y + alto / 2 + 4,
+          rotulo.length > 34 ? rotulo.slice(0, 33) + "…" : rotulo, "end");
+    g += '<path class="seg" d="' + barraPath(izq, y, w, alto, true) + '" fill="var(--azul)"' +
+         ' data-sku="' + esc(l.sku) + '"' +
+         ' data-tip="' + esc("<b>" + (l.descripcion || l.sku) + "</b>" +
+           l.ubicacion + " · " + fmtCant.format(l.cantidad) + " " + (l.um || "u") + "<br>" +
+           plata(l.valorizado) + " · " + entero(l.aging) + " dias habiles, target " +
+           entero(l.target)) + '"></path>';
+    g += svgTexto("val", izq + w + 8, y + alto / 2 + 4,
+          plata(l.valorizado) + "  ·  " + fmtMoneda.format((acum / totalFuera) * 100) + " % acumulado");
+  });
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("height", H);
+  svg.setAttribute("aria-label", "Lineas fuera de aging mas caras");
+  svg.innerHTML = g;
+  enganchar(svg, (el) => {
+    irA("detalle");
+    $("#btnLimpiar").click();
+    $("#fBuscar").value = el.dataset.sku;
+    pintarDetalle();
+  });
+
+  const pct = (acum / totalFuera) * 100;
+  $("#notaPlata").innerHTML = fuera.length <= 15
+    ? "Son todas las lineas fuera de aging: <b>" + plata(totalFuera) + "</b>."
+    : "Estas <b>" + top.length + "</b> lineas concentran el <b>" + fmtMoneda.format(pct) +
+      " %</b> de los " + plata(totalFuera) + " fuera de aging, repartidos en " +
+      entero(fuera.length) + " lineas en total.";
+}
+
+/* techo redondo para que los ticks no queden en numeros raros */
+function escalaLinda(max){
+  if (!(max > 0)) return { techo: 1, paso: 0.25 };
+  const exp = Math.pow(10, Math.floor(Math.log10(max)));
+  const n = max / exp;
+  const paso = (n <= 1 ? 0.25 : n <= 2 ? 0.5 : n <= 5 ? 1 : 2) * exp;
+  return { techo: Math.ceil(max / paso) * paso, paso };
+}
+
+/* ---------- tendencia ---------- */
+function pintarTendencia(){
+  const panel = $("#panelTendencia"), svg = $("#gTendencia");
+  const hist = leer(LS.hist, []);
+  if (hist.length < 2) {
+    panel.hidden = !estado.lineas.length;
+    svg.innerHTML = "";
+    $("#ayudaTendencia").innerHTML = hist.length === 1
+      ? "Hay un solo corte guardado. Guarda el del proximo lunes y aca vas a ver si mejora o empeora."
+      : "Todavia no guardaste ningun corte. Toca <b>Guardar corte</b> arriba a la derecha y cada semana se suma un punto.";
+    return;
+  }
+  panel.hidden = false;
+  $("#ayudaTendencia").textContent = "Valorizado fuera de aging en cada corte guardado.";
+
+  const pts = hist.map((c) => ({
+    fecha: new Date(c.fecha + "T00:00:00"),
+    v: c.areas.reduce((a, x) => a + (x.fueraValorizado || 0), 0),
+    lin: c.areas.reduce((a, x) => a + (x.fueraLineas || 0), 0)
+  }));
+  const W = 900, izq = 86, der = 34, arriba = 18, abajo = 34;
+  const H = 260, altoUtil = H - arriba - abajo, anchoUtil = W - izq - der;
+  const esc0 = escalaLinda(Math.max.apply(null, pts.map((p) => p.v)));
+  const max = esc0.techo;
+  const x = (i) => izq + (pts.length === 1 ? anchoUtil / 2 : (i / (pts.length - 1)) * anchoUtil);
+  const y = (v) => arriba + altoUtil - (v / max) * altoUtil;
+
+  let g = "";
+  for (let v = 0; v <= max + 1e-9; v += esc0.paso) {
+    const yy = y(v);
+    g += '<line class="grilla" x1="' + izq + '" y1="' + yy + '" x2="' + (W - der) + '" y2="' + yy + '"/>';
+    g += svgTexto("val", izq - 10, yy + 4, "$ " + fmtEntero.format(v), "end");
+  }
+  g += '<path class="linea-serie" d="' + pts.map((p, i) => (i ? "L" : "M") + x(i) + "," + y(p.v)).join(" ") + '"/>';
+  pts.forEach((p, i) => {
+    g += '<circle class="punto seg" cx="' + x(i) + '" cy="' + y(p.v) + '" r="5"' +
+         ' data-tip="' + esc("<b>" + fechaAR(p.fecha) + "</b>" + plata(p.v) + " en " +
+           entero(p.lin) + " lineas") + '"></circle>';
+    g += svgTexto("rot-chico", x(i), H - 12, fechaCorta(p.fecha), "middle");
+  });
+  const ult = pts[pts.length - 1], ant = pts[pts.length - 2];
+  const dif = ult.v - ant.v;
+  g += svgTexto(dif > 0 ? "delta-mal" : "delta-bien",
+        x(pts.length - 1) - 10, y(ult.v) - 15,
+        (dif > 0 ? "▲ subio " : dif < 0 ? "▼ bajo " : "igual que ") +
+        plata(Math.abs(dif)) + " vs el corte anterior", "end");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("height", H);
+  svg.setAttribute("aria-label", "Valorizado fuera de aging por corte");
+  svg.innerHTML = g;
+  enganchar(svg, null);
+}
+
+/* globos y clics para cualquier grafico */
+function enganchar(svg, alTocar){
+  svg.querySelectorAll("[data-tip]").forEach((el) => {
+    el.addEventListener("mousemove", (e) => tip(e, el.dataset.tip));
+    el.addEventListener("mouseleave", tipOff);
+    if (alTocar) el.addEventListener("click", () => { tipOff(); alTocar(el); });
+  });
 }
 
 /* ---------- detalle ---------- */
@@ -1458,6 +1804,7 @@ function poblarFiltros(){
 function lineasFiltradas(){
   const a = $("#fArea").value, r = $("#fResp").value, p = $("#fProceso").value;
   const q = norm($("#fBuscar").value);
+  const bnd = $("#fBanda").value;
   const soloF = $("#fSoloFuera").checked, soloP = $("#fSoloProblemas").checked;
   const resp = new Map(estado.resumen.map((x) => [x.area, x]));
   return estado.lineas.filter((l) => {
@@ -1465,6 +1812,7 @@ function lineasFiltradas(){
     const rr = resp.get(l.area) || {};
     if (r && rr.responsable !== r) return false;
     if (p && rr.proceso !== p) return false;
+    if (bnd !== "" && String(banda(l)) !== bnd) return false;
     if (soloF && !l.fuera) return false;
     if (soloP && !(l.sinCosto || l.sinFecha || l.sinTarget)) return false;
     if (q && !(norm(l.sku).includes(q) || norm(l.descripcion).includes(q) || norm(l.ubicacion).includes(q))) return false;
@@ -1809,7 +2157,7 @@ async function cargarLibro(file){
     }
     estadoZona("#zonaLibro", "#estLibro", "listo", esc(file.name) + "<br>" + msg.join(" &middot; "));
     pintarTodo();
-    irA("tablero");
+    irA("panorama");
   } catch (e) {
     estadoZona("#zonaLibro", "#estLibro", "error", esc(e.message));
   }
@@ -1904,7 +2252,7 @@ $("#btnAplicarMaestro").addEventListener("click", () => aplicarMaestro());
 $("#btnPegar").addEventListener("click", () => {
   const txt = $("#pegado").value.trim();
   if (!txt) return;
-  try { ingestarStock(parseDelimitado(txt, "\t")); pintarTodo(); irA("tablero"); }
+  try { ingestarStock(parseDelimitado(txt, "\t")); pintarTodo(); irA("panorama"); }
   catch (e) { alert(e.message); }
 });
 
@@ -1925,7 +2273,7 @@ $("#tablaAreas").addEventListener("input", (e) => {
   const c = e.target.dataset.campo;
   estado.areas[i][c] = c === "target" ? (e.target.value === "" ? null : num(e.target.value)) : e.target.value;
   guardar(LS.areas, estado.areas);
-  calcular(); pintarTablero(); pintarKpis(); pintarGrafico(); pintarAvisos();
+  calcular(); pintarTablero(); pintarKpis(); pintarPanorama(); pintarAvisos();
 });
 $("#tablaAreas").addEventListener("click", (e) => {
   const i = e.target.dataset.delar;
@@ -1955,7 +2303,7 @@ $("#tablaUbic").addEventListener("input", (e) => {
   const c = e.target.dataset.campo;
   estado.ubicaciones[i][c] = c === "target" ? num(e.target.value) : e.target.value.trim();
   guardar(LS.ubic, estado.ubicaciones);
-  calcular(); pintarTablero(); pintarKpis(); pintarGrafico(); pintarAvisos();
+  calcular(); pintarTablero(); pintarKpis(); pintarPanorama(); pintarAvisos();
 });
 $("#tablaUbic").addEventListener("click", (e) => {
   const i = e.target.dataset.delub;
@@ -2027,6 +2375,14 @@ $("#btnCsvMaestro").addEventListener("click", () => {
   bajarCSV("maestro_valorizado.csv", f);
 });
 
+/* --- selector del grafico de bandas --- */
+$$("#panelBandas .selector button").forEach((b) => b.addEventListener("click", () => {
+  modoBandas = b.dataset.modo;
+  $$("#panelBandas .selector button").forEach((o) =>
+    o.setAttribute("aria-pressed", o === b ? "true" : "false"));
+  pintarBandas();
+}));
+
 /* --- ajustes de fecha --- */
 $("#tablaDetalle").addEventListener("change", (e) => {
   const clave = e.target.dataset.clave;
@@ -2071,10 +2427,10 @@ $("#btnCsvAjustes").addEventListener("click", () => {
 });
 
 /* --- detalle --- */
-["#fArea","#fResp","#fProceso","#fBuscar","#fSoloFuera","#fSoloProblemas"]
+["#fArea","#fResp","#fProceso","#fBanda","#fBuscar","#fSoloFuera","#fSoloProblemas"]
   .forEach((s) => $(s).addEventListener("input", pintarDetalle));
 $("#btnLimpiar").addEventListener("click", () => {
-  ["#fArea","#fResp","#fProceso"].forEach((s) => $(s).value = "");
+  ["#fArea","#fResp","#fProceso","#fBanda"].forEach((s) => $(s).value = "");
   $("#fBuscar").value = "";
   $("#fSoloFuera").checked = $("#fSoloProblemas").checked = false;
   pintarDetalle();
@@ -2102,7 +2458,8 @@ $("#btnGuardarCorte").addEventListener("click", () => {
   hist.sort((a, b) => a.fecha.localeCompare(b.fecha));
   if (!guardar(LS.hist, hist)) { alert("No se pudo guardar: el almacenamiento del navegador esta lleno."); return; }
   pintarHistorico();
-  irA("historico");
+  pintarTendencia();
+  irA(hist.length > 1 ? "panorama" : "historico");
 });
 $("#hMetrica").addEventListener("change", pintarHistorico);
 $("#tablaHist").addEventListener("click", (e) => {
@@ -2157,7 +2514,7 @@ $("#btnRestaurar").addEventListener("click", () => {
   if (estado.ubicaciones.length) estadoZona("#zonaLibro", "#estLibro", "", "Config guardada: " + estado.ubicaciones.length + " ubicaciones. Falta el stock del dia.");
   if (m.length) estadoZona("#zonaMaestro", "#estMaestro", "listo", "Guardado en este navegador<br>" + entero(m.length) + " SKU valorizados");
   pintarTodo();
-  if (!estado.stock.length) irA("datos");
+  irA(estado.stock.length ? "panorama" : "datos");
 })();
 </script>
 </body>

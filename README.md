@@ -29,11 +29,15 @@ Reemplaza el calculo manual del libro `Aging_ddmmaa.xlsx`. Replica sus formulas:
    470 KB con los 22.398 materiales), asi que solo se vuelve a cargar cuando cambian los precios.
    Espera el `Material` en la columna A y el `Precio interno periodico` en la H; si cambia, se
    remapea ahi mismo. Los precios estan en USD.
-3. **Tablero** → el reporte. Clic en un area abre su detalle.
-4. **Detalle** → la `Fecha Aging` de cada linea se puede editar. El ajuste queda guardado y
+3. **Panorama** → la vista para analizar: cuanto se pasa cada area de su target, donde
+   esta concentrada la plata y como viene evolucionando. Todo es clicable y cae filtrado
+   en el detalle.
+4. **Tablero** → el mismo reporte de siempre, calcado del Excel, para imprimir y mandar.
+   Clic en un area abre su detalle.
+5. **Detalle** → la `Fecha Aging` de cada linea se puede editar. El ajuste queda guardado y
    se vuelve a aplicar cada semana sobre la misma linea; para volver a la del archivo, se
    borra el campo. Abajo hay un panel con todos los ajustes vigentes.
-5. **Guardar corte** → agrega una columna al historico.
+6. **Guardar corte** → agrega una columna al historico y un punto a la tendencia.
 
 Las 199 ubicaciones criticas y las 9 areas vienen cargadas de fabrica, asi que no hace falta
 el libro grande para arrancar. Se editan en la solapa **Ubicaciones criticas**, que tiene
@@ -42,6 +46,23 @@ ademas un boton para restaurar las originales.
 La configuracion (ubicaciones, areas, maestro de costos e historico) vive en el LocalStorage
 del navegador: es por equipo y por navegador, no se comparte entre personas. Para moverla a
 otra maquina, exportar los CSV desde cada solapa.
+
+### Las bandas de atraso
+
+El Panorama no agrupa por dias sino por **cuanto se paso cada linea del target de su
+area**, porque los targets van de 2 a 90 dias y en dias crudos no se pueden comparar:
+22 dias en 8030 (target 2) es mucho peor que 77 en 0900 (target 90).
+
+| Banda | Significa |
+|---|---|
+| Dentro del target | `aging < target`. Es contexto, va en gris. |
+| Hasta 2x | se paso, pero poco |
+| 2 a 5x | |
+| Mas de 5x | |
+
+Las tres bandas de atraso usan una sola rampa de un hue de claro a oscuro, porque son
+una escala ordenada y no categorias sueltas. Validada sobre fondo blanco: lightness
+monotona, saltos visibles y el extremo claro por encima de 2:1.
 
 ### Offline
 
