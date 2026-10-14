@@ -25,8 +25,10 @@ Reemplaza el calculo manual del libro `Aging_ddmmaa.xlsx`. Replica sus formulas:
 1. **Datos** → arrastrar el `Base_Aging_ddmmaa.XLSX` del lunes. Es el export crudo del WMS,
    con la columna `Fecha Aging` ya completada. Tambien acepta el libro completo
    `Aging_ddmmaa.xlsx`, del que ademas lee las hojas de configuracion.
-2. **Datos** → arrastrar `Base Item Valorizados.xlsx` una sola vez: queda guardado en el
-   navegador. Espera el SKU en la columna A y el costo en la H; si cambia, se remapea ahi mismo.
+2. **Datos** → arrastrar `Base Item Valorizados.xlsx`: queda guardado en el navegador (unos
+   470 KB con los 22.398 materiales), asi que solo se vuelve a cargar cuando cambian los precios.
+   Espera el `Material` en la columna A y el `Precio interno periodico` en la H; si cambia, se
+   remapea ahi mismo. Los precios estan en USD.
 3. **Tablero** → el reporte. Clic en un area abre su detalle.
 4. **Detalle** → la `Fecha Aging` de cada linea se puede editar. El ajuste queda guardado y
    se vuelve a aplicar cada semana sobre la misma linea; para volver a la del archivo, se
@@ -50,6 +52,19 @@ otra maquina, exportar los CSV desde cada solapa.
 - Las areas con stock pero sin responsable cargado aparecen marcadas como "sin configurar".
   En el Excel directamente no salen en el reporte.
 - Pisar la `Fecha Aging` de una linea no se pierde al pegar la base de la semana siguiente.
+- Avisa cuando una linea se valoriza con un precio dudoso (ver abajo).
+
+### Sobre los precios repetidos
+
+En el maestro hay 107 materiales que aparecen con mas de un precio, uno por clase de
+valoracion: `D8_STD.AA`, por ejemplo, tiene 48 precios distintos que van de USD 0,01 a
+USD 787.014,57. El `XLOOKUP` del Excel se queda con el primero y la herramienta hace lo
+mismo, para no cambiar los numeros. La diferencia es que marca esas lineas como
+"precio dudoso" y deja ver el rango, asi se puede corregir el costo a mano desde la solapa
+**Maestro valorizado**. En la base del 13-oct ninguna linea cae en ese caso.
+
+Al cargar un maestro que tenga menos de la mitad de los SKU que el guardado, pregunta si
+reemplazar o fusionar, para no perder precios con un archivo parcial o mal mapeado.
 
 ### Sobre los ajustes de fecha
 

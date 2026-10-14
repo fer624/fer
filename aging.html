@@ -537,6 +537,7 @@ input.fecha-aging.ajustada{
       </div>
       <label class="check"><input type="checkbox" id="fSoloUsados"> Solo los SKU del stock actual</label>
       <label class="check"><input type="checkbox" id="fSoloSinCosto"> Solo los que faltan</label>
+      <label class="check"><input type="checkbox" id="fSoloAmbiguos"> Solo precios dudosos</label>
       <button class="btn claro" id="btnCsvMaestro" type="button">Exportar (CSV)</button>
       <button class="btn peligro" id="btnBorrarMaestro" type="button">Vaciar maestro</button>
     </div>
@@ -610,7 +611,8 @@ const LS = {
   hist:   "aging.historico.v1",
   mapeo:  "aging.mapeoMaestro.v1",
   sembrado:"aging.sembrado.v1",
-  ajustes:"aging.ajustes.v1"
+  ajustes:"aging.ajustes.v1",
+  ambiguos:"aging.ambiguos.v1"
 };
 
 /* Configuracion de arranque: las ubicaciones criticas y areas tal como estan en
@@ -760,6 +762,8 @@ const estado = {
   maestro: new Map(),   // claveSku -> costo
   maestroCrudo: [],     // [[sku, costo], ...] tal como se cargo
   ajustes: {},          // clave de linea -> {fecha, nota, creado}
+  maestroAmbiguos: {},  // sku repetido en el maestro con precios distintos
+  ambiguosClaves: new Set(),
   lineas: [],           // calculadas
   resumen: [],          // por area
   diag: {},             // diagnosticos
@@ -1000,20 +1004,29 @@ function ingestarAreas(filas){
   return out.length;
 }
 
-function indexarMaestro(pares){
+function indexarMaestro(pares, ambiguos){
   const m = new Map();
   for (const [sku, costo] of pares) {
     for (const k of clavesSku(sku)) if (!m.has(k)) m.set(k, costo);
   }
   estado.maestro = m;
   estado.maestroCrudo = pares;
+  if (ambiguos) estado.maestroAmbiguos = ambiguos;
+  const sa = new Set();
+  Object.keys(estado.maestroAmbiguos || {}).forEach((sku) => clavesSku(sku).forEach((k) => sa.add(k)));
+  estado.ambiguosClaves = sa;
   guardar(LS.maestro, pares);
+  guardar(LS.ambiguos, estado.maestroAmbiguos || {});
   estado.fuentes.maestro = { filas: pares.length, cuando: new Date() };
 }
 
+/* El maestro trae materiales repetidos con precios muy distintos (una misma
+   maquina en varias clases de valoracion). Como el XLOOKUP del Excel, nos
+   quedamos con el primero, pero registramos el rango para poder avisarlo. */
 function ingestarMaestro(filas, iSku, iCosto){
   const pares = [];
-  const vistos = new Set();
+  const vistos = new Map();
+  const ambiguos = {};
   for (const f of filas) {
     if (!f) continue;
     const sku = f[iSku];
@@ -1022,12 +1035,23 @@ function ingestarMaestro(filas, iSku, iCosto){
     if (crudo == null || crudo === "") continue;
     if (typeof crudo === "string" && !/\d/.test(crudo)) continue;   // fila de encabezado
     const clave = String(sku).trim().toUpperCase();
-    if (vistos.has(clave)) continue;
-    vistos.add(clave);
-    pares.push([String(sku).trim(), num(crudo)]);
+    const costo = num(crudo);
+    if (vistos.has(clave)) {
+      const primero = pares[vistos.get(clave)][1];
+      if (Math.abs(primero - costo) > 0.005) {
+        const a = ambiguos[clave] || { usado: primero, min: primero, max: primero, n: 1 };
+        a.n++;
+        a.min = Math.min(a.min, costo);
+        a.max = Math.max(a.max, costo);
+        ambiguos[clave] = a;
+      }
+      continue;
+    }
+    vistos.set(clave, pares.length);
+    pares.push([String(sku).trim(), costo]);
   }
   if (!pares.length) throw new Error("No encontre pares SKU / costo con esas columnas.");
-  indexarMaestro(pares);
+  indexarMaestro(pares, ambiguos);
   return pares.length;
 }
 
@@ -1087,9 +1111,13 @@ function calcular(){
     if (aj) usados.add(clave);
     const aging = fechaUsada ? diasHabiles(fechaUsada, corte) : null;
 
-    let costo = null;
+    let costo = null, costoAmbiguo = false;
     for (const k of clavesSku(f.producto)) {
-      if (estado.maestro.has(k)) { costo = estado.maestro.get(k); break; }
+      if (estado.maestro.has(k)) {
+        costo = estado.maestro.get(k);
+        costoAmbiguo = estado.ambiguosClaves.has(k);
+        break;
+      }
     }
     if (costo == null && f.producto != null && String(f.producto).trim() !== "") {
       skusSinCosto.add(String(f.producto).trim());
@@ -1107,7 +1135,7 @@ function calcular(){
       tipoStock: f.tipoStock || "",
       um: f.um || "",
       cantidad: cant,
-      costo,
+      costo, costoAmbiguo,
       valorizado: costo == null ? 0 : costo * cant,
       fechaAging: fechaUsada,
       aging,
@@ -1174,6 +1202,9 @@ function calcular(){
     desconocidas: Array.from(desconocidas.values()).sort((a, b) => b.lineas - a.lineas),
     skusSinCosto: Array.from(skusSinCosto),
     lineasSinCosto: lineas.filter((l) => l.sinCosto).length,
+    lineasCostoAmbiguo: lineas.filter((l) => l.costoAmbiguo).length,
+    skusAmbiguosEnUso: Array.from(new Set(lineas.filter((l) => l.costoAmbiguo)
+      .map((l) => String(l.sku).trim().toUpperCase()))),
     lineasSinFecha: lineas.filter((l) => l.sinFecha).length,
     areasSinConfig: resumen.filter((r) => !r.enConfig && r.lineas > 0).map((r) => r.area),
     lineasAjustadas: lineas.filter((l) => l.ajustada).length,
@@ -1232,6 +1263,16 @@ function pintarAvisos(){
         entero(d.skusSinCosto.length) + " SKU distintos). Su valorizado cuenta como $0, " +
         "asi que el total esta subestimado.",
         "Ver cuales", () => { irA("maestro"); $("#fSoloSinCosto").checked = true; $("#fSoloUsados").checked = true; pintarMaestro(); }));
+    }
+    if (d.lineasCostoAmbiguo) {
+      const peor = (d.skusAmbiguosEnUso || []).map((k) => estado.maestroAmbiguos[k])
+        .filter(Boolean).sort((a, b) => (b.max - b.min) - (a.max - a.min))[0];
+      c.push(aviso("alerta",
+        "<b>" + entero(d.lineasCostoAmbiguo) + " lineas valorizadas con un precio dudoso</b>: " +
+        "su material aparece repetido en el maestro con precios distintos" +
+        (peor ? " (el peor caso va de " + plata(peor.min) + " a " + plata(peor.max) + ")" : "") +
+        ". Se toma el primero, igual que el XLOOKUP del Excel.",
+        "Ver cuales", () => { irA("maestro"); $("#fSoloAmbiguos").checked = true; pintarMaestro(); }));
     }
     if (d.lineasSinFecha) {
       c.push(aviso("alerta",
@@ -1439,7 +1480,9 @@ function pintarDetalle(){
     const p = l.fuera ? '<span class="pastilla mal">FUERA</span>'
             : (l.aging == null ? '<span class="pastilla neutro">sin fecha</span>'
             : '<span class="pastilla ok">OK</span>');
-    const av = l.sinCosto ? ' <span class="pastilla neutro" title="SKU sin costo en el maestro">sin costo</span>' : "";
+    const av = l.sinCosto
+      ? ' <span class="pastilla neutro" title="SKU sin costo en el maestro">sin costo</span>'
+      : (l.costoAmbiguo ? ' <span class="pastilla neutro" title="El material esta repetido en el maestro con precios distintos">precio dudoso</span>' : "");
     h += "<tr>" +
       "<td><b>" + esc(l.area) + "</b></td>" +
       '<td class="mono">' + esc(l.ubicacion) + "</td>" +
@@ -1576,6 +1619,7 @@ function pintarMaestro(){
   const q = norm($("#fSku").value);
   const soloUsados = $("#fSoloUsados").checked;
   const soloFaltan = $("#fSoloSinCosto").checked;
+  const soloAmbiguos = $("#fSoloAmbiguos").checked;
   const usados = new Set();
   estado.lineas.forEach((l) => { if (l.sku) usados.add(String(l.sku).trim().toUpperCase()); });
   const faltan = new Set(estado.diag.skusSinCosto ? estado.diag.skusSinCosto.map((s) => s.toUpperCase()) : []);
@@ -1585,7 +1629,9 @@ function pintarMaestro(){
     filas = Array.from(faltan).map((s) => [s, null]);
   } else {
     filas = estado.maestroCrudo.filter(([sku]) => {
-      if (soloUsados && !usados.has(String(sku).trim().toUpperCase())) return false;
+      const k = String(sku).trim().toUpperCase();
+      if (soloUsados && !usados.has(k)) return false;
+      if (soloAmbiguos && !estado.maestroAmbiguos[k]) return false;
       if (q && !norm(sku).includes(q)) return false;
       return true;
     });
@@ -1600,7 +1646,13 @@ function pintarMaestro(){
       '<td class="cifra"><input type="text" data-sku="' + esc(sku) + '" value="' +
         (costo == null ? "" : fmtMoneda.format(costo)) + '" style="width:120px;text-align:right" placeholder="sin costo"></td>' +
       "<td>" + (costo == null ? '<span class="pastilla mal">falta</span>' :
-                (usado ? '<span class="pastilla ok">en uso</span>' : '<span class="pastilla neutro">sin stock</span>')) + "</td>" +
+                (usado ? '<span class="pastilla ok">en uso</span>' : '<span class="pastilla neutro">sin stock</span>')) +
+        (function(){
+          const a = estado.maestroAmbiguos[String(sku).trim().toUpperCase()];
+          return a ? ' <span class="pastilla mal" title="En el maestro tiene ' + a.n +
+            " precios distintos, de " + plata(a.min) + " a " + plata(a.max) +
+            ". Se usa " + plata(a.usado) + ', el primero que aparece.">repetido</span>' : "";
+        })() + "</td>" +
       '<td><button class="btn peligro chico" data-delSku="' + esc(sku) + '" type="button">Eliminar</button></td></tr>';
   });
   t.innerHTML = h + "</tbody>";
@@ -1800,7 +1852,24 @@ function aplicarMaestro(nombreArchivo){
   try {
     const filas = filasMaestroActuales();
     const iSku = +$("#mSku").value, iCosto = +$("#mCosto").value;
+    const previos = estado.maestroCrudo.slice();
     const n = ingestarMaestro(filas, iSku, iCosto);
+    /* Si el archivo nuevo es mucho mas chico que el guardado, probablemente sea
+       parcial o este mal mapeado: antes de perder precios, preguntamos. */
+    if (previos.length > 100 && n < previos.length * 0.5) {
+      const fusionar = !confirm(
+        "El archivo trae " + entero(n) + " SKU y el maestro guardado tiene " + entero(previos.length) + ".\n\n" +
+        "Aceptar: reemplazar igual, quedan solo los " + entero(n) + ".\n" +
+        "Cancelar: fusionar, manteniendo los que no vengan en el archivo nuevo.");
+      if (fusionar) {
+        const nuevos = new Map(estado.maestroCrudo.map(([k, v]) => [String(k).trim().toUpperCase(), [k, v]]));
+        for (const [k, v] of previos) {
+          const kk = String(k).trim().toUpperCase();
+          if (!nuevos.has(kk)) nuevos.set(kk, [k, v]);
+        }
+        indexarMaestro(Array.from(nuevos.values()));
+      }
+    }
     guardar(LS.mapeo, { hoja: $("#mHoja").value || null, iSku, iCosto });
     const muestra = estado.maestroCrudo.slice(0, 3).map(([s, c]) => esc(s) + " = " + fmtMoneda.format(c)).join(" &middot; ");
     $("#vistaMaestro").innerHTML = "Primeros registros leidos: " + muestra;
@@ -1916,6 +1985,7 @@ $("#tablaMaestro").addEventListener("change", (e) => {
   const v = e.target.value.trim();
   const pares = estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase());
   if (v !== "") pares.push([sku, num(v)]);
+  delete estado.maestroAmbiguos[sku.toUpperCase()];
   indexarMaestro(pares);
   pintarTodo();
 });
@@ -1931,6 +2001,7 @@ $("#btnAddSku").addEventListener("click", () => {
   if (!c) { $("#errSku").textContent = "Pone el costo unitario."; return; }
   const pares = estado.maestroCrudo.filter(([x]) => String(x).trim().toUpperCase() !== s.toUpperCase());
   pares.push([s, num(c)]);
+  delete estado.maestroAmbiguos[s.toUpperCase()];
   indexarMaestro(pares);
   $("#nSku").value = $("#nCosto").value = "";
   $("#errSku").textContent = "";
@@ -1940,7 +2011,7 @@ $("#btnBorrarMaestro").addEventListener("click", () => {
   if (!confirm("Vaciar el maestro de costos?\n\nTodo el valorizado va a dar $0 hasta que cargues uno nuevo.")) return;
   indexarMaestro([]); pintarTodo();
 });
-["#fSku","#fSoloUsados","#fSoloSinCosto"].forEach((s) => $(s).addEventListener("input", pintarMaestro));
+["#fSku","#fSoloUsados","#fSoloSinCosto","#fSoloAmbiguos"].forEach((s) => $(s).addEventListener("input", pintarMaestro));
 $("#btnCsvMaestro").addEventListener("click", () => {
   const f = [["SKU","Costo"]];
   estado.maestroCrudo.forEach(([s, c]) => f.push([s, dec(c)]));
@@ -2070,6 +2141,7 @@ $("#btnRestaurar").addEventListener("click", () => {
     guardar(LS.sembrado, true);
   }
   estado.ajustes    = leer(LS.ajustes, {});
+  estado.maestroAmbiguos = leer(LS.ambiguos, {});
   const m = leer(LS.maestro, []);
   if (m.length) indexarMaestro(m);
   $("#fCorte").value = fechaISO(estado.corte);
