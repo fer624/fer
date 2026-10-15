@@ -2,6 +2,7 @@
 
 Documenta la capa `A0001` de `gemelo-digital-cd.html` (botón **Mezzanine** del HUD).
 Reemplaza al modelo inventado de las versiones V23–V24.
+Emplazamiento calcado del Lay Out del CDR y verificado contra SAP.
 
 ## 1. De dónde sale
 
@@ -27,22 +28,49 @@ Los niveles 1 a 7 se dibujan como cajones; los niveles 8 y 9 (sólo en los
 pasillos 01, 02 y 03, con código de 5 segmentos) se dibujan como cajas sobre el
 gabinete, porque no son cajones del mueble.
 
-## 2. Lo que SÍ es provisional: el emplazamiento
+## 2. Emplazamiento — calcado del plano maestro
 
-El maestro trae las coordenadas X, Y y Z **en cero**. Las filas se arman por
-orden de cuerpo dentro de cada pasillo, con estas reglas:
+Sale de la hoja **"Plano FASA con notas"** del Lay Out del CDR, y está
+**verificado**: cada fila de gabinetes del plano trae la capacidad de cada
+cuerpo como `compartimentos/cajones` (`25/7` = 175, `16/7` = 112, `9/7` = 63,
+`6/6` = 36) más la caja `1/2` de arriba, y esa secuencia se cruzó contra la del
+maestro de SAP para saber qué fila es qué pasillo:
 
-- Un cuerpo mide 0,90 × 0,72 × 1,85 m, con paso de 0,94 m.
-- Los pasillos con columnas de una sola paridad son una fila simple.
-- El pasillo 02 tiene columnas pares e impares: se arma como fila doble espalda
-  contra espalda, pares mirando a un pasillo e impares al otro (lo que dice la
-  Hoja2 del maestro).
-- Pasillos y alturas se definen en la constante **`LAY0`**, al principio del
-  bloque `const A0001`. **Corregir el emplazamiento contra el plano real es
-  editar esas seis líneas y nada más.**
+| Fila del plano | Pasillo SAP | Coincidencia |
+|---|---|---|
+| `Pas 1 Gabin` superior | 01 pares | 27 de 28 |
+| `Pas 1 Gabin` inferior | 02 impares | 27 de 28 |
+| `Pas 2 Gabin` superior | 02 pares | 18 de 28 |
+| `Pas 2 Gabin` inferior | 03 impares | 20 de 28 |
+| `Pas 5 Gabin` | 05 impares | **28 de 28** |
+| `Pas 6 Gabin` | 06 pares | **13 de 13** |
 
-Hasta tener el plano con los cuerpos numerados, las posiciones en planta son una
-hipótesis; la estructura, los códigos y los datos no.
+De ahí sale la regla que antes faltaba: **el pasillo de SAP es el corredor, y
+par/impar son sus dos lados**. Dos filas van espalda contra espalda entre
+corredor y corredor, que es exactamente lo que decía la Hoja2 del maestro
+(`PASILLO: 0001-01 / 0001-02` y `PASILLO: 0001-02 / 0001-03`):
+
+```
+===== pasillo 01 =====
+fila de cuerpos PARES   de 01      mira al 01
+fila de cuerpos IMPARES de 02      mira al 02
+===== pasillo 02 =====
+fila de cuerpos PARES   de 02      mira al 02
+fila de cuerpos IMPARES de 03      mira al 03
+===== pasillo 03 =====
+```
+
+El altillo repite el esquema con el pasillo 06 (pares) y el 05 (impares)
+espalda contra espalda. Los cuerpos van en **grupos de 7 con una calle
+transversal** entre grupo y grupo, como los separa el plano en secciones
+A, B, C, D / E, F, G, H.
+
+Se ajusta en las constantes `FILAS`, `X0`, `PITCH` y `GAP` del bloque `A0001`.
+
+**Lo que todavía no está calcado:** el pasillo 04, que está fuera del mezzanine
+y en el plano no aparece en el mismo bloque, así que sigue en una posición
+tentativa; y las medidas del gabinete (0,80 × 0,62 × 1,85 m), tomadas para que
+28 cuerpos más tres calles entren en el ancho del mezzanine, no de una cota.
 
 ## 3. Qué muestra
 

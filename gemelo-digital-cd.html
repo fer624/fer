@@ -802,9 +802,9 @@ const D0001={"corte":"2026-07-10","n":19562,"masks":[1056698302,1,58254,7989150,
      embebida (estado, llenado volumétrico, antigüedad, bloqueos, tipo).
    · El código de ubicación se reconstruye, no se inventa:
          0001 - pasillo - cuerpo - cajón - subdivisión - posición
-   · LA POSICIÓN FÍSICA DE LOS CUERPOS ES PROVISIONAL. El maestro trae
-     las coordenadas X/Y/Z en 0, así que las filas se arman por orden de
-     cuerpo. Para corregirlas con el plano real se edita LAY0, nada más.
+   · El emplazamiento se calca del plano maestro (Lay Out CDR), cruzado
+     contra las capacidades del maestro de SAP para confirmar qué fila
+     del plano es cada pasillo. Se ajusta en FILAS / X0 / PITCH / GAP.
    ==================================================================== */
 const A0001=(function(){
   const dec=s=>{const b=atob(s),u=new Uint8Array(b.length);
@@ -814,17 +814,36 @@ const A0001=(function(){
   const bit=(m,b)=>Math.floor(m/Math.pow(2,b))%2;
   const pad=(n,w)=>String(n).padStart(w||2,'0');
 
-  /* ---- zonas y emplazamiento (editable) --------------------------- */
+  /* ---- zonas y emplazamiento ---------------------------------------
+     Calcado del plano maestro (hoja "Plano FASA con notas"). El pasillo
+     de SAP es el CORREDOR; par e impar son sus dos lados, y dos filas
+     van espalda contra espalda entre corredor y corredor:
+
+        ===== pasillo 01 =====
+        fila de cuerpos PARES   de 01   (mira al 01)
+        fila de cuerpos IMPARES de 02   (mira al 02)
+        ===== pasillo 02 =====
+        fila de cuerpos PARES   de 02   (mira al 02)
+        fila de cuerpos IMPARES de 03   (mira al 03)
+        ===== pasillo 03 =====
+
+     Verificado cruzando la secuencia de capacidades de cada fila del
+     plano contra la del maestro de SAP: el pasillo 05 coincide en 28 de
+     28 cuerpos y el 06 en 13 de 13.
+     Los cuerpos van en grupos de 7 con una calle entre grupo y grupo,
+     como los separa el plano (secciones A, B, C, D / E, F, G, H).      */
   const PISO={'01':'PB','02':'PB','03':'PB','04':'EXT','05':'ALT','06':'ALT'};
   const ZNOM={PB:'PB mezzanine',ALT:'Altillo',EXT:'Fuera del mezzanine'};
-  const LAY0={
-    '01':{y:0,    x0:-35.9, z: 0.00, face: 1, dual:false},
-    '02':{y:0,    x0:-35.9, z: 3.12, face: 1, dual:true },
-    '03':{y:0,    x0:-35.9, z: 6.20, face:-1, dual:false},
-    '05':{y:5.23, x0:-35.4, z: 1.00, face: 1, dual:false},
-    '06':{y:5.23, x0:-35.4, z: 4.40, face:-1, dual:false},
-    '04':{y:0,    x0: -7.0, z:20.50, face:-1, dual:false}};
-  const CW=.90, CP=.94, CD=.72, CH=1.85, TOPH=.26;
+  const FILAS=[
+    {pas:'01',par:0,y:0,    z: 2.33,face:-1},
+    {pas:'02',par:1,y:0,    z: 2.98,face: 1},
+    {pas:'02',par:0,y:0,    z: 5.63,face:-1},
+    {pas:'03',par:1,y:0,    z: 6.28,face: 1},
+    {pas:'06',par:0,y:5.23, z: 2.33,face:-1},
+    {pas:'05',par:1,y:5.23, z: 2.98,face: 1},
+    {pas:'04',par:1,y:0,    z:20.50,face:-1}];   // fuera del mezzanine: posición aún por calcar
+  const X0=-35.9, PITCH=.86, GAP=.80, GRUPO=7;
+  const CW=.80, CD=.62, CH=1.85, TOPH=.26;
 
   /* ---- 1. reconstruir cuerpos, cajones y ubicaciones -------------- */
   const CU=[], LOC=[], byCode={};
@@ -848,19 +867,18 @@ const A0001=(function(){
     });
   })();
 
-  /* ---- 2. emplazar: una corrida de cuerpos por pasillo ------------ */
-  const byPas={};
-  CU.forEach(c=>{ (byPas[c.pas]=byPas[c.pas]||[]).push(c); });
-  Object.keys(byPas).forEach(p=>{
-    const cfg=LAY0[p] || LAY0['04'];
-    const list=byPas[p].slice().sort((a,b)=>(+a.col)-(+b.col));
-    if(cfg.dual){                       // racks espalda contra espalda: par de un lado, impar del otro
-      [[0,-1],[1,1]].forEach(g=>{
-        list.filter(c=>((+c.col)%2)===g[0]).forEach((c,i)=>{
-          c.x=cfg.x0+i*CP; c.y=cfg.y; c.z=cfg.z+g[1]*CD/2; c.face=g[1]; });
-      });
-    } else list.forEach((c,i)=>{ c.x=cfg.x0+i*CP; c.y=cfg.y; c.z=cfg.z; c.face=cfg.face; });
-  });
+  /* ---- 2. emplazar cada fila del plano ----------------------------- */
+  function colocar(list,f){
+    list.sort((a,b)=>(+a.col)-(+b.col)).forEach((c,i)=>{
+      c.x=X0+i*PITCH+Math.floor(i/GRUPO)*GAP; c.y=f.y; c.z=f.z; c.face=f.face; }); }
+  FILAS.forEach(f=>colocar(CU.filter(c=>c.pas===f.pas && (+c.col)%2===f.par), f));
+  // cuerpos cuyo código no cae en ninguna fila (anomalías del maestro):
+  // se cuelgan al final de la fila de su pasillo para que no queden fuera del modelo
+  CU.filter(c=>c.x===undefined).forEach(c=>{
+    const f=FILAS.filter(x=>x.pas===c.pas)[0] || FILAS[FILAS.length-1];
+    const n=CU.filter(x=>x.z===f.z && x.y===f.y).length;
+    c.x=X0+n*PITCH+Math.floor(n/GRUPO)*GAP; c.y=f.y; c.z=f.z; c.face=f.face; });
+
   // alturas: los niveles 1-7 son cajones; los que pasan de 7 son cajas sobre el gabinete
   CU.forEach(c=>{
     const dr=c.caj.filter(j=>j.nivN<=7).sort((a,b)=>a.nivN-b.nivN);
