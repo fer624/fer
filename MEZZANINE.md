@@ -1,77 +1,96 @@
-# Mezzanine — ubicación y ocupación
+# Almacén 0001 — gaveteros en el gemelo digital
 
-Documenta la capa `MZ` de `gemelo-digital-cd.html` (botón **Mezzanine** del HUD).
+Documenta la capa `A0001` de `gemelo-digital-cd.html` (botón **Mezzanine** del HUD).
+Reemplaza al modelo inventado de las versiones V23–V24.
 
-## 1. Esquema de codificación
+## 1. De dónde sale
 
-Las ubicaciones **no están escritas a mano**: se derivan de la misma geometría que
-dibuja el mezzanine (`LAY.MEZZ`, `LAY.GAB_ROWS`, `LAY.GAB_BLOCKS`,
-`LAY.MEZZ_OFFICE`), así que el código y el modelo no se pueden desincronizar.
-Si cambia el layout, cambian las ubicaciones.
+Del maestro de ubicaciones de SAP WM (`UBIS_0001.xlsx`, extracto del
+**10-jul-2026**). La topología **no se inventa**: el bloque `D0001` embebido en
+el HTML trae los 169 cuerpos, 1.396 cajones y 19.562 ubicaciones reales, más la
+foto de stock de esa fecha (estado, llenado volumétrico, antigüedad, bloqueos y
+tipo de ubicación). El código se reconstruye, no se genera:
 
-| Nivel | Formato | Ejemplo | Lectura |
-|---|---|---|---|
-| Gaveteros (bajo el deck) | `MZ-{bloque}{fila}-{casillero}-{nivel}{columna}` | `MZ-A07-03-2C` | zona MZ · bloque A · fila 07 · casillero 03 · nivel 2 · columna C |
-| Bandejas (sobre el deck) | `MZ-D{fila}-{módulo}-L{nivel}` | `MZ-D03-21-L2` | zona MZ · fila D03 · módulo 21 · nivel L2 |
+```
+0001  -  05   -  47   -  03   -  02    -  1
+almacén  pasillo cuerpo  cajón  subdiv.   posición
+```
 
-- **Bloques**: `A` (x −35,4 a −24,6) y `B` (x −21,0 a −10,0).
-- **Filas de gaveteros**: 01 a 14, de z = −0,10 a z = 13,68 (paso 1,06 m).
-- **Niveles de gavetero**: `1` arriba, `3` abajo. **Columnas**: `A`–`D` de izquierda a derecha (x creciente).
-- **Niveles de bandeja**: `L1` abajo a `L4` arriba.
-- La numeración de casillero es **física**: donde está la oficina del mezzanine
-  (filas 10–14 del bloque A, casilleros 01–04) los números existen pero no hay
-  posición. Así el número de casillero no se corre si mañana se saca la oficina.
-
-Para cambiar el formato hay **una sola función** a tocar, `fmt()`, al principio
-del bloque `const MZ=(function(){…})` en `gemelo-digital-cd.html`.
-
-## 2. Inventario de posiciones
-
-| | Casilleros / módulos | Ubicaciones | Hueco unitario | Volumen |
+| Zona | Pasillos | Cuerpos | Ubicaciones | Ocupación al 10-jul-2026 |
 |---|---|---|---|---|
-| Gaveteros bajo deck | 148 casilleros (4 col × 3 niveles) | **1.776** | 0,435 × 0,613 × 0,80 m | 379 m³ |
-| Bandejas sobre deck | 5 filas × 41 módulos × 4 niveles | **820** | 0,62 × 0,66 × 0,85 m | 285 m³ |
-| **Total** | | **2.596** | | **664 m³** |
+| Planta baja del mezzanine | 01, 02, 03 | 112 | 12.519 | 80 % |
+| Altillo | 05, 06 | 41 | 5.481 | 12 % |
+| Fuera del mezzanine | 04 | 16 | 1.562 | 98 % |
+| **Total** | | **169** | **19.562** | **62 %** |
 
-Superficie del mezzanine: 27,4 × 15,2 m = 416 m².
+Los niveles 1 a 7 se dibujan como cajones; los niveles 8 y 9 (sólo en los
+pasillos 01, 02 y 03, con código de 5 segmentos) se dibujan como cajas sobre el
+gabinete, porque no son cajones del mueble.
 
-## 3. Carga de ocupación real (CSV)
+## 2. Lo que SÍ es provisional: el emplazamiento
 
-Hasta que se carga un archivo, la ocupación que se ve es **simulada** y el panel
-lo avisa en ámbar. El ciclo previsto es: **Exportar CSV → completar en Excel →
-Cargar CSV**.
+El maestro trae las coordenadas X, Y y Z **en cero**. Las filas se arman por
+orden de cuerpo dentro de cada pasillo, con estas reglas:
 
-Delimitador `,`, `;` o tabulación (se detecta solo), UTF‑8 con o sin BOM, y
-admite coma decimal. Sólo `ubicacion` es obligatoria:
+- Un cuerpo mide 0,90 × 0,72 × 1,85 m, con paso de 0,94 m.
+- Los pasillos con columnas de una sola paridad son una fila simple.
+- El pasillo 02 tiene columnas pares e impares: se arma como fila doble espalda
+  contra espalda, pares mirando a un pasillo e impares al otro (lo que dice la
+  Hoja2 del maestro).
+- Pasillos y alturas se definen en la constante **`LAY0`**, al principio del
+  bloque `const A0001`. **Corregir el emplazamiento contra el plano real es
+  editar esas seis líneas y nada más.**
 
-| Columna | Alias aceptados | Uso |
+Hasta tener el plano con los cuerpos numerados, las posiciones en planta son una
+hipótesis; la estructura, los códigos y los datos no.
+
+## 3. Qué muestra
+
+Seis modos de color sobre los frentes de los cajones:
+
+| Modo | Qué pinta | Escala |
 |---|---|---|
-| `ubicacion` | ubicación, location, loc, posicion, bin | **obligatoria**, debe coincidir con el maestro |
-| `sku` | codigo, parte, part, material, item, articulo | se muestra al seleccionar y es buscable |
-| `descripcion` | desc, detalle, nombre | informativo |
-| `cantidad` | cant, qty, stock, saldo, existencia | > 0 marca la posición como ocupada |
-| `ocupacion` | ocup, fill, llenado, pct | 0–1 o 0–100; define el color del mapa de calor |
-| `clase` | abc, categoria, rotacion | A/B/C; habilita el modo ABC |
+| Ocupación | % de compartimentos ocupados del cajón | secuencial azul |
+| Llenado | volumen cargado sobre la capacidad | secuencial azul |
+| Antigüedad | meses desde el último movimiento | secuencial naranja |
+| Vacíos | cajones sin stock | destacado / recesivo |
+| Bloqueos | bloqueo de entrada o salida | estado crítico |
+| Tamaño | capacidad del gavetín (≤1,5 L / ≤2,5 L / >2,5 L) | categórico 1-3 |
 
-Las ubicaciones del maestro que no estén en el archivo se muestran **vacías**, y
-el panel informa cuántas quedaron sin dato y cuántos códigos no reconoció.
+Clic en un cajón abre la grilla de sus compartimentos, y clic en un
+compartimento da su código, estado, llenado, antigüedad, tipo y capacidad.
+Todas las escalas están validadas contra la superficie del panel (`#1b232b`):
+banda de luminosidad, piso de croma, separación para daltonismo y contraste.
 
-## 4. Colores
+## 4. Subir una foto de stock
 
-Escala secuencial de un solo tono para la ocupación, slots categóricos 1‑3 para
-ABC, gris neutro para lo recesivo. Validados contra la superficie del panel
-(`#1b232b`): banda de luminosidad, piso de croma, separación para daltonismo y
-contraste.
+**Cargar stock** acepta un CSV con el delimitador que sea (`,`, `;` o
+tabulación), UTF-8 con o sin BOM y coma decimal. Reconoce los encabezados
+nativos del extracto de SAP, así que alcanza con guardar el reporte como CSV:
 
-## 5. Pendientes a verificar con el plano real
+| Columna de SAP | Para qué se usa |
+|---|---|
+| `Ubicación` | **obligatoria**, se cruza contra el maestro |
+| `Ind.ubicación vacía` | X = vacía |
+| `Volumen de carga` + `Volumen máximo` | % de llenado |
+| `Fe.último movimiento` | antigüedad (la fecha de corte se deduce del máximo del archivo) |
+| `Bloq.salida stock` / `Bloq.entrada stock` | bloqueos |
 
-1. **Códigos**: el esquema de arriba es propio de este modelo. Si el WMS ya tiene
-   codificadas las posiciones del mezzanine, hay que reemplazar `fmt()` por el
-   formato real o mapear uno contra otro.
-2. **Pasillos entre filas de gaveteros**: con el paso de 1,06 m de `GAB_ROWS` y
-   casilleros de 0,85 m de fondo quedan **0,21 m** entre el frente de una fila y
-   el fondo de la anterior (y 0,20 m entre casilleros contiguos). El único
-   pasillo real es el central de 2,0 m entre los bloques A y B. Eso no es
-   operable: o el plano tiene pasillos que el modelo no tomó, o los casilleros
-   son de doble cara. Hasta aclararlo, las 1.776 posiciones de gavetero son un
-   **techo teórico**, no una capacidad utilizable.
+También acepta `cantidad` u `ocupación` genéricas. Las ubicaciones que no estén
+en el archivo se muestran vacías y el panel informa cuántas quedaron sin dato.
+**Original** vuelve a la foto embebida. **Exportar CSV** baja las 19.562
+ubicaciones con su estado actual.
+
+## 5. Calidad de datos del maestro (a corregir en SAP)
+
+- **233 códigos de 5 segmentos** en los niveles 08 y 09 de los pasillos 01, 02 y
+  03. Rompen cualquier integración que parsee el código por posición.
+- **El campo "Área de almacenamiento" no indica el piso**: el pasillo 06 está en
+  el altillo pero figura como GENE igual que la planta baja. Sólo el 05 es ALTI.
+- **1.557 ubicaciones con volumen máximo en 0** (1.179 ocupadas): el control de
+  capacidad no actúa ahí.
+- **89 ubicaciones sobrepasadas**, la peor al 3.420 % de su capacidad.
+- 5 filas donde el código y los campos Pasillo/Columna/Nivel no coinciden.
+- 300 sin tipo de ubicación, 171 sin área, 167 ocupadas con volumen de carga 0.
+- El maestro son dos cargas masivas (2024-05-22 y 2025-10-27, 93 % de las
+  modificaciones): tipos y capacidades son valores por defecto, no medidos.
