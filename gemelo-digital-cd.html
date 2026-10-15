@@ -268,9 +268,7 @@ function buildFloor(){
   for(let z=B.z0;z<=B.z1;z+=10){g.beginPath();g.moveTo(0,py(z));g.lineTo(cw,py(z));g.stroke();}
   function yRect(x0,z0,x1,z1,w){ g.strokeStyle='#e7b400'; g.lineWidth=sw(w||.12);
     g.strokeRect(px(x0),py(z0),px(x1)-px(x0),py(z1)-py(z0)); }
-  LAY.RACKS_N1.concat(LAY.RACKS_N1W).forEach(r=>yRect(r.x-r.d/2-.35,r.z0,r.x+r.d/2+.35,r.z1,.14));
   LAY.RACKS_N2.forEach(r=>yRect(r.x-r.d/2-.35,r.z0,r.x+r.d/2+.35,r.z1,.14));
-  const gv=LAY.GONDOLAS; yRect(gv.x0-.3,gv.z0-.3,gv.x1+.3,gv.z1+.3,.16);
   // RUTA DE MÁQUINAS en L: detrás del mezzanine → tramo este → corredor al portón
   const segs=[LAY.MACHINE_AISLE,LAY.AISLE_LEG,LAY.FRONT_CORR];
   g.strokeStyle='#e7b400'; g.lineWidth=sw(.16);
@@ -283,7 +281,7 @@ function buildFloor(){
   g.lineTo(px(LAY.FRONT_CORR.x0),py((LAY.FRONT_CORR.z0+LAY.FRONT_CORR.z1)/2));
   g.stroke();
   // secuencia al pie del mezzanine: cada zona con su recuadro amarillo
-  [LAY.GONDOLAS,LAY.PALLET_PED,LAY.STAFF,LAY.CAB_BEHIND,LAY.OUTBOUND].forEach(a=>yRect(a.x0,a.z0,a.x1,a.z1,.14));
+  [LAY.STAFF,LAY.CAB_BEHIND,LAY.OUTBOUND].forEach(a=>yRect(a.x0,a.z0,a.x1,a.z1,.14));
   // pasillo peatonal entre mezz y góndolas: línea verde central + bordes amarillos
   const pa=LAY.PED_AISLE, pax=(pa.x0+pa.x1)/2;
   g.strokeStyle='#e7b400'; g.lineWidth=sw(.1);
@@ -307,7 +305,6 @@ function buildFloor(){
   g.strokeStyle='#e7b400'; g.lineWidth=sw(.09);
   for(let z=q.z0+1.5;z<q.z1;z+=1.9){g.beginPath();g.moveTo(px(q.x0+.5),py(z));g.lineTo(px(q.x1-.5),py(z));g.stroke();}
   g.fillStyle='#c0392b';
-  LAY.RACKS_N1.concat(LAY.RACKS_N1W).forEach(r=>{ g.fillStyle='#c0392b'; g.fillRect(px(r.x-.4),py(r.z1+.7),sw(.8),sw(.55)); });
   LAY.WALKWAYS.forEach(wl=>{ const a=wl[0],b2=wl[1],horiz=Math.abs(b2[1]-a[1])<.5;
     g.strokeStyle='#e7b400'; g.lineWidth=sw(.1);
     [-.6,.6].forEach(o=>{ g.beginPath();
@@ -476,8 +473,8 @@ function rackH(cz,x0,x1,up,beam,h,levels,fill){ // (sin uso: los racks son verti
   cy('ySafe',xf+.55,.35,cz-1.3,.06,.7); cy('ySafe',xf+.55,.35,cz+1.3,.06,.7);
   put('c_ySafe','cyl','ySafe',xf+.55,.68,cz,.12,2.6,Math.PI/2,0,0); }
 function buildRacks(){
-  LAY.RACKS_N1.forEach(r=>rackV(r.x,r.z0+.6,r.z1-.6,'grayUp','yBeam',10,6,.74,true));
-  LAY.RACKS_N1W.forEach(r=>rackV(r.x,r.z0+.6,r.z1-.6,'grayUp','yBeam',9,4,.72,true));
+  /* Los racks de Nave 1 los construye la capa A0001 con los 16 racks del
+     plano (R01 a R16). Acá quedan sólo los de Nave 2, que el plano no cubre. */
   LAY.RACKS_N2.forEach(r=>rackV(r.x,r.z0+.6,r.z1-.6,'blueUp','oBeam',11.3,6,.78,true)); }
 
 /* ---------------- mezzanine + gaveteros ---------------- */
@@ -507,15 +504,14 @@ function buildMezzanine(){
   for(let i=0;i<17;i++) bx('steel',mcx,.3*(i+1),m.z1-1.2-i*.26,1.2,.07,.3);
   bx('ySafe',mcx-.55,2.6,m.z1-2.6,.07,5.4,.07); bx('ySafe',mcx+.55,2.6,m.z1-2.6,.07,5.4,.07);
   /* los gaveteros reales los construye la capa A0001 desde el maestro de SAP */
-  bx('officeW',(off.x0+off.x1)/2,1.3,(off.z0+off.z1)/2,off.x1-off.x0,2.6,off.z1-off.z0);
+  /* la oficina del mezzanine no va bajo el deck: el plano la dibuja al este
+     del bloque de estanterías, fuera de estas 15 filas */
   // cinta transportadora de rodillos que baja del mezzanine hacia la operación
   const cvx=m.x1-2, cvz0=m.z1, cvz1=m.z1+5.5;
   for(let z=cvz0;z<cvz1;z+=.55){ const yy=m.deck-1.0-(z-cvz0)/(cvz1-cvz0)*(m.deck-1.0);
     put('c_rollerY','cyl','rollerY',cvx,yy+.5,z,.16,1.4,0,Math.PI/2,0);
     bx('steel',cvx-.75,yy+.15,z,.08,.7,.5); bx('steel',cvx+.75,yy+.15,z,.08,.7,.5); }
-  bx('glass',(off.x0+off.x1)/2,1.7,off.z0-.03,(off.x1-off.x0)-1.4,.9,.08);
-  bx('officeD',off.x1-1.4,1.05,off.z0-.04,1,2.1,.1);
-  bx('tblTop',off.x0+1.5,.75,off.z0+1.4,1.4,.06,.7); bx('seat',off.x0+1.5,.5,off.z0+2.2,.5,.9,.5);
+
 }
 
 /* ---------------- áreas operativas ---------------- */
@@ -568,38 +564,9 @@ function buildOperations(){
     for(let ly=0;ly<3;ly++) for(let k=0;k<3;k++)
       put('c_rollerY','cyl','rollerY',x-.45+k*.45,.42+ly*.42,dc.z0+3,.4,1.1,0,Math.PI/2,0); }
   bx('rollerY',dc.x1-3,.85,dc.z1-3,1.6,1.4,1.1); bx('black',dc.x1-3,1.65,dc.z1-3,1,.3,.7);
-  // ===== GAVETAS DE PEDIDOS (estanterías de ángulo ranurado, doble cara) =====
-  // parantes negros visibles, 3 bandejas grises galvanizadas y panel de fondo central
-  const gd=LAY.GONDOLAS;
-  const gcx=(gd.x0+gd.x1)/2, bayZ=1.05, shD=.72, shLv=[.32,.88,1.44], upH=1.7;
-  for(let z=gd.z0; z<gd.z1-.15; z+=bayZ){
-    const zc=z+bayZ/2, wz=Math.min(bayZ,gd.z1-z);
-    bx('cab',gcx,upH/2,zc,.05,upH,wz-.04);                       // panel de fondo central
-    for(const s of [-1,1]){                                      // cara oeste (-1) y este (+1)
-      const xo=gcx+s*shD;                                        // borde exterior de la bandeja
-      bx('black',xo,upH/2,zc-wz/2+.05,.07,upH,.07);              // parantes de ángulo ranurado
-      bx('black',xo,upH/2,zc+wz/2-.05,.07,upH,.07);
-      for(const hy of shLv){
-        bx('steel',gcx+s*shD/2,hy,zc,shD,.035,wz-.06);           // bandeja gris galvanizada
-        bx('tag',xo+s*.006,hy+.02,zc,.008,.07,wz*.5);            // etiqueta blanca en el canto
-        if(rng()<.6) bx('carton',gcx+s*shD*.5,hy+.19,zc,shD*.62,.3,wz*.55);  // repuestos/cajas
-      }
-    }
-  }
-  // PASILLO PEATONAL entre mezzanine y góndolas (marcado en el piso; sin objetos)
-  // FILA DE PALLETS DE PEDIDOS delante de las góndolas
-  const pp=LAY.PALLET_PED;                                // VARIAS FILAS de pallets planos
-  for(let xf=pp.x0+.7;xf<pp.x1-.5;xf+=1.35)              // filas paralelas
-    for(let z=pp.z0+.8;z<pp.z1-.5;z+=1.35){
-      bx('pallet',xf,.08,z,1.15,.15,1.15);
-      // cintas de color pegadas, orientadas HACIA LA PARED (a lo largo de X)
-      const cinta=['red','tblFrame','ySafe'][(Math.random()*3)|0];
-      bx(cinta,xf,.17,z-.25,1.1,.02,.12); bx(cinta,xf,.17,z+.25,1.1,.02,.12);
-      if(rng()<.6){ const r2=rng();
-        if(r2<.5) bx('carton',xf,.42,z,.85,.5,.85);
-        else bx('wood',xf,.5,z,.9,.7,.9); }
-    }
-  // los gaveteros del mezzanine los construye la capa A0001
+  /* Las gavetas de pedidos inventadas se reemplazan por las 229 estanterías
+     reales del plano, que la capa A0001 construye dentro del mezzanine. */
+
   // CAJONERAS detrás de los supervisores
   const cb=LAY.CAB_BEHIND;
   for(let x=cb.x0+.6;x<cb.x1-.4;x+=1.05){
@@ -806,6 +773,8 @@ const D0001={"corte":"2026-07-10","n":19562,"masks":[1056698302,1,58254,7989150,
      contra las capacidades del maestro de SAP para confirmar qué fila
      del plano es cada pasillo. Se ajusta en FILAS / X0 / PITCH / GAP.
    ==================================================================== */
+const PLANO={"pb":[{"r":17,"lado":"I","pas":null,"sec":["D0","C0","B0"],"cel":[[10,1,"2/5",0],[11,3,"2/5",0],[12,5,"2/5",0],[13,7,"2/5",0],[14,9,"2/5",0],[15,11,"2/5",0],[18,15,"2/5",0],[19,17,"2/5",0],[20,19,"2/5",0],[21,21,"2/5",0],[22,23,"2/5",0],[23,25,"2/5",0],[26,29,"2/5",0],[27,31,"2/5",0],[28,33,"2/5",0],[29,35,"1/5",0],[30,37,"1/5",0],[31,39,"1/5",0]]},{"r":20,"lado":"P","pas":null,"sec":["D1","C1","B1"],"cel":[[10,2,"2/8",0],[11,4,"2/8",0],[12,6,"2/8",0],[13,8,"2/8",0],[14,10,"2/8",0],[15,12,"2/8",0],[18,16,"2/8",0],[19,18,"2/8",0],[20,20,"2/8",0],[21,22,"2/8",0],[22,24,"2/8",0],[23,26,"2/8",0],[26,30,"2/8",0],[27,32,"2/8",0],[28,34,"2/8",0],[29,36,"2/8",0],[30,38,"2/8",0],[31,40,"2/6",0]]},{"r":21,"lado":"I","pas":null,"sec":["D2","C2","B2"],"cel":[[13,7,"2/8",0],[14,9,"2/8",0],[15,11,"2/8",0],[18,15,"2/8",0],[19,17,"2/8",0],[20,19,"2/8",0],[21,21,"2/8",0],[22,23,"2/8",0],[23,25,"2/8",0],[26,29,"2/8",0],[27,31,"2/8",0],[28,33,"2/8",0],[29,35,"2/8",0],[30,37,"2/8",0],[31,39,"2/6",0]]},{"r":26,"lado":"P","pas":null,"sec":["D3","C3","B3"],"cel":[[10,2,"2/6",0],[11,4,"2/6",0],[12,6,"2/6",0],[13,8,"2/6",0],[14,10,"2/6",0],[15,12,"2/6",0],[18,16,"2/6",0],[19,18,"2/6",0],[20,20,"2/6",0],[21,22,"2/6",0],[22,24,"2/6",0],[23,26,"2/6",0],[26,30,"2/6",0],[27,32,"2/6",0],[28,34,"2/6",0],[29,36,"2/6",0],[30,38,"2/6",0],[31,40,"2/6",0]]},{"r":27,"lado":"I","pas":null,"sec":["D4","C4","B4","A4"],"cel":[[10,1,"3/6",0],[12,5,"3/6",0],[13,7,"3/6",0],[14,9,"3/6",0],[15,11,"3/6",0],[18,15,"3/6",0],[19,17,"3/6",0],[20,19,"3/6",0],[21,21,"3/6",0],[22,23,"3/6",0],[23,25,"3/6",0],[26,29,"3/6",0],[27,31,"3/6",0],[28,33,"3/6",0],[29,35,"3/6",0],[30,37,"3/6",0],[31,39,"3/6",0],[35,45,"3/6",0],[36,47,"3/6",0],[37,49,"3/6",0],[38,51,"3/6",0],[39,53,"3/6",0]]},{"r":30,"lado":"P","pas":null,"sec":["D5","C5","B5","A5"],"cel":[[10,2,"3/6",0],[11,4,"3/6",0],[12,6,"3/6",0],[13,8,"3/6",0],[14,null,"3/6",0],[15,12,"3/6",0],[18,16,"3/6",0],[19,18,"3/6",0],[20,20,"3/6",0],[21,22,"3/6",0],[22,24,"3/6",0],[23,26,"3/6",0],[26,30,"3/6",0],[27,32,"3/6",0],[28,34,"3/6",0],[29,36,"3/6",0],[30,38,"3/6",0],[31,40,"3/6",0],[34,44,"3/6",0],[35,46,"3/6",0],[36,48,"3/6",0],[37,50,"3/6",0],[38,52,"3/6",0],[39,54,"3/6",0]]},{"r":31,"lado":"I","pas":null,"sec":["D6","C6","B6","A6"],"cel":[[10,1,"3/6",0],[11,3,"3/6",0],[12,5,"3/6",0],[13,7,"3/6",0],[14,9,"3/6",0],[15,11,"3/6",0],[18,15,"3/6",0],[19,17,"3/6",0],[20,19,"3/6",0],[21,21,"3/6",0],[22,23,"3/6",0],[23,25,"3/6",0],[26,29,"3/6",0],[27,31,"3/6",0],[28,33,"3/6",0],[29,35,"3/6",0],[30,37,"3/6",0],[31,39,"3/6",0],[34,43,"3/6",0],[35,45,"3/6",0],[36,47,"3/6",0],[37,49,"3/6",0],[38,51,"3/6",0],[39,53,"3/6",0]]},{"r":34,"lado":"P","pas":null,"sec":["D7","C7","B7","A7"],"cel":[[10,2,"4/8",0],[11,4,"4/8",0],[12,6,"4/8",0],[13,8,"4/8",0],[14,10,"4/8",0],[15,12,"4/8",0],[18,16,"3/8",0],[19,18,"3/8",0],[20,20,"3/8",0],[21,22,"3/8",0],[22,24,"3/8",0],[23,26,"3/8",0],[26,30,"4/8",0],[27,32,"4/8",0],[28,34,"4/8",0],[29,36,"4/8",0],[30,38,"4/8",0],[31,40,"4/8",0],[34,44,"4/8",0],[35,46,"4/8",0],[36,48,"4/8",0],[37,50,"4/8",0],[38,52,"4/8",0],[39,54,"4/8",0]]},{"r":35,"lado":"I","pas":null,"sec":["D8","C8","B8","A8"],"cel":[[10,1,"4/8",0],[11,3,"4/8",0],[12,5,"4/8",0],[13,7,"4/8",0],[14,9,"4/8",0],[15,11,"4/8",0],[18,15,"2/8",0],[19,17,"2/8",0],[20,19,"2/8",0],[21,21,"2/8",0],[22,23,"2/8",0],[23,25,"2/8",0],[26,29,"4/8",0],[27,31,"4/8",0],[28,33,"4/8",0],[29,35,"4/8",0],[30,37,"4/8",0],[31,39,"4/8",0],[34,43,"4/8",0],[35,45,"4/8",0],[36,47,"4/8",0],[37,49,"4/8",0],[38,51,"4/8",0],[39,53,"4/8",0]]},{"r":39,"lado":"P","pas":null,"sec":["D9","C9","B9","A9"],"cel":[[10,2,"4/8",0],[11,4,"4/8",0],[12,6,"4/8",0],[13,8,"4/8",0],[14,10,"4/8",0],[15,12,"4/8",0],[18,16,"4/8",0],[19,18,"4/8",0],[20,20,"4/8",0],[21,22,"4/8",0],[22,24,"4/8",0],[23,26,"4/8",0],[29,36,"3/8",0],[30,38,"3/8",0],[31,40,"3/8",0],[34,44,"4/8",0],[35,46,"4/8",0],[36,48,"4/8",0],[37,50,"4/8",0],[38,52,"4/8",0],[39,54,"4/8",0]]},{"r":40,"lado":"I","pas":null,"sec":["D10","C10","B10","A10"],"cel":[[10,1,"4/8",0],[11,3,"4/8",0],[12,5,"4/8",0],[13,7,"4/8",0],[14,9,"4/8",0],[15,11,"4/8",0],[18,15,"3/8",0],[19,17,"3/8",0],[20,19,"3/8",0],[21,21,"3/8",0],[22,23,"3/8",0],[23,25,"3/8",0],[29,35,"3/8",0],[30,37,"3/8",0],[31,39,"3/8",0],[34,43,"3/8",0],[35,45,"3/8",0],[36,47,"3/8",0],[37,49,"3/8",0],[38,51,"3/8",0],[39,53,"3/8",0]]},{"r":44,"lado":"P","pas":"01","sec":["D11","C11","B11","A11"],"cel":[[10,2,"25/7",1],[11,4,"25/7",1],[12,6,"25/7",1],[13,8,"25/7",1],[14,10,"25/7",1],[15,12,"25/7",1],[16,14,"16/7",1],[18,18,"25/7",1],[19,20,"25/7",1],[20,22,"25/7",1],[21,24,"25/7",1],[22,26,"16/7",1],[23,28,"16/7",1],[24,30,"25/7",1],[26,34,"25/7",1],[27,36,"25/7",1],[28,38,"25/7",1],[29,40,"6/6",1],[30,42,"16/7",1],[31,44,"16/7",1],[32,46,"16/7",1],[34,50,"25/7",1],[35,52,"9/7",1],[36,54,"25/7",1],[37,56,"16/7",1],[38,58,"25/7",1],[39,60,"16/7",1],[40,62,"16/7",1]]},{"r":45,"lado":"I","pas":"02","sec":["D12","C12","B12","A12"],"cel":[[10,1,"25/7",1],[11,3,"25/7",1],[12,5,"16/7",1],[13,7,"16/7",1],[14,9,"25/7",1],[15,11,"25/7",1],[16,13,"16/7",1],[18,17,"9/7",1],[19,19,"25/7",1],[20,21,"25/7",1],[21,23,"25/7",1],[22,25,"16/7",1],[23,27,"16/7",1],[24,29,"25/7",1],[26,33,"25/7",1],[27,35,"25/7",1],[28,37,"25/7",1],[29,39,"6/6",1],[30,41,"16/7",1],[31,43,"9/7",1],[32,45,"16/7",1],[34,49,"9/7",1],[35,51,"25/7",1],[36,53,"16/7",1],[37,55,"25/7",1],[38,57,"16/7",1],[39,59,"25/7",1],[40,61,"9/7",1]]},{"r":50,"lado":"P","pas":"02","sec":["D13","C13","B13","A13"],"cel":[[10,2,"9/7",1],[11,4,"9/7",1],[12,6,"9/7",1],[13,8,"9/7",1],[14,10,"9/7",1],[15,12,"9/7",1],[16,14,"16/7",1],[18,18,"16/7",1],[19,20,"16/7",1],[20,22,"16/7",1],[21,24,"16/7",1],[22,26,"16/7",1],[23,28,"16/7",1],[24,30,"16/7",1],[26,34,"25/7",1],[27,36,"16/7",1],[28,38,"25/7",1],[29,40,"6/6",1],[30,42,"6/6",1],[31,44,"6/6",1],[32,46,"6/6",1],[34,50,"6/6",1],[35,52,"6/6",1],[36,54,"6/6",1],[37,56,"6/6",1],[38,58,"9/7",1],[39,60,"9/7",1],[40,62,"9/7",1]]},{"r":51,"lado":"I","pas":"03","sec":["D14","C14","B14","A14"],"cel":[[10,1,"9/7",1],[11,3,"9/7",1],[12,5,"9/7",1],[13,7,"16/7",1],[14,9,"25/7",1],[15,11,"16/7",1],[16,13,"16/7",1],[18,17,"16/7",1],[19,19,"16/7",1],[20,21,"16/7",1],[21,23,"16/7",1],[22,25,"16/7",1],[23,27,"16/7",1],[24,29,"6/6",1],[26,33,"9/7",1],[27,35,"16/7",1],[28,37,"25/7",1],[29,39,"16/7",1],[30,41,"6/6",1],[31,43,"6/6",1],[32,45,"6/6",1],[34,49,"6/7",1],[35,51,"6/7",1],[36,53,"6/6",1],[37,55,"6/6",1],[38,57,"6/6",1],[39,59,"6/6",1],[40,61,"6/6",1]]}],"alt":[{"r":83,"lado":"I","pas":null,"sec":["H7","E4"],"cel":[[4,1,"4/8",0],[5,3,"4/8",0],[6,5,"4/8",0],[7,7,"4/8",0],[8,9,"4/8",0],[9,11,"4/8",0]]},{"r":86,"lado":"P","pas":null,"sec":["H6","G6","E3"],"cel":[[4,2,"4/8",0],[5,4,"4/8",0],[6,6,"4/8",0],[7,8,"4/8",0],[8,10,"4/8",0],[9,12,"4/8",0],[13,16,"4/8",0],[14,18,"4/8",0],[15,20,"4/8",0],[16,22,"4/8",0],[17,24,"4/8",0],[18,26,"4/8",0]]},{"r":87,"lado":"I","pas":null,"sec":["H5","G5","G5"],"cel":[[4,1,"4/8",0],[5,3,"4/8",0],[6,5,"4/8",0],[7,7,"4/8",0],[8,9,"4/8",0],[9,11,"4/8",0],[13,15,"4/8",0],[14,17,"1/7",0],[15,19,"4/8",0],[16,21,"1/6",0],[17,23,"2/6",0],[18,25,"4/8",0]]},{"r":90,"lado":"P","pas":null,"sec":["H4","G4"],"cel":[[4,2,"4/8",0],[5,4,"4/8",0],[6,6,"4/8",0],[7,8,"4/8",0],[8,10,"4/8",0],[9,12,"4/8",0],[13,16,"4/8",0],[14,18,"4/8",0],[15,20,"4/8",0],[16,22,"4/8",0],[17,24,"4/8",0],[18,26,"4/8",0]]},{"r":91,"lado":"I","pas":null,"sec":["H3","G3"],"cel":[[4,1,"4/8",0],[5,3,"4/8",0],[6,5,"4/8",0],[7,7,"4/8",0],[8,9,"4/8",0],[9,11,"4/8",0],[13,15,"4/8",0],[14,17,"4/8",0],[15,19,"4/8",0],[16,21,"4/8",0],[17,23,"4/8",0],[18,25,"4/8",0]]},{"r":95,"lado":"P","pas":"06","sec":["H2","G2","F2","E2"],"cel":[[4,2,"16/7",0],[5,4,"25/7",0],[6,6,"25/7",0],[7,8,"25/7",0],[8,10,"9/7",0],[9,12,"16/7",0],[10,14,"9/7",0],[13,18,"25/7",0],[14,20,"16/7",0],[15,22,"25/7",0],[16,24,"9/7",0],[17,26,"25/7",0],[18,28,"25/7",0],[19,30,"9/7",0],[23,36,"25/7",0],[24,38,"25/7",0],[25,40,"25/7",0],[26,42,"9/7",0],[27,44,"25/7",0],[28,46,"9/7",0],[29,48,"9/7",0],[32,52,"9/7",0],[33,54,"9/7",0],[34,56,"9/7",0],[35,58,"9/7",0],[36,60,"25/7",0],[37,62,"16/7",0],[38,64,"25/7",0]]},{"r":96,"lado":"I","pas":"05","sec":["H1","G1","F1","E1"],"cel":[[4,1,"16/7",0],[5,3,"16/7",0],[6,5,"16/7",0],[7,7,"16/7",0],[8,9,"16/7",0],[9,11,"9/7",0],[10,13,"16/7",0],[13,17,"16/7",0],[14,19,"9/7",0],[15,21,"25/7",0],[16,23,"25/7",0],[17,25,"25/7",0],[18,27,"16/7",0],[19,29,"25/7",0],[23,35,"16/7",0],[24,37,"16/7",0],[25,39,"25/7",0],[26,41,"25/7",0],[27,43,"16/7",0],[28,45,"25/7",0],[29,47,"25/7",0],[32,51,"16/7",0],[33,53,"16/7",0],[34,55,"25/7",0],[35,57,"25/7",0],[36,59,"16/7",0],[37,61,"25/7",0],[38,63,"16/7",0]]}],"racks":[{"id":"R16","col":9,"spec":"4/4","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R15","col":13,"spec":"4/6","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R14","col":14,"spec":"4/7","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R13","col":19,"spec":"4/7","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R12","col":20,"spec":"4/7","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R11","col":24,"spec":"4/6","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R10","col":25,"spec":"4/8","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R09","col":29,"spec":"4/8","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R08","col":30,"spec":"4/8","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R07","col":34,"spec":"4/7","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R06","col":35,"spec":"4/7","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R05","col":39,"spec":"4/7","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R04","col":40,"spec":"4/7","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R03","col":45,"spec":"4/7","n":8,"nums":[1,3,5,7,9,11,13,15]},{"id":"R02","col":46,"spec":"4/7","n":8,"nums":[2,4,6,8,10,12,14,16]},{"id":"R01","col":52,"spec":"4/7","n":8,"nums":[1,3,5,7,9,11,13,15]}],"pasRack":{"11":"Pas 8","16":"Pas 7","22":"Pas 6","27":"Pas 5","32":"Pas 4","37":"Pas 3","42":"Pas 2","49":"Pas 1"}};
+let A0001RACKS={};
 const A0001=(function(){
   const dec=s=>{const b=atob(s),u=new Uint8Array(b.length);
     for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i); return u;};
@@ -814,97 +783,142 @@ const A0001=(function(){
   const bit=(m,b)=>Math.floor(m/Math.pow(2,b))%2;
   const pad=(n,w)=>String(n).padStart(w||2,'0');
 
-  /* ---- zonas y emplazamiento ---------------------------------------
-     Calcado del plano maestro (hoja "Plano FASA con notas"). El pasillo
-     de SAP es el CORREDOR; par e impar son sus dos lados, y dos filas
-     van espalda contra espalda entre corredor y corredor:
-
-        ===== pasillo 01 =====
-        fila de cuerpos PARES   de 01   (mira al 01)
-        fila de cuerpos IMPARES de 02   (mira al 02)
-        ===== pasillo 02 =====
-        fila de cuerpos PARES   de 02   (mira al 02)
-        fila de cuerpos IMPARES de 03   (mira al 03)
-        ===== pasillo 03 =====
-
-     Verificado cruzando la secuencia de capacidades de cada fila del
-     plano contra la del maestro de SAP: el pasillo 05 coincide en 28 de
-     28 cuerpos y el 06 en 13 de 13.
-     Los cuerpos van en grupos de 7 con una calle entre grupo y grupo,
-     como los separa el plano (secciones A, B, C, D / E, F, G, H).      */
+  /* ---- 1. emplazamiento, calcado del plano maestro -------------------
+     El plano "Plano FASA con notas" dibuja el bloque completo del
+     mezzanine como 15 filas con secciones D, C, B y A: D0 a D10 son
+     estanterías y D11 a D14 los gabinetes del almacén 0001. El altillo
+     repite el esquema con 7 filas (secciones H, G, F, E).
+     El pasillo de SAP es el CORREDOR: par e impar son sus dos lados, y
+     dos filas van espalda contra espalda entre corredor y corredor.
+     Verificado cruzando la secuencia de capacidades de cada fila contra
+     el maestro: los pasillos 01, 02, 03 y 05 coinciden cuerpo por
+     cuerpo. La grilla del Excel no está a escala (los anchos de columna
+     son irregulares), así que de ahí sale la TOPOLOGÍA y las medidas
+     salen de ajustar el bloque a la huella del mezzanine.             */
   const PISO={'01':'PB','02':'PB','03':'PB','04':'EXT','05':'ALT','06':'ALT'};
   const ZNOM={PB:'PB mezzanine',ALT:'Altillo',EXT:'Fuera del mezzanine'};
-  const FILAS=[
-    {pas:'01',par:0,y:0,    z: 2.33,face:-1},
-    {pas:'02',par:1,y:0,    z: 2.98,face: 1},
-    {pas:'02',par:0,y:0,    z: 5.63,face:-1},
-    {pas:'03',par:1,y:0,    z: 6.28,face: 1},
-    {pas:'06',par:0,y:5.23, z: 2.33,face:-1},
-    {pas:'05',par:1,y:5.23, z: 2.98,face: 1},
-    {pas:'04',par:1,y:0,    z:20.50,face:-1}];   // fuera del mezzanine: posición aún por calcar
-  const X0=-35.9, PITCH=.86, GAP=.80, GRUPO=7;
-  const CW=.80, CD=.62, CH=1.85, TOPH=.26;
+  const BLOQ={
+    pb: {y:0,    z0:-0.80, x0:-35.9, orden:[[17,0],[20,1],[21,0],[26,1],[27,0],[30,1],[31,0],
+                                            [34,1],[35,0],[39,1],[40,0],[44,1],[45,0],[50,1],[51,0]]},
+    alt:{y:5.23, z0: 0.40, x0:-35.4, orden:[[83,0],[86,1],[87,0],[90,1],[91,0],[95,1],[96,0]]}};
+  const PITCH=.82, GAP=.80, DF=.60, AISLE=.85;   // paso, calle, fondo de fila, pasillo
+  const CW=.76, CD=.56, CH=1.85, TOPH=.26;       // gabinete
+  const EH=2.05, ED=.52;                         // estantería
 
-  /* ---- 1. reconstruir cuerpos, cajones y ubicaciones -------------- */
-  const CU=[], LOC=[], byCode={};
-  (function(){ let k=0;
-    D0001.cuerpos.forEach(c=>{
-      const pas=c[0], col=c[1];
-      const cu={pas:pas, col:col, zona:PISO[pas]||'EXT', caj:[], n:0, i:CU.length};
-      c[2].split(',').forEach(part=>{
-        const q=part.split(':'), niv=q[0], mask=D0001.masks[+q[1]];
-        const cj={niv:niv, nivN:+niv, locs:[], cu:cu};
-        for(let b=0;b<36;b++){
-          if(!bit(mask,b)) continue;
-          const sub=(b/6|0)+1, pos=b%6;
-          const code='0001-'+pas+'-'+col+'-'+niv+'-'+pad(sub)+(pos?'-'+pos:'');
-          LOC.push({i:k, cu:cu, cj:cj, sub:sub, pos:pos, code:code});
-          byCode[code]=LOC[k]; cj.locs.push(k); k++;
-        }
-        cu.caj.push(cj); cu.n+=cj.locs.length;
-      });
-      CU.push(cu);
+  /* ---- 2. reconstruir cuerpos, cajones y ubicaciones ------------------
+     Los gabinetes se enganchan con el maestro de SAP por (pasillo,
+     cuerpo). Las estanterías todavía no tienen maestro cargado: se
+     dibujan con su capacidad instalada y se marcan como sin dato.      */
+  const CU=[], LOC=[], byCode={}, GABSAP={};
+  D0001.cuerpos.forEach(c=>{ GABSAP[c[0]+'-'+(+c[1])]=c; });
+  const usados={};
+  function nuevoCuerpo(o){ o.i=CU.length; o.caj=[]; o.n=0; CU.push(o); return o; }
+  function armarGab(cu, spec){
+    const d=GABSAP[cu.pas+'-'+cu.num];
+    cu.sap=!!d;
+    if(!d){                                      // en el plano pero sin alta en SAP
+      const m=/^(\d+)\/(\d+)$/.exec(spec); if(!m) return;
+      for(let n=1;n<=+m[2];n++) cu.caj.push({niv:String(n).padStart(2,'0'),nivN:n,locs:[],cu:cu,sin:true});
+      cu.cap=(+m[1])*(+m[2]); return;
+    }
+    usados[cu.pas+'-'+cu.num]=1;
+    d[2].split(',').forEach(part=>{
+      const q=part.split(':'), niv=q[0], mask=D0001.masks[+q[1]];
+      const cj={niv:niv,nivN:+niv,locs:[],cu:cu};
+      for(let b=0;b<36;b++){
+        if(Math.floor(mask/Math.pow(2,b))%2===0) continue;
+        const sub=(b/6|0)+1, pos=b%6;
+        const code='0001-'+cu.pas+'-'+d[1]+'-'+niv+'-'+String(sub).padStart(2,'0')+(pos?'-'+pos:'');
+        LOC.push({i:LOC.length,cu:cu,cj:cj,sub:sub,pos:pos,code:code});
+        byCode[code]=LOC[LOC.length-1]; cj.locs.push(LOC.length-1);
+      }
+      cu.caj.push(cj); cu.n+=cj.locs.length;
     });
-  })();
-
-  /* ---- 2. emplazar cada fila del plano ----------------------------- */
-  function colocar(list,f){
-    list.sort((a,b)=>(+a.col)-(+b.col)).forEach((c,i)=>{
-      c.x=X0+i*PITCH+Math.floor(i/GRUPO)*GAP; c.y=f.y; c.z=f.z; c.face=f.face; }); }
-  FILAS.forEach(f=>colocar(CU.filter(c=>c.pas===f.pas && (+c.col)%2===f.par), f));
-  // cuerpos cuyo código no cae en ninguna fila (anomalías del maestro):
-  // se cuelgan al final de la fila de su pasillo para que no queden fuera del modelo
-  CU.filter(c=>c.x===undefined).forEach(c=>{
-    const f=FILAS.filter(x=>x.pas===c.pas)[0] || FILAS[FILAS.length-1];
-    const n=CU.filter(x=>x.z===f.z && x.y===f.y).length;
-    c.x=X0+n*PITCH+Math.floor(n/GRUPO)*GAP; c.y=f.y; c.z=f.z; c.face=f.face; });
-
-  // alturas: los niveles 1-7 son cajones; los que pasan de 7 son cajas sobre el gabinete
+    cu.col=d[1]; cu.cap=cu.n;
+  }
+  function armarEst(cu, spec){
+    const m=/^(\d+)\/(\d+)$/.exec(spec); if(!m) return;
+    const porNiv=+m[1], niv=+m[2];
+    for(let n=1;n<=niv;n++) cu.caj.push({niv:String(n).padStart(2,'0'),nivN:n,locs:[],cu:cu,sin:true,porNiv:porNiv});
+    cu.cap=porNiv*niv; cu.sap=false;
+  }
+  Object.keys(BLOQ).forEach(bk=>{
+    const B=BLOQ[bk], filas=PLANO[bk];
+    let z=B.z0;
+    B.orden.forEach(o=>{
+      const rn=o[0], aisleAntes=o[1];
+      const f=filas.filter(x=>x.r===rn)[0]; if(!f) return;
+      if(aisleAntes) z+=AISLE;
+      const zc=z+DF/2, face=(f.lado==='I')?1:-1;
+      let x=B.x0, prev=null;
+      f.cel.forEach(cel=>{
+        const col=cel[0], num=cel[1], spec=cel[2], top=cel[3];
+        if(prev!==null && col-prev>1) x+=GAP;
+        const es=!!f.pas;
+        const cu=nuevoCuerpo({tipo:es?'GAB':'EST', pas:f.pas||('E'+rn), num:num, col:String(num||col),
+          spec:spec, sec:f.sec[0]||'', zona:es?PISO[f.pas]:(bk==='pb'?'PB':'ALT'),
+          x:x+PITCH/2, y:B.y, z:zc, face:face, fila:rn, top:top});
+        if(es) armarGab(cu,spec); else armarEst(cu,spec);
+        x+=PITCH; prev=col;
+      });
+      z+=DF;
+    });
+  });
+  // cuerpos del maestro que este bloque del plano no dibuja.
+  // El pasillo 04 está fuera del mezzanine y arma su propia fila; su posición
+  // es la única que no sale del plano.
+  const FUERA={y:0, z:20.50, x0:-7.0, face:-1};
+  const faltan=Object.keys(GABSAP).filter(k=>!usados[k]);
+  const porPas={};
+  faltan.forEach(k=>{ const d=GABSAP[k]; (porPas[d[0]]=porPas[d[0]]||[]).push(d); });
+  Object.keys(porPas).sort().forEach(pas=>{
+    const lista=porPas[pas].sort((a,b)=>(+a[1])-(+b[1]));
+    const herm=CU.filter(c=>c.tipo==='GAB'&&c.pas===pas);
+    const ref=herm.length?herm[herm.length-1]:null;
+    lista.forEach((d,i)=>{
+      const cu=nuevoCuerpo({tipo:'GAB',pas:pas,num:+d[1],col:d[1],spec:'',
+        sec:ref?ref.sec:'', zona:PISO[pas]||'EXT',
+        x:ref? ref.x+(i+1)*PITCH : FUERA.x0+PITCH/2+i*PITCH,
+        y:ref?ref.y:FUERA.y, z:ref?ref.z:FUERA.z,
+        face:ref?ref.face:FUERA.face, fila:ref?ref.fila:0, top:0, fueraDePlano:true});
+      armarGab(cu,'');
+    });
+  });
+  // alturas de cajón
   CU.forEach(c=>{
+    const H=(c.tipo==='GAB')?CH:EH;
     const dr=c.caj.filter(j=>j.nivN<=7).sort((a,b)=>a.nivN-b.nivN);
     const tp=c.caj.filter(j=>j.nivN>7).sort((a,b)=>a.nivN-b.nivN);
-    const dh=CH/Math.max(1,dr.length);
+    const dh=H/Math.max(1,dr.length);
     dr.forEach((j,i)=>{ j.y0=c.y+i*dh; j.h=dh; j.top=false; });
-    tp.forEach((j,i)=>{ j.y0=c.y+CH+.04+i*TOPH; j.h=TOPH-.03; j.top=true; });
-    c.h=CH+(tp.length? .04+tp.length*TOPH : 0);
+    tp.forEach((j,i)=>{ j.y0=c.y+H+.04+i*TOPH; j.h=TOPH-.03; j.top=true; });
+    c.h=H+(tp.length? .04+tp.length*TOPH : 0);
+    const w=(c.tipo==='GAB')?CW:PITCH-.08, d2=(c.tipo==='GAB')?CD:ED;
+    c.w=w; c.d=d2;
     c.caj.forEach(j=>{ j.box=new THREE.Box3(
-      new THREE.Vector3(c.x-CW/2, j.y0, c.z-CD/2),
-      new THREE.Vector3(c.x+CW/2, j.y0+j.h, c.z+CD/2)); });
+      new THREE.Vector3(c.x-w/2, j.y0, c.z-d2/2),
+      new THREE.Vector3(c.x+w/2, j.y0+j.h, c.z+d2/2)); });
   });
   const CAJ=[]; CU.forEach(c=>c.caj.forEach(j=>{ j.i=CAJ.length; CAJ.push(j); }));
 
-  /* ---- 3. geometría ----------------------------------------------- */
+  /* ---- 3. geometría --------------------------------------------------- */
   const M=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c},o||{}));
   const g=new THREE.Group(); scene.add(g);
-  function IM(mat,n){ const m=new THREE.InstancedMesh(GEO.box,mat,n);
+  function IM(mat,n){ const m=new THREE.InstancedMesh(GEO.box,mat,Math.max(1,n));
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.castShadow=m.receiveShadow=true; m.frustumCulled=false; g.add(m); return m; }
-  const nDr=CAJ.filter(j=>!j.top).length, nTp=CAJ.length-nDr;
-  const bodyIM =IM(M(0x9aa0a6,{roughness:.7,metalness:.25}), CU.length);
+  const GABS=CU.filter(c=>c.tipo==='GAB'), ESTS=CU.filter(c=>c.tipo==='EST');
+  const nDr=CAJ.filter(j=>!j.top && j.cu.tipo==='GAB').length;
+  const nTp=CAJ.filter(j=>j.top).length;
+  const nEstRep=CAJ.filter(j=>j.cu.tipo==='EST').length;
+  const bodyIM =IM(M(0x9aa0a6,{roughness:.7,metalness:.25}), GABS.length);
   const frontIM=IM(M(0xa8aeb4,{roughness:.6,metalness:.3 }), nDr);
   const handIM =IM(M(0xd8dde2,{roughness:.25,metalness:.8}), nDr);
-  const topIM  =IM(M(0x8e949a,{roughness:.75,metalness:.2}), Math.max(1,nTp));
-  const labIM  =IM(M(0xf2b705,{roughness:.5 }), CU.length);
+  const topIM  =IM(M(0x8e949a,{roughness:.75,metalness:.2}), nTp);
+  const labIM  =IM(M(0xf2b705,{roughness:.5 }), GABS.length);
+  const estUpIM=IM(M(0x3c4248,{roughness:.6,metalness:.4}), ESTS.length*2);
+  const estShIM=IM(M(0xb7bcc2,{roughness:.5,metalness:.45}), nEstRep);
+  const estBoxIM=IM(M(0xb98a52,{roughness:.9}), nEstRep);
   const plateIM=new THREE.InstancedMesh(GEO.box,
     new THREE.MeshBasicMaterial({toneMapped:false}), CAJ.length);
   plateIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -915,25 +929,70 @@ const A0001=(function(){
   const set=(im,i,x,y,z,sx,sy,sz)=>{ M4.compose(VP.set(x,y,z),QQ,VS.set(sx,sy,sz));
     im.setMatrixAt(i,M4); };
   (function build(){
-    let di=0, ti=0;
-    CU.forEach((c,ci)=>{
-      set(bodyIM,ci, c.x, c.y+CH/2, c.z, CW, CH, CD);
-      set(labIM, ci, c.x, c.y+CH-.10, c.z+c.face*(CD/2+.015), .30,.15,.012);
+    let bi=0, di=0, ti=0, ui=0, si=0;
+    CU.forEach(c=>{
+      if(c.tipo==='GAB'){
+        set(bodyIM,bi, c.x, c.y+CH/2, c.z, c.w, CH, c.d);
+        set(labIM, bi, c.x, c.y+CH-.10, c.z+c.face*(c.d/2+.015), .26,.13,.012); bi++;
+      } else {
+        for(const s of [-1,1])
+          set(estUpIM,ui++, c.x+s*(c.w/2-.03), c.y+EH/2, c.z, .06, EH, c.d);
+      }
       c.caj.forEach(j=>{
-        if(j.top){ set(topIM, ti++, c.x, j.y0+j.h/2, c.z, CW-.08, j.h, CD-.10); }
-        else {
-          const zf=c.z+c.face*(CD/2+.013);
-          set(frontIM,di, c.x, j.y0+j.h/2, zf, CW-.05, j.h-.022, .026);
-          set(handIM, di, c.x, j.y0+j.h*.78, zf+c.face*.045, CW*.76, .032, .022);
-          di++;
+        if(j.top){ set(topIM, ti++, c.x, j.y0+j.h/2, c.z, c.w-.08, j.h, c.d-.10); return; }
+        if(c.tipo==='GAB'){
+          const zf=c.z+c.face*(c.d/2+.013);
+          set(frontIM,di, c.x, j.y0+j.h/2, zf, c.w-.05, j.h-.022, .026);
+          set(handIM, di, c.x, j.y0+j.h*.78, zf+c.face*.045, c.w*.76, .032, .022); di++;
+        } else {
+          set(estShIM,si, c.x, j.y0+.02, c.z, c.w-.04, .03, c.d);        // bandeja
+          set(estBoxIM,si, c.x, j.y0+j.h*.45, c.z, c.w*.82, j.h*.62, c.d*.72); si++;
         }
       });
     });
-    [bodyIM,frontIM,handIM,topIM,labIM].forEach(m=>m.instanceMatrix.needsUpdate=true);
+    [bodyIM,frontIM,handIM,topIM,labIM,estUpIM,estShIM,estBoxIM].forEach(m=>m.instanceMatrix.needsUpdate=true);
+  })();
+
+  /* ---- 3b. racks de pallets del plano --------------------------------- */
+  (function racks(){
+    const Z0=-30.6, BAY=2.20, RD=1.10, LH=1.55;
+    const cols=PLANO.racks.map(r=>r.col).sort((a,b)=>a-b);
+    const pas=Object.keys(PLANO.pasRack).map(Number).sort((a,b)=>a-b);
+    // ancho disponible en Nave 1 para la batería de racks
+    const X0=-41.0, X1=6.0, AIS=(X1-X0-PLANO.racks.length*RD)/pas.length;
+    let x=X0, prev=null;
+    const up=[], bm=[], pl=[];
+    PLANO.racks.forEach(r=>{
+      if(prev!==null){ const hayPas=pas.some(p=>p>prev&&p<r.col); x+= hayPas?AIS:0.10; }
+      const m=/^(\d+)\/(\d+)$/.exec(r.spec), porNiv=m?+m[1]:4, niv=m?+m[2]:7;
+      const cx=x+RD/2;
+      for(let b=0;b<r.n;b++){
+        const z0=Z0+b*BAY;
+        for(const o of [0,BAY]) up.push([cx,LH*niv/2,z0+o]);
+        for(let L=1;L<niv;L++){
+          bm.push([cx,L*LH,z0+BAY/2]);
+          for(let p=0;p<porNiv/2;p++)
+            if(((b*7+L*3+p)%10)<7) pl.push([cx+(p%2?.26:-.26),L*LH+.14,z0+BAY/2+(p<2?-.55:.55)]);
+        }
+      }
+      r.x=cx; r.niv=niv; x+=RD; prev=r.col;
+    });
+    const upIM=IM(M(0x2f6fb0,{roughness:.55,metalness:.45}), up.length);
+    const bmIM=IM(M(0xe8590c,{roughness:.5,metalness:.3}), bm.length);
+    const plIM=IM(M(0xb08d57,{roughness:.95}), pl.length);
+    up.forEach((p,i)=>set(upIM,i,p[0],p[1],p[2],.12,p[1]*2,.12));
+    bm.forEach((p,i)=>set(bmIM,i,p[0],p[1],p[2],RD*.9,.12,BAY));
+    pl.forEach((p,i)=>set(plIM,i,p[0],p[1],p[2],.95,.70,1.05));
+    [upIM,bmIM,plIM].forEach(m=>m.instanceMatrix.needsUpdate=true);
+    A0001RACKS={n:PLANO.racks.length, cuerpos:PLANO.racks.reduce((a,r)=>a+r.n,0),
+      pos:PLANO.racks.reduce((a,r)=>{const m=/^(\d+)\/(\d+)$/.exec(r.spec);
+        return a+(m?(+m[1])*(+m[2])*r.n:0);},0)};
   })();
 
   /* ---- 4. estadística por cajón ----------------------------------- */
   function stat(j){
+    if(j.sin) return {sin:true,n:0,oc:0,p:0,fill:0,blq:0,meses:255,vol:0,
+                      cap:(j.porNiv||1)};
     let n=0,oc=0,fs=0,blq=0,mn=255,vol=0,sc=0;
     for(let q=0;q<j.locs.length;q++){ const idx=j.locs[q], a=SA[idx]; n++;
       if(a&1){ oc++; const fb=(a>>1)&7; if(fb!==7){ fs+=fb; sc++; }
@@ -947,7 +1006,9 @@ const A0001=(function(){
   const RB=[0xcde2fb,0x9ec5f4,0x5598e7,0x2a78d6,0x1c5cab];   // secuencial azul
   const RO=[0xfbe3d2,0xf6bd95,0xee9158,0xd95926,0xa8431b];   // secuencial naranja
   const MUTE=0x898781, HI=0x3987e5, CRIT=0xd03b3b, CAT=[0x3987e5,0xd95926,0x199e70];
+  const SIN=0x5a6066;                                 // sin maestro cargado
   function color(s){
+    if(s.sin) return SIN;
     switch(mode){
       case 'ocup': return s.oc===0?RB[0]:RB[s.p<=.4?1:s.p<=.7?2:s.p<=.9?3:4];
       case 'llen': return s.oc===0?RB[0]:RB[s.fill<=1?1:s.fill<=2?2:s.fill<=4?3:4];
@@ -966,18 +1027,20 @@ const A0001=(function(){
     blq :[['Con bloqueo','#d03b3b'],['Sin bloqueo','#898781']],
     tam :[['Chico ≤ 1,5 L','#3987e5'],['Medio ≤ 2,5 L','#d95926'],['Grande > 2,5 L','#199e70']],
     off :[]};
+  const LEG_SIN=['Sin maestro en SAP','#5a6066'];
 
   /* ---- 6. filtros ------------------------------------------------- */
   let zone='all', pasF='all', mode='ocup', active=false, isolate=true, roofWas=true;
-  const cuOK=c=>(zone==='all'||c.zona===zone)&&(pasF==='all'||c.pas===pasF);
+  const cuOK=c=>(zone==='all'||c.zona===zone)&&
+    (pasF==='all' || (pasF==='EST' ? c.tipo==='EST' : c.pas===pasF));
 
   function repaint(){
     let n=0;
     if(mode!=='off') CU.forEach(c=>{ if(!cuOK(c)) return;
       c.caj.forEach(j=>{ const s=stat(j);
-        const zf=c.z+c.face*(CD/2+(j.top?.05:.034));
-        set(plateIM,n, c.x, j.y0+j.h/2, j.top?c.z:zf, CW-.10, Math.max(.04,j.h-.05), .02);
-        if(j.top) set(plateIM,n, c.x, j.y0+j.h+.015, c.z, CW-.16,.02, CD-.14);
+        const zf=c.z+c.face*(c.d/2+(j.top?.05:.034));
+        set(plateIM,n, c.x, j.y0+j.h/2, j.top?c.z:zf, c.w-.10, Math.max(.04,j.h-.05), .02);
+        if(j.top) set(plateIM,n, c.x, j.y0+j.h+.015, c.z, c.w-.16,.02, c.d-.14);
         plateIM.setColorAt(n, CO.setHex(color(s))); n++; });
     });
     plateIM.count=n; plateIM.instanceMatrix.needsUpdate=true;
@@ -1004,8 +1067,8 @@ const A0001=(function(){
     dist=fly.d0+(fly.d1-fly.d0)*e; applyCam(); if(u>=1) fly=null; }
   function bboxVis(){ const b=new THREE.Box3(); let any=false;
     CU.forEach(c=>{ if(!cuOK(c)) return; any=true;
-      b.expandByPoint(new THREE.Vector3(c.x-CW/2,c.y,c.z-CD/2));
-      b.expandByPoint(new THREE.Vector3(c.x+CW/2,c.y+c.h,c.z+CD/2)); });
+      b.expandByPoint(new THREE.Vector3(c.x-c.w/2,c.y,c.z-c.d/2));
+      b.expandByPoint(new THREE.Vector3(c.x+c.w/2,c.y+c.h,c.z+c.d/2)); });
     return any?b:null; }
   // de qué lado están los frentes de los gabinetes visibles: la cámara va de ese lado
   function frontSide(){ let f=0; CU.forEach(c=>{ if(cuOK(c)) f+=c.face; }); return f>=0?1:-1; }
@@ -1046,9 +1109,9 @@ const A0001=(function(){
     sel=j; selLoc=loc||null;
     if(!j){ hi.visible=hib.visible=false; drawDet(); return; }
     const c=j.cu;
-    hi.position.set(c.x,j.y0+j.h/2,c.z); hi.scale.set(CW+.03,j.h,CD+.03);
+    hi.position.set(c.x,j.y0+j.h/2,c.z); hi.scale.set(c.w+.03,j.h,c.d+.03);
     hib.box.copy(j.box); hi.visible=hib.visible=true;
-    if(move) flyTo(new THREE.Vector3(c.x,j.y0+j.h/2,c.z+c.face*2.2),
+    if(move) flyTo(new THREE.Vector3(c.x,j.y0+j.h/2,c.z+c.face*2.4),
                    theta,Math.min(phi,1.45),Math.max(10,Math.min(dist,16)),650);
     drawDet(); }
 
@@ -1059,8 +1122,10 @@ const A0001=(function(){
   let sortBy='pas';
 
   function agg(){
-    const s={n:0,oc:0,blq:0,viejo:0,pas:{}};
+    const s={n:0,oc:0,blq:0,viejo:0,pas:{},est:0,estCap:0,sinAlta:0};
     CU.forEach(c=>{ if(!cuOK(c)) return;
+      if(c.tipo==='EST'){ s.est++; s.estCap+=c.cap||0; return; }
+      if(!c.sap){ s.sinAlta++; s.estCap+=c.cap||0; return; }
       const r=s.pas[c.pas]||(s.pas[c.pas]={n:0,oc:0});
       c.caj.forEach(j=>{ for(let q=0;q<j.locs.length;q++){ const idx=j.locs[q],a=SA[idx];
         s.n++; r.n++;
@@ -1072,9 +1137,12 @@ const A0001=(function(){
     $('kTot').textContent=nf(s.n); $('kOcu').textContent=nf(s.oc);
     $('kPct').textContent=s.n?Math.round(s.oc/s.n*100)+'%':'—';
     $('kVac').textContent=nf(s.n-s.oc);
-    $('mzVol').textContent='Sin mover hace más de 1 año: '+nf(s.viejo)
+    $('mzVol').innerHTML='Sin mover hace más de 1 año: '+nf(s.viejo)
       +(s.oc?' ('+Math.round(s.viejo/s.oc*100)+'% de lo ocupado)':'')
-      +'  ·  con bloqueo: '+nf(s.blq);
+      +'  ·  con bloqueo: '+nf(s.blq)
+      +((s.est||s.sinAlta)?'<br><span style="color:var(--mute)">Además '+nf(s.est)
+        +' cuerpos de estantería'+(s.sinAlta?' y '+nf(s.sinAlta)+' gabinetes':'')
+        +' del plano, con '+nf(s.estCap)+' posiciones instaladas y sin maestro en SAP.</span>':'');
     const ks=Object.keys(s.pas);
     ks.sort(sortBy==='pas'?undefined:(a,b)=>(s.pas[a].oc/s.pas[a].n)-(s.pas[b].oc/s.pas[b].n));
     $('mzRows').innerHTML=ks.map(k=>{ const r=s.pas[k], p=r.n?r.oc/r.n:0;
@@ -1085,14 +1153,19 @@ const A0001=(function(){
       pasF=d.dataset.p; drawPas(); refresh(); markIso(); VIEWS.iso(); }));
     $('mzRowsLbl').textContent='Ocupación por pasillo ▾ '+(sortBy==='pas'?'orden':'peor primero'); }
   function drawPas(){
-    const zs=CU.filter(c=>zone==='all'||c.zona===zone).map(c=>c.pas);
-    const u=Array.from(new Set(zs)).sort();
+    const vis=CU.filter(c=>zone==='all'||c.zona===zone);
+    const u=Array.from(new Set(vis.filter(c=>c.tipo==='GAB').map(c=>c.pas))).sort();
+    const hayEst=vis.some(c=>c.tipo==='EST');
     $('mzPas').innerHTML='<button data-p="all"'+(pasF==='all'?' class="on"':'')+'>Todos</button>'
-      +u.map(p=>'<button data-p="'+p+'"'+(pasF===p?' class="on"':'')+'>'+p+'</button>').join('');
+      +u.map(p=>'<button data-p="'+p+'"'+(pasF===p?' class="on"':'')+'>'+p+'</button>').join('')
+      +(hayEst?'<button data-p="EST"'+(pasF==='EST'?' class="on"':'')+' title="Estanterías del plano, sin maestro en SAP">Estant.</button>':'');
     $('mzPas').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
       pasF=b.dataset.p; drawPas(); refresh(); })); }
-  function drawLeg(){ $('mzLg').innerHTML=(LEG[mode]||[]).map(e=>
-    '<span><i style="background:'+e[1]+'"></i>'+e[0]+'</span>').join(''); }
+  function drawLeg(){
+    let L=(LEG[mode]||[]).slice();
+    if(L.length && CU.some(c=>cuOK(c)&&!c.sap)) L.push(LEG_SIN);
+    $('mzLg').innerHTML=L.map(e=>
+      '<span><i style="background:'+e[1]+'"></i>'+e[0]+'</span>').join(''); }
   function drawSrc(){ $('mzSrcTxt').textContent='Fuente: '+src.name;
     $('mzSrc').className='src'+(src.orig?'':' demo');
     $('mzSrc').querySelector('.dot').textContent='●'; }
@@ -1105,11 +1178,19 @@ const A0001=(function(){
     if(!sel){ d.innerHTML='<span class="none">Clic en un cajón de la maqueta para ver '
       +'su ubicación y lo que hay adentro.</span>'; return; }
     const c=sel.cu, s=stat(sel);
-    let h='<div class="code">0001-'+c.pas+'-'+c.col+'-'+sel.niv+'</div>'
+    const esGab=c.tipo==='GAB';
+    let h='<div class="code">'+(esGab?'0001-'+c.pas+'-'+c.col+'-'+sel.niv
+            :'Estantería '+(c.sec||'')+' · cuerpo '+(c.num!=null?c.num:'?'))+'</div>'
       +'<dl><dt>Zona</dt><dd>'+ZNOM[c.zona]+'</dd>'
-      +'<dt>Pasillo</dt><dd>'+c.pas+'</dd><dt>Cuerpo</dt><dd>'+c.col+'</dd>'
-      +'<dt>'+(sel.top?'Nivel':'Cajón')+'</dt><dd>'+sel.niv+' de '+c.caj.length+'</dd>'
-      +'<dt>Ubicaciones</dt><dd>'+s.n+' · '+s.oc+' ocupadas ('+Math.round(s.p*100)+' %)</dd></dl>';
+      +'<dt>Tipo</dt><dd>'+(esGab?'Gabinete de cajones':'Estantería')+'</dd>'
+      +(esGab?'<dt>Pasillo</dt><dd>'+c.pas+'</dd><dt>Cuerpo</dt><dd>'+c.col+'</dd>':'')
+      +(c.sec?'<dt>Sección</dt><dd>'+c.sec+' (fila '+c.fila+' del plano)</dd>':'')
+      +'<dt>'+(sel.top?'Nivel':(esGab?'Cajón':'Bandeja'))+'</dt><dd>'+sel.niv+' de '+c.caj.length+'</dd>'
+      +(c.spec?'<dt>Plano</dt><dd>'+c.spec+' = '+(c.cap||0)+' posiciones</dd>':'')
+      +(c.sap?'<dt>Ubicaciones</dt><dd>'+s.n+' · '+s.oc+' ocupadas ('+Math.round(s.p*100)+' %)</dd>'
+             :'<dt>Maestro</dt><dd style="color:var(--warn)">▲ sin alta en SAP</dd>')
+      +'</dl>';
+    if(!c.sap){ d.innerHTML=h; return; }
     // grilla de compartimentos del cajón
     const subs=[],poss=[];
     sel.locs.forEach(i=>{ const l=LOC[i];
@@ -1180,9 +1261,11 @@ const A0001=(function(){
     last=e; if(raf) return;
     raf=requestAnimationFrame(()=>{ raf=0; const ev=last, j=at(ev.clientX,ev.clientY);
       if(!j){ tipEl.style.display='none'; return; }
-      const s=stat(j);
-      tipEl.innerHTML='<b>0001-'+j.cu.pas+'-'+j.cu.col+'-'+j.niv+'</b><br>'
-        +s.oc+'/'+s.n+' ocupadas'+(s.oc?' · '+(s.meses===255?'sin fecha':mesesTxt(s.meses)):'');
+      const s=stat(j), c=j.cu;
+      tipEl.innerHTML='<b>'+(c.tipo==='GAB'?'0001-'+c.pas+'-'+c.col+'-'+j.niv
+          :'Estantería '+(c.sec||'')+' · '+(c.num!=null?'cuerpo '+c.num:''))+'</b><br>'
+        +(c.sap ? s.oc+'/'+s.n+' ocupadas'+(s.oc?' · '+(s.meses===255?'sin fecha':mesesTxt(s.meses)):'')
+                : '<span>'+(c.spec?c.spec+' · '+(c.cap||0)+' posiciones · ':'')+'sin maestro</span>');
       tipEl.style.display='block';
       const r=tipEl.getBoundingClientRect();
       tipEl.style.left=Math.min(ev.clientX+14,innerWidth-r.width-8)+'px';

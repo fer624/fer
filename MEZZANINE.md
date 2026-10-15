@@ -72,6 +72,30 @@ y en el plano no aparece en el mismo bloque, así que sigue en una posición
 tentativa; y las medidas del gabinete (0,80 × 0,62 × 1,85 m), tomadas para que
 28 cuerpos más tres calles entren en el ancho del mezzanine, no de una cota.
 
+## 2b. El resto de la maqueta, también del plano
+
+El plano no sólo ubica los gabinetes: dibuja todo el almacenaje. La maqueta se
+construye entera desde ahí.
+
+| | Cuerpos | Posiciones |
+|---|---|---|
+| Gabinetes planta baja (filas D11–D14) | 112 | 12.519 en SAP |
+| Gabinetes altillo (filas H1–H2) | 56 | 2.638 en SAP + 15 cuerpos sin alta |
+| Gabinetes pasillo 04 (fuera del mezzanine) | 16 | 1.562 en SAP |
+| Estanterías planta baja (filas D0–D10) | 229 | 4.744 instaladas, sin maestro |
+| Estanterías altillo (filas H3–H7) | 54 | 1.666 instaladas, sin maestro |
+| Racks de pallets R01–R16 (8 pasillos) | 128 | 3.520 instaladas, sin maestro |
+| **Total modelado** | **595** | |
+
+Las celdas `N/M` del plano se leen igual en todos lados: **posiciones por nivel /
+cantidad de niveles**. Un `4/8` de estantería son 4 posiciones en cada una de
+8 bandejas; un `4/7` de rack son 4 pallets por nivel en 7 niveles.
+
+Lo que tiene maestro en SAP se pinta con el dato real; lo que no, se dibuja en
+gris y el panel lo informa aparte. Así la maqueta muestra de un vistazo **dónde
+hay capacidad instalada que el sistema no conoce**: 283 cuerpos de estantería,
+15 gabinetes del altillo y los 16 racks de pallets.
+
 ## 3. Qué muestra
 
 Seis modos de color sobre los frentes de los cajones:
