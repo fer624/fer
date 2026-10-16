@@ -162,9 +162,19 @@ o fusionar, para no perder precios con un archivo parcial o mal mapeado.
 
 ### La marca
 
+Los colores salen del logo de CEVA: navy `#001038` y rojo `#f80000`.
+
+El **navy** es el color de la interfaz: barra lateral, botones, encabezados. El **rojo**
+queda reservado para la marca (el acento del menu) y nunca toca un dato, porque en los
+graficos el rojo ya significa severidad y mezclarlo arruinaria la lectura. La rampa de
+bandas no se toco.
+
 El encabezado del PDF y la barra lateral llevan los logos de **Inventory Management** y
-**CEVA Logistics**, y el site **Finning Cat**. Van embebidos en el HTML como los demas
-recursos, asi que el archivo sigue siendo uno solo y funciona sin internet.
+**CEVA Logistics**, y el site **Finning Cat**, embebidos en el HTML.
+
+El panel de la derecha es mas ancho y arranca con una **rosca** del reparto por banda, con
+el total de lineas en el centro: es parte-de-un-todo con cuatro tramos, el caso donde una
+rosca efectivamente sirve.
 
 ### Offline
 

@@ -28,11 +28,20 @@
   --t2:#59637a;
   --t3:#99a1b3;
 
-  /* acento */
-  --ac:#2563eb;
-  --ac-fuerte:#1d4ed8;
-  --ac-suave:#eef3ff;
-  --ac-borde:#c9dbff;
+  /* marca CEVA, tomados del logo */
+  --ceva:#001038;
+  --ceva-2:#17264f;
+  --ceva-3:#2b4a94;
+  --ceva-rojo:#f80000;
+  --sobre-ceva:#aab6d4;
+  --sobre-ceva-2:#8f9dc0;
+
+  /* acento: el navy de CEVA. El rojo se reserva para la marca y los datos,
+     para que no compita con la rampa de severidad */
+  --ac:#001038;
+  --ac-fuerte:#17264f;
+  --ac-suave:#eaeef7;
+  --ac-borde:#c3cce0;
 
   /* estado */
   --ok:#0f7a4e;
@@ -54,8 +63,8 @@
   --sombra-alta:0 8px 30px rgba(15,23,42,.12);
   --fuente:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
-  --rail:236px;
-  --ctx:330px;
+  --rail:244px;
+  --ctx:404px;
 }
 
 html,body{height:100%;margin:0}
@@ -81,49 +90,58 @@ button{font:inherit}
 
 /* ---------- columna de navegacion ---------- */
 .rail{
-  background:var(--panel);
-  border-right:1px solid var(--borde);
+  background:var(--ceva);
+  border-right:1px solid var(--ceva);
   display:flex;flex-direction:column;
-  height:100vh;overflow:hidden;
+  height:100vh;overflow:hidden;color:#fff;
 }
 .marca{padding:20px 18px 14px;display:flex;gap:11px;align-items:center}
 .sitio{
-  display:flex;align-items:center;gap:9px;padding:11px 14px 0;margin-top:11px;
-  border-top:1px solid var(--borde);
+  display:flex;align-items:center;gap:9px;padding:12px 14px 0;margin-top:12px;
+  border-top:1px solid rgba(255,255,255,.12);
 }
 .sitio .txt{min-width:0}
-.sitio .k{font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.sitio .v{font-size:12.5px;font-weight:650;color:var(--t1);line-height:1.25}
-.marca h1{font-size:15px;font-weight:650;line-height:1.15}
-.marca p{margin:1px 0 0;font-size:11.5px;color:var(--t3)}
+.sitio .k{font-size:10px;color:var(--sobre-ceva-2);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.sitio .v{font-size:12.5px;font-weight:650;color:#fff;line-height:1.25}
+/* el logo de CEVA es navy sobre blanco: sobre el navy lo pasamos a blanco */
+.rail .logo-ceva{filter:brightness(0) invert(1)}
+.pastilla-logo{background:#fff;border-radius:9px;padding:5px 6px;display:flex;flex:none}
+.marca{border-bottom:1px solid rgba(255,255,255,.1)}
+.marca h1{font-size:15px;font-weight:650;line-height:1.15;color:#fff}
+.marca p{margin:1px 0 0;font-size:11.5px;color:var(--sobre-ceva-2)}
 
 .nav{padding:6px 10px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
 .nav .grupo{
-  font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:.07em;
-  text-transform:uppercase;padding:14px 8px 5px;
+  font-size:10.5px;font-weight:700;color:var(--sobre-ceva-2);letter-spacing:.07em;
+  text-transform:uppercase;padding:16px 8px 6px;
 }
 .nav button{
-  display:flex;align-items:center;gap:10px;width:100%;
-  border:0;background:transparent;color:var(--t2);
-  padding:8px 10px;border-radius:var(--r);cursor:pointer;
-  font-size:13.5px;font-weight:500;text-align:left;transition:.12s;
+  display:flex;align-items:center;gap:10px;width:100%;position:relative;
+  border:0;background:transparent;color:var(--sobre-ceva);
+  padding:9px 10px;border-radius:var(--r);cursor:pointer;
+  font-size:13.5px;font-weight:500;text-align:left;transition:.13s;
 }
-.nav button:hover{background:var(--panel-2);color:var(--t1)}
-.nav button[aria-current=true]{background:var(--ac-suave);color:var(--ac-fuerte);font-weight:600}
-.nav button svg{flex:none;opacity:.85}
+.nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav button[aria-current=true]{background:var(--ceva-3);color:#fff;font-weight:650}
+/* el rojo de CEVA entra solo como acento de marca, nunca sobre un dato */
+.nav button[aria-current=true]::before{
+  content:"";position:absolute;left:-10px;top:7px;bottom:7px;width:3px;
+  border-radius:0 3px 3px 0;background:var(--ceva-rojo);
+}
+.nav button svg{flex:none;opacity:.9}
 .nav .pico{
   margin-left:auto;font-size:10.5px;font-weight:700;border-radius:20px;
-  padding:1px 7px;background:var(--mal-suave);color:var(--mal);
+  padding:1px 7px;background:var(--ceva-rojo);color:#fff;
 }
-.nav button[aria-current=true] .pico{background:#fff}
 
-.pie-rail{padding:12px 14px 16px;border-top:1px solid var(--borde)}
-.pie-rail label{display:block;font-size:11px;color:var(--t3);font-weight:600;margin-bottom:5px}
+.pie-rail{padding:13px 14px 16px;border-top:1px solid rgba(255,255,255,.12)}
+.pie-rail label{display:block;font-size:11px;color:var(--sobre-ceva-2);font-weight:600;margin-bottom:5px}
 .pie-rail input[type=date]{
-  width:100%;padding:7px 9px;border-radius:9px;border:1px solid var(--borde-fuerte);
-  font:inherit;font-size:13px;color:var(--t1);background:var(--panel);
+  width:100%;padding:7px 9px;border-radius:9px;border:1px solid rgba(255,255,255,.2);
+  font:inherit;font-size:13px;color:#fff;background:rgba(255,255,255,.07);
 }
-.pie-rail .fuente{font-size:11px;color:var(--t3);margin-top:9px;line-height:1.45}
+.pie-rail .fuente{font-size:11px;color:var(--sobre-ceva-2);margin-top:9px;line-height:1.45}
+.pie-rail .fuente b{color:#fff}
 
 /* ---------- area principal ---------- */
 .obra{height:100vh;overflow:hidden;display:flex;flex-direction:column;min-width:0}
@@ -280,10 +298,27 @@ label.campo{display:block;font-size:11.5px;color:var(--t2);font-weight:600;margi
   width:var(--ctx);flex:none;border-left:1px solid var(--borde);
   background:var(--panel);display:flex;flex-direction:column;overflow:hidden;
 }
-.ctx-cab{padding:16px 18px 13px;border-bottom:1px solid var(--borde)}
-.ctx-cab .eti{font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:.07em;text-transform:uppercase}
-.ctx-cab h2{font-size:17px;font-weight:680;margin-top:3px;word-break:break-word}
-.ctx-cab .bajo{font-size:12.5px;color:var(--t2);margin-top:3px}
+.ctx-cab{padding:16px 20px 15px;background:var(--ceva);color:#fff}
+.ctx-cab .eti{font-size:10.5px;font-weight:700;color:var(--sobre-ceva-2);letter-spacing:.07em;text-transform:uppercase}
+.ctx-cab h2{font-size:19px;font-weight:700;margin-top:3px;word-break:break-word;color:#fff;letter-spacing:-.02em}
+.ctx-cab .bajo{font-size:12.5px;color:var(--sobre-ceva);margin-top:4px}
+.rosca{display:flex;align-items:center;gap:18px;margin-bottom:18px}
+.rosca svg{flex:none}
+.rosca .seg{cursor:default;transition:opacity .12s}
+.rosca .seg:hover{opacity:.8}
+.rosca .centro-n{font-size:15px;font-weight:700;fill:var(--t1);font-variant-numeric:tabular-nums}
+.rosca .centro-r{font-size:9.5px;fill:var(--t3);letter-spacing:.04em;text-transform:uppercase}
+.rosca .lado{min-width:0;flex:1;display:flex;flex-direction:column;gap:9px}
+.rosca .dato .n{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.15;letter-spacing:-.02em}
+.rosca .dato .n.mal{color:var(--mal)}
+.rosca .dato .n.ok{color:var(--ok)}
+.rosca .dato .r{font-size:11.5px;color:var(--t2);margin-top:1px}
+.repartos{display:flex;flex-direction:column;gap:5px;margin:2px 0 4px}
+.reparto{display:flex;align-items:center;gap:8px;font-size:12px}
+.reparto i{width:9px;height:9px;border-radius:3px;flex:none}
+.reparto .r{color:var(--t2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reparto .v{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.reparto .p{color:var(--t3);font-variant-numeric:tabular-nums;width:54px;text-align:right;white-space:nowrap;flex:none}
 .ctx-cuerpo{flex:1;overflow-y:auto;padding:14px 18px 20px}
 .par{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--borde);font-size:13px}
 .par:last-of-type{border-bottom:0}
@@ -292,7 +327,8 @@ label.campo{display:block;font-size:11.5px;color:var(--t2);font-weight:600;margi
 .par .v.mal{color:var(--mal)}
 .barra-mezcla{display:flex;height:9px;border-radius:5px;overflow:hidden;margin:12px 0 8px;gap:2px;background:var(--fondo)}
 .barra-mezcla i{display:block;height:100%;border-radius:3px}
-.ctx h3{font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin:20px 0 9px}
+.ctx h3{font-size:11px;font-weight:700;color:var(--t2);letter-spacing:.07em;text-transform:uppercase;margin:20px 0 9px;
+  padding-left:9px;border-left:3px solid var(--ceva);border-radius:0 2px 2px 0}
 .lista-lineas{display:flex;flex-direction:column;gap:6px}
 .ficha{
   display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:var(--r);
@@ -415,8 +451,11 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
   .solo-papel .linea b{color:#000}
 }
 
+@media (max-width:1400px){
+  :root{--ctx:348px}
+}
 @media (max-width:1180px){
-  :root{--ctx:290px}
+  :root{--ctx:304px}
 }
 @media (max-width:960px){
   body{grid-template-columns:1fr}
@@ -432,7 +471,7 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
 
 <aside class="rail">
   <div class="marca">
-    <i class="logo logo-inv" style="width:40px;height:34px" role="img" aria-label="Inventory Management"></i>
+    <span class="pastilla-logo"><i class="logo logo-inv" style="width:34px;height:29px" role="img" aria-label="Inventory Management"></i></span>
     <div>
       <h1>Monitoreo Aging</h1>
       <p>Ubicaciones criticas</p>
@@ -1756,6 +1795,47 @@ function cabeceraPapel(){
       '<span><i style="background:' + b.col + '"></i>' + b.rot + "</span>").join("") + "</div>";
 }
 
+/* ---------- rosca de reparto por banda ----------
+   Parte-de-un-todo con cuatro tramos: es el caso donde una rosca sirve.
+   Separacion de 2px en el radio medio, como entre los tramos de una barra. */
+function arcoRosca(cx, cy, R, r, a0, a1){
+  if (a1 <= a0) a1 = a0 + 0.004;
+  const P = (rad, ang) => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)];
+  const p1 = P(R, a0), p2 = P(R, a1), p3 = P(r, a1), p4 = P(r, a0);
+  const g = (a1 - a0) > Math.PI ? 1 : 0;
+  return "M" + p1 + " A" + R + "," + R + " 0 " + g + " 1 " + p2 +
+         " L" + p3 + " A" + r + "," + r + " 0 " + g + " 0 " + p4 + " Z";
+}
+function rosca(mez, tam, centroN, centroR){
+  const total = mez.reduce((a, v) => a + v, 0);
+  const R = tam / 2, r = R * 0.64, cx = R, cy = R, medio = (R + r) / 2;
+  let g = "";
+  if (!(total > 0)) {
+    g = '<circle cx="' + cx + '" cy="' + cy + '" r="' + medio + '" fill="none" stroke="var(--borde)" stroke-width="' + (R - r) + '"/>';
+  } else {
+    const vivos = mez.map((v, i) => ({ v, i })).filter((x) => x.v > 0);
+    if (vivos.length === 1) {
+      g = '<circle class="seg" cx="' + cx + '" cy="' + cy + '" r="' + medio +
+          '" fill="none" stroke="' + BANDAS[vivos[0].i].col + '" stroke-width="' + (R - r) +
+          '" data-tip="' + esc("<b>" + BANDAS[vivos[0].i].rot + "</b>100 % · " + plata(total)) + '"/>';
+    } else {
+      const hueco = 2 / medio;
+      let a = -Math.PI / 2;
+      for (const { v, i } of vivos) {
+        const ang = (v / total) * Math.PI * 2;
+        g += '<path class="seg" d="' + arcoRosca(cx, cy, R, r, a + hueco / 2, a + ang - hueco / 2) +
+             '" fill="' + BANDAS[i].col + '" data-tip="' +
+             esc("<b>" + BANDAS[i].rot + "</b>" + fmtMoneda.format((v / total) * 100) + " % · " + plata(v)) + '"/>';
+        a += ang;
+      }
+    }
+  }
+  g += '<text class="centro-n" x="' + cx + '" y="' + (cy - 1) + '" text-anchor="middle">' + esc(centroN) + "</text>";
+  g += '<text class="centro-r" x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle">' + esc(centroR) + "</text>";
+  return '<svg width="' + tam + '" height="' + tam + '" viewBox="0 0 ' + tam + ' ' + tam +
+         '" role="img" aria-label="Reparto por banda de atraso">' + g + "</svg>";
+}
+
 /* ---------- panel de contexto ---------- */
 function lineasDe(sel){
   if (!sel) return estado.lineas;
@@ -1798,22 +1878,32 @@ function pintarCtx(){
 
   h += '<div class="ctx-cuerpo">';
   if (sel) h += '<div class="acciones" style="margin:0 0 14px"><button class="btn suave chico" id="ctxTodo">Ver el total</button></div>';
-  h += par("Plata frenada", plata(fV), fV > 0);
+
+  h += '<div class="rosca">' + rosca(mez, 150, entero(todas.length), "lineas") +
+    '<div class="lado">' +
+    '<div class="dato"><div class="n' + (fV > 0 ? " mal" : " ok") + '">' + plata(fV) +
+      '</div><div class="r">frenados fuera de aging</div></div>' +
+    '<div class="dato"><div class="n">' + entero(fL) + " de " + entero(todas.length) +
+      '</div><div class="r">lineas frenadas</div></div>' +
+    "</div></div>";
+
+  h += '<div class="repartos">' + mez.map((v, i) => v > 0
+    ? '<div class="reparto"><i style="background:' + BANDAS[i].col + '"></i>' +
+      '<span class="r">' + BANDAS[i].rot + "</span>" +
+      '<span class="v">' + plata(v) + "</span>" +
+      '<span class="p">' + fmtMoneda.format((v / totMez) * 100) + " %</span></div>"
+    : "").join("") + "</div>";
+
   if (!sel) {
     const porTipo = { retencion: 0, transito: 0 };
-    todas.forEach((l) => { if (l.fuera) porTipo[tipoArea(l.area)] += l.valorizado; });
-    h += par("&nbsp;&nbsp;en stock retenido", plata(porTipo.retencion), porTipo.retencion > 0);
-    h += par("&nbsp;&nbsp;en transito", plata(porTipo.transito), porTipo.transito > 0);
+    todas.forEach((l) => { if (l.fuera) porTipo[tipoUbic(l.ubicacion, l.area)] += l.valorizado; });
+    h += "<h3>Como se reparte</h3>";
+    h += par("Stock retenido", plata(porTipo.retencion), porTipo.retencion > 0);
+    h += par("Transito operativo", plata(porTipo.transito), porTipo.transito > 0);
   }
-  h += par("Lineas frenadas", entero(fL) + " de " + entero(todas.length), fL > 0);
+  h += "<h3>Numeros</h3>";
   h += par("Dias maximos", entero(dMax));
   h += par("Valorizado total", plata(val));
-  h += '<div class="barra-mezcla" title="Como se reparte la plata segun el atraso">' +
-    mez.map((v, i) => v > 0
-      ? '<i style="background:' + BANDAS[i].col + ';width:' + ((v / totMez) * 100).toFixed(2) + '%"></i>' : "").join("") +
-    "</div>";
-  h += '<div style="font-size:11.5px;color:var(--t2)">' + mez.map((v, i) => v > 0
-    ? BANDAS[i].corto + " " + fmtMoneda.format((v / totMez) * 100) + " %" : "").filter(Boolean).join(" · ") + "</div>";
 
   const top = todas.filter((l) => ui.alcance === "todo" ? true : l.fuera)
     .sort((a, b) => b.valorizado - a.valorizado).slice(0, 12);
@@ -1830,6 +1920,10 @@ function pintarCtx(){
   }
   h += "</div>";
   c.innerHTML = h;
+  c.querySelectorAll(".rosca [data-tip]").forEach((el) => {
+    el.addEventListener("mousemove", (e) => tip(e, el.dataset.tip));
+    el.addEventListener("mouseleave", tipOff);
+  });
   const bt = $("#ctxTodo");
   if (bt) bt.addEventListener("click", () => { ui.sel = null; marcarSel(); pintarCtx(); pintarMigas(); });
   c.querySelectorAll(".ficha").forEach((b) => b.addEventListener("click", () => {
