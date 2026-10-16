@@ -24,7 +24,19 @@ en vez de calcular con otra cosa.
 
 ### Las pantallas
 
-**Panorama** — la principal. Un bloque por area, y dentro **una barra por ubicacion**,
+**Panorama** — la principal. Arranca separando el stock en dos secciones, cada una con su
+subtotal, porque no todas las ubicaciones significan lo mismo:
+
+| Seccion | Que es | Como se lee |
+|---|---|---|
+| **Stock retenido** | mercaderia parada por un problema: reclamos, daños, mermas, garantias | el stock en si es el tema |
+| **Transito operativo** | mercaderia de paso hacia recepcion o despacho | que haya stock es normal; lo que importa es que no se frene |
+
+El tipo se **deriva del target**, que ya codifica la diferencia: hasta 7 dias es transito,
+mas es retencion. Se corrige a mano con el desplegable **Tipo** en la solapa Ubicaciones, y
+la eleccion queda guardada.
+
+Dentro de cada seccion hay un bloque por area, y dentro **una barra por ubicacion**,
 ordenadas de mayor a menor. Todas las barras comparten la misma escala, asi se comparan
 entre areas distintas; cada barra va partida por banda de atraso, para ver de que esta
 hecha la ubicacion y no solo cuanto pesa. Es una tabla con barras y no un grafico suelto:
@@ -32,7 +44,10 @@ con decenas de ubicaciones cada fila necesita su cifra al lado, y asi **se impri
 
 Un clic en una ubicacion la selecciona y el panel de la derecha muestra su detalle y sus
 lineas mas caras; un clic en una linea abre su ficha, con la Fecha Aging editable ahi mismo.
-Dos interruptores: ver solo lo frenado o todo el stock, y medir por plata o por lineas.
+Tres medidas, y la tercera importa: **por plata**, **por lineas** y **por severidad**
+(cuantas veces se paso del target). Con plata gana siempre el area de mas volumen; por
+severidad el orden se da vuelta y sube lo que esta peor en proporcion a su propio target.
+Mas un interruptor para ver solo lo frenado o todo el stock.
 
 **Lineas** — la tabla completa, con filtros: SKU, descripcion, cantidad, precio unitario,
 valorizado, dias y target. Aca tambien se edita la `Fecha Aging` de cada linea.

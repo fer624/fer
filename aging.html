@@ -215,6 +215,20 @@ label.campo{display:block;font-size:11.5px;color:var(--t2);font-weight:600;margi
 .regla .rot{font-size:10.5px;color:var(--t3);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 
 :root{--cols:216px 1fr 104px 132px}
+.seccion{
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  margin:22px 2px 11px;break-after:avoid;page-break-after:avoid;
+}
+.seccion:first-of-type{margin-top:2px}
+.seccion h2{font-size:14.5px;font-weight:700;letter-spacing:-.015em}
+.seccion .desc{font-size:12px;color:var(--t2);max-width:60ch}
+.seccion .tot{margin-left:auto;font-size:14px;font-weight:680;font-variant-numeric:tabular-nums;white-space:nowrap}
+.seccion .tot.mal{color:var(--mal)}
+.seccion .tot .chico{font-size:11.5px;font-weight:500;color:var(--t2);margin-left:7px}
+.eti-tipo{
+  font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 7px;border-radius:5px;background:var(--fondo);color:var(--t2);
+}
 .bloque{
   background:var(--panel);border:1px solid var(--borde);border-radius:var(--r-g);
   box-shadow:var(--sombra);margin-bottom:14px;overflow:hidden;break-inside:avoid;
@@ -481,6 +495,7 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
         <div class="grupo-btn" id="mandoMedida" role="group" aria-label="Como medir">
           <button type="button" data-medida="valorizado" aria-pressed="true">Por plata</button>
           <button type="button" data-medida="lineas" aria-pressed="false">Por lineas</button>
+          <button type="button" data-medida="severidad" aria-pressed="false">Por severidad</button>
         </div>
         <div class="leyenda" id="leyenda"></div>
       </div>
@@ -1317,6 +1332,22 @@ function calcular(){
       .map((l) => String(l.sku).trim().toUpperCase()))),
     lineasSinFecha: lineas.filter((l) => l.sinFecha).length,
     areasSinConfig: resumen.filter((r) => !r.enConfig && r.lineas > 0).map((r) => r.area),
+    targetsMezclados: (function(){
+      const out = [];
+      ubicPorArea.forEach((us, a) => {
+        if (!a || us.length < 2) return;
+        const c = {};
+        us.forEach((u) => { const t = num(u.target); c[t] = (c[t] || 0) + 1; });
+        const ks = Object.keys(c);
+        if (ks.length < 2) return;
+        const comun = ks.sort((x, y) => c[y] - c[x])[0];
+        us.forEach((u) => {
+          if (String(num(u.target)) !== comun)
+            out.push({ area: a, ubicacion: u.ubicacion, target: num(u.target), comun: Number(comun) });
+        });
+      });
+      return out;
+    })(),
     lineasAjustadas: lineas.filter((l) => l.ajustada).length,
     ajustesHuerfanos: Object.keys(estado.ajustes).filter((k) => !usados.has(k)),
     ajustesCompartidos: (function(){
@@ -1397,34 +1428,63 @@ function pintarMigas(){
    Es una tabla con barras, no un grafico suelto: con decenas de
    ubicaciones cada fila necesita su cifra, y asi se imprime entero.
    ============================================================ */
+const TIPOS = {
+  retencion: { rot: "Stock retenido",
+    desc: "Mercaderia parada por un problema: reclamos, daños, mermas, garantias. Aca el stock en si es el tema." },
+  transito: { rot: "Transito operativo",
+    desc: "Mercaderia de paso hacia recepcion o despacho. Que haya stock es normal; lo que importa es que no se frene." }
+};
+/* El target ya dice de que se trata: 2-3 dias es mercaderia de paso, 90 es stock
+   retenido por un problema. Lo derivamos de ahi y se puede corregir a mano. */
+function tipoArea(area){
+  const cfg = (estado.areas || []).find((a) => String(a.area).trim() === String(area).trim());
+  if (cfg && (cfg.tipo === "transito" || cfg.tipo === "retencion")) return cfg.tipo;
+  const r = (estado.resumen || []).find((x) => x.area === area);
+  const t = r && r.target != null ? r.target : (cfg ? num(cfg.target) : 0);
+  return t > 7 ? "retencion" : "transito";
+}
+
 function datosPanorama(){
   const soloFuera = ui.alcance === "fuera";
   const porArea = new Map();
   for (const l of estado.lineas) {
     if (soloFuera && !l.fuera) continue;
     if (!porArea.has(l.area)) porArea.set(l.area, { area: l.area, ubic: new Map(),
-      lineas: 0, valorizado: 0, fueraL: 0, fueraV: 0, diasMax: 0, mezclaL: [0,0,0,0], mezclaV: [0,0,0,0] });
+      lineas: 0, valorizado: 0, fueraL: 0, fueraV: 0, diasMax: 0, sev: 0, maxBanda: 0,
+      mezclaL: [0,0,0,0], mezclaV: [0,0,0,0] });
     const A = porArea.get(l.area);
     if (!A.ubic.has(l.ubicacion)) A.ubic.set(l.ubicacion, { nombre: l.ubicacion,
-      lineas: 0, valorizado: 0, fueraL: 0, fueraV: 0, diasMax: 0, mezclaL: [0,0,0,0], mezclaV: [0,0,0,0] });
+      lineas: 0, valorizado: 0, fueraL: 0, fueraV: 0, diasMax: 0, sev: 0, maxBanda: 0,
+      mezclaL: [0,0,0,0], mezclaV: [0,0,0,0] });
     const U = A.ubic.get(l.ubicacion);
     const b = banda(l) == null ? 0 : banda(l);
+    const rel = (l.aging != null && l.target > 0) ? l.aging / l.target : 0;
     for (const o of [A, U]) {
       o.lineas++; o.valorizado += l.valorizado;
       o.mezclaL[b]++; o.mezclaV[b] += l.valorizado;
       if (l.fuera) { o.fueraL++; o.fueraV += l.valorizado; }
       if (l.aging != null && l.aging > o.diasMax) o.diasMax = l.aging;
+      if (rel > (o.sev || 0)) o.sev = rel;
+      if (b > (o.maxBanda || 0)) o.maxBanda = b;
     }
   }
   const cfg = new Map(estado.resumen.map((r) => [r.area, r]));
-  const tam = (o) => ui.medida === "lineas" ? o.lineas : o.valorizado;
   return Array.from(porArea.values()).map((A) => {
     const r = cfg.get(A.area) || {};
     A.responsable = r.responsable || ""; A.proceso = r.proceso || ""; A.target = r.target;
+    A.tipo = tipoArea(A.area);
     A.totalLineas = r.lineas != null ? r.lineas : A.lineas;
-    A.ubicaciones = Array.from(A.ubic.values()).sort((x, y) => tam(y) - tam(x) || y.diasMax - x.diasMax);
+    A.ubicaciones = Array.from(A.ubic.values()).sort((x, y) => tamano(y) - tamano(x) || y.diasMax - x.diasMax);
     return A;
-  }).sort((x, y) => tam(y) - tam(x) || y.diasMax - x.diasMax);
+  }).sort((x, y) => tamano(y) - tamano(x) || y.diasMax - x.diasMax);
+}
+function tamano(o){
+  return ui.medida === "lineas" ? o.lineas : ui.medida === "severidad" ? (o.sev || 0) : o.valorizado;
+}
+function fmtMedida(v){
+  return ui.medida === "lineas" ? entero(v)
+    : ui.medida === "severidad" ? (v > 0 ? fmtMoneda.format(v) + "×" : "—")
+    : plata(v);
 }
 
 function pintarPanorama(){
@@ -1448,50 +1508,69 @@ function pintarPanorama(){
     pintarCtx();
     return;
   }
-  const tam = (o) => ui.medida === "lineas" ? o.lineas : o.valorizado;
-  const esPlata = ui.medida !== "lineas";
-  const fmt = esPlata ? plata : entero;
+  const esPlata = ui.medida === "valorizado";
+  const esSev = ui.medida === "severidad";
   let max = 0;
-  datos.forEach((A) => A.ubicaciones.forEach((U) => { if (tam(U) > max) max = tam(U); }));
-  const esc0 = escalaLinda(max), techo = esc0.techo || 1;
+  datos.forEach((A) => A.ubicaciones.forEach((U) => { if (tamano(U) > max) max = tamano(U); }));
+  const techo = escalaLinda(max).techo || 1;
 
-  /* regla: la escala arriba, pegada, para no repetir el eje en cada grupo */
+  /* la escala va una sola vez arriba, pegada, en vez de repetirse en cada bloque */
   let h = papel;
   h += '<div class="regla"><div class="rot">Ubicacion</div><div class="ticks">';
   for (let k = 0; k <= 4; k++) {
     const v = (techo / 4) * k;
     h += '<span style="left:' + (k * 25) + '%">' +
-      (esPlata ? "$ " + fmtEntero.format(v) : entero(v)) + "</span>";
+      (esPlata ? "$ " + fmtEntero.format(v) : esSev ? fmtEntero.format(v) + "×" : entero(v)) + "</span>";
   }
-  h += '</div><div class="rot" style="text-align:right">' + (esPlata ? "Plata" : "Lineas") +
+  h += '</div><div class="rot" style="text-align:right">' +
+       (esPlata ? "Plata" : esSev ? "Peor" : "Lineas") +
        '</div><div class="rot">Detalle</div></div>';
 
-  for (const A of datos) {
-    const sinFrenar = A.fueraV === 0 && A.fueraL === 0;
-    h += '<section class="bloque"><header class="cab" data-area="' + esc(A.area) + '">' +
-      '<span class="cod">' + esc(A.area) + "</span>" +
-      '<span class="meta">' + esc([A.responsable || "sin responsable", A.proceso,
-        A.target != null ? "target " + entero(A.target) + " dias" : ""].filter(Boolean).join(" · ")) + "</span>" +
-      '<span class="der"><span class="plata' + (sinFrenar ? " ok" : "") + '">' +
-        (esPlata ? plata(A.fueraV) : entero(A.fueraL) + " lineas") + "</span>" +
-      '<span class="meta">' + entero(A.fueraL) + " de " + entero(A.totalLineas) +
-        " lineas · " + entero(A.diasMax) + ' dias max</span></span></header><div class="cuerpo">';
-    for (const U of A.ubicaciones) {
-      const mez = esPlata ? U.mezclaV : U.mezclaL;
-      const totU = mez.reduce((a, v) => a + v, 0) || 1;
-      const anchoBarra = Math.max(0.6, (tam(U) / techo) * 100);
-      const segs = mez.map((v, i) => v > 0
-        ? '<i style="width:' + ((v / totU) * 100).toFixed(3) + '%;background:' + BANDAS[i].col + '"></i>'
-        : "").join("");
-      h += '<button class="fila" data-area="' + esc(A.area) + '" data-ubic="' + esc(U.nombre) + '" data-tip="' +
-        esc(globoUbic(A, U)) + '">' +
-        '<span class="nom" title="' + esc(U.nombre) + '">' + esc(U.nombre) + "</span>" +
-        '<span class="pista"><span class="barra" style="width:' + anchoBarra.toFixed(3) + '%">' + segs + "</span></span>" +
-        '<span class="cif">' + esc(fmt(tam(U))) + "</span>" +
-        '<span class="aux"><b>' + entero(U.diasMax) + "</b> dias max · " + entero(U.lineas) + " lin</span>" +
-        "</button>";
+  for (const tipo of ["retencion", "transito"]) {
+    const grupo = datos.filter((A) => A.tipo === tipo);
+    if (!grupo.length) continue;
+    const tV = grupo.reduce((a, A) => a + A.fueraV, 0);
+    const tL = grupo.reduce((a, A) => a + A.fueraL, 0);
+    h += '<div class="seccion"><h2>' + TIPOS[tipo].rot + "</h2>" +
+      '<span class="desc">' + TIPOS[tipo].desc + "</span>" +
+      '<span class="tot' + (tV > 0 ? " mal" : "") + '">' + plata(tV) +
+      '<span class="chico">' + entero(tL) + " lineas frenadas</span></span></div>";
+
+    for (const A of grupo) {
+      const sinFrenar = A.fueraV === 0 && A.fueraL === 0;
+      h += '<section class="bloque"><header class="cab" data-area="' + esc(A.area) + '">' +
+        '<span class="cod">' + esc(A.area) + "</span>" +
+        '<span class="eti-tipo">' + (tipo === "retencion" ? "retencion" : "transito") + "</span>" +
+        '<span class="meta">' + esc([A.responsable || "sin responsable", A.proceso,
+          A.target != null ? "target " + entero(A.target) + " dias" : ""].filter(Boolean).join(" · ")) + "</span>" +
+        '<span class="der"><span class="plata' + (sinFrenar ? " ok" : "") + '">' +
+          (esSev ? fmtMedida(A.sev) : esPlata ? plata(A.fueraV) : entero(A.fueraL) + " lineas") + "</span>" +
+        '<span class="meta">' + entero(A.fueraL) + " de " + entero(A.totalLineas) +
+          ' lineas · ' + entero(A.diasMax) + ' dias max</span></span></header><div class="cuerpo">';
+
+      for (const U of A.ubicaciones) {
+        const ancho = Math.max(0.6, (tamano(U) / techo) * 100);
+        let segs;
+        if (esSev) {
+          /* la severidad es un cociente: no se puede partir en bandas, va entera */
+          segs = '<i style="width:100%;background:' + BANDAS[U.maxBanda || 0].col + '"></i>';
+        } else {
+          const mez = esPlata ? U.mezclaV : U.mezclaL;
+          const totU = mez.reduce((a, v) => a + v, 0) || 1;
+          segs = mez.map((v, i) => v > 0
+            ? '<i style="width:' + ((v / totU) * 100).toFixed(3) + '%;background:' + BANDAS[i].col + '"></i>'
+            : "").join("");
+        }
+        h += '<button class="fila" data-area="' + esc(A.area) + '" data-ubic="' + esc(U.nombre) +
+          '" data-tip="' + esc(globoUbic(A, U)) + '">' +
+          '<span class="nom" title="' + esc(U.nombre) + '">' + esc(U.nombre) + "</span>" +
+          '<span class="pista"><span class="barra" style="width:' + ancho.toFixed(3) + '%">' + segs + "</span></span>" +
+          '<span class="cif">' + esc(fmtMedida(tamano(U))) + "</span>" +
+          '<span class="aux"><b>' + entero(U.diasMax) + "</b> dias max · " + entero(U.lineas) + " lin</span>" +
+          "</button>";
+      }
+      h += "</div></section>";
     }
-    h += "</div></section>";
   }
   cont.innerHTML = h;
   cont.querySelectorAll(".fila").forEach((el) => {
@@ -1518,7 +1597,8 @@ function globoUbic(A, U){
   const mez = ui.medida === "lineas" ? U.mezclaL : U.mezclaV;
   const tot = mez.reduce((a, v) => a + v, 0) || 1;
   return "<b>" + esc(U.nombre) + "</b>" +
-    plata(U.valorizado) + " en " + entero(U.lineas) + " lineas · " + entero(U.diasMax) + " dias max<br>" +
+    plata(U.valorizado) + " en " + entero(U.lineas) + " lineas · " + entero(U.diasMax) + " dias max" +
+    (U.sev > 0 ? " · hasta " + fmtMoneda.format(U.sev) + "× el target" : "") + "<br>" +
     '<span class="mut">' + mez.map((v, i) => v > 0
       ? BANDAS[i].corto + " " + fmtMoneda.format((v / tot) * 100) + " %" : "").filter(Boolean).join(" · ") +
     "</span>";
@@ -1586,6 +1666,12 @@ function pintarCtx(){
   h += '<div class="ctx-cuerpo">';
   if (sel) h += '<div class="acciones" style="margin:0 0 14px"><button class="btn suave chico" id="ctxTodo">Ver el total</button></div>';
   h += par("Plata frenada", plata(fV), fV > 0);
+  if (!sel) {
+    const porTipo = { retencion: 0, transito: 0 };
+    todas.forEach((l) => { if (l.fuera) porTipo[tipoArea(l.area)] += l.valorizado; });
+    h += par("&nbsp;&nbsp;en stock retenido", plata(porTipo.retencion), porTipo.retencion > 0);
+    h += par("&nbsp;&nbsp;en transito", plata(porTipo.transito), porTipo.transito > 0);
+  }
   h += par("Lineas frenadas", entero(fL) + " de " + entero(todas.length), fL > 0);
   h += par("Dias maximos", entero(dMax));
   h += par("Valorizado total", plata(val));
@@ -1728,6 +1814,15 @@ function pintarAvisos(){
     if (d.ajustesHuerfanos && d.ajustesHuerfanos.length) c.push(av("alerta", "<b>" +
       entero(d.ajustesHuerfanos.length) + " ajustes de fecha</b> no coinciden con ninguna linea de esta base.",
       "Ver", () => irA("lineas")));
+    if (d.targetsMezclados && d.targetsMezclados.length) {
+      const x = d.targetsMezclados[0];
+      c.push(av("alerta", "<b>" + entero(d.targetsMezclados.length) +
+        (d.targetsMezclados.length === 1 ? " ubicacion tiene" : " ubicaciones tienen") +
+        " un target distinto al resto de su area</b>: " + esc(x.ubicacion) + " con " +
+        entero(x.target) + (x.target === 1 ? " dia" : " dias") + " contra " + entero(x.comun) +
+        " del resto de " + esc(x.area) + ". Puede ser a proposito o un error de tipeo.",
+        "Revisar", () => { irA("ubicaciones"); $("#fUbicArea").value = x.area; pintarUbicaciones(); }));
+    }
     if (d.areasSinConfig.length) c.push(av("alerta", "<b>Area sin configurar: " +
       d.areasSinConfig.map(esc).join(", ") + "</b>. Tiene stock critico pero no tiene responsable.",
       "Configurar", () => irA("ubicaciones")));
@@ -1937,7 +2032,7 @@ function pintarAreas(){
   }
   const conStock = new Map(estado.resumen.map((r) => [r.area, r]));
   let h = "<thead><tr><th>Area</th><th>Responsable</th><th>Proceso</th>" +
-    '<th class="cifra">Target</th><th class="cifra">Ubicaciones</th><th></th></tr></thead><tbody>';
+    '<th class="cifra">Target</th><th>Tipo</th><th class="cifra">Ubicaciones</th><th></th></tr></thead><tbody>';
   estado.areas.forEach((a, i) => {
     const n = estado.ubicaciones.filter((u) => String(u.area).trim() === String(a.area).trim()).length;
     const r = conStock.get(String(a.area).trim());
@@ -1951,6 +2046,11 @@ function pintarAreas(){
           ? "<option selected>" + esc(a.proceso) + "</option>" : "") + "</select></td>" +
       '<td class="cifra"><input type="number" min="0" data-ar="' + i + '" data-campo="target" value="' +
         (a.target == null ? "" : a.target) + '" style="width:72px"></td>' +
+      '<td><select data-ar="' + i + '" data-campo="tipo" style="width:118px">' +
+        [["", "del target (" + (tipoArea(a.area) === "retencion" ? "retencion" : "transito") + ")"],
+         ["transito", "Transito"], ["retencion", "Retencion"]].map(([v, r]) =>
+          '<option value="' + v + '"' + (String(a.tipo || "") === v ? " selected" : "") + ">" + esc(r) + "</option>").join("") +
+        "</select></td>" +
       '<td class="cifra">' + entero(n) + "</td>" +
       '<td><button class="btn riesgo chico" data-delar="' + i + '" type="button">Eliminar</button></td></tr>';
   });
