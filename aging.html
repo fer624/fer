@@ -2519,52 +2519,97 @@ function pintarRespaldo(){
 
 /* ============================================================
    11. EXPORTACION
+   Sale .xlsx y no .csv por una razon concreta: los codigos del WMS son
+   12219274.327 o 3969703.000, y Excel, al abrir un CSV, los lee como numero
+   y les come los decimales. Acá cada columna va tipada: los codigos como
+   texto, las cantidades como numero y las fechas como fecha.
    ============================================================ */
-function bajarCSV(nombre, filas){
-  const csv = filas.map((f) => f.map((c) => {
-    const s = c == null ? "" : String(c);
-    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  }).join(";")).join("\r\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+const COL_T = "t", COL_N = "n", COL_F = "f";
+
+function bajarArchivo(nombre, blob){
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = nombre;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 400);
 }
-const dec = (n) => String(n == null ? "" : n).replace(".", ",");
+function bajarXLSX(base, hoja, cabeceras, filas, tipos, anchos){
+  if (typeof XLSX === "undefined") return bajarCSV(base + ".csv", [cabeceras].concat(filas));
+  const aoa = [cabeceras].concat(filas);
+  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+  for (let r = 1; r < aoa.length; r++) {
+    for (let c = 0; c < tipos.length; c++) {
+      const ref = XLSX.utils.encode_cell({ c: c, r: r });
+      const cel = ws[ref];
+      if (!cel) continue;
+      if (tipos[c] === COL_T) {
+        cel.t = "s";
+        cel.v = cel.v == null ? "" : String(cel.v);
+        cel.z = "@";                         /* formato texto, para que no lo reinterprete */
+      } else if (tipos[c] === COL_N) {
+        if (cel.v === "" || cel.v == null) { delete ws[ref]; continue; }
+        cel.t = "n"; cel.v = Number(cel.v);
+        cel.z = Number.isInteger(cel.v) ? "0" : "#,##0.00";
+      } else if (tipos[c] === COL_F) {
+        if (!(cel.v instanceof Date)) { if (cel.v === "" || cel.v == null) delete ws[ref]; continue; }
+        cel.z = "dd/mm/yyyy";
+      }
+    }
+  }
+  ws["!cols"] = (anchos || cabeceras.map(() => 14)).map((w) => ({ wch: w }));
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { c: 0, r: 0 },
+    e: { c: cabeceras.length - 1, r: aoa.length - 1 } }) };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, hoja.slice(0, 31));
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array", bookSST: true });
+  bajarArchivo(base + ".xlsx", new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+}
+/* queda como respaldo por si la libreria no esta */
+function bajarCSV(nombre, filas){
+  const csv = filas.map((f) => f.map((c) => {
+    const s = c instanceof Date ? fechaAR(c) : (c == null ? "" : String(c));
+    return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(";")).join("\r\n");
+  bajarArchivo(nombre, new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" }));
+}
 
 function exportarResumen(){
-  const f = [["Aging - corte " + fechaAR(estado.corte)], [],
-    ["Area","Responsable","Proceso","Target","Lineas","Valorizado","Lineas frenadas","Plata frenada","Dias max"]];
-  estado.resumen.forEach((r) => f.push([r.area, r.responsable, r.proceso, r.target, r.lineas,
-    dec(r.valorizado.toFixed(2)), r.fueraLineas, dec(r.fueraValorizado.toFixed(2)), r.diasMax]));
-  bajarCSV("aging_resumen_" + fechaISO(estado.corte) + ".csv", f);
+  const filas = estado.resumen.map((r) => [r.area, r.responsable, r.proceso,
+    tipoArea(r.area) === "retencion" ? "Stock retenido" : "Transito operativo",
+    r.target, r.lineas, +r.valorizado.toFixed(2), r.fueraLineas, +r.fueraValorizado.toFixed(2), r.diasMax]);
+  bajarXLSX("aging_resumen_" + fechaISO(estado.corte), "Resumen",
+    ["Area","Responsable","Proceso","Tipo","Target","Lineas","Valorizado","Lineas frenadas","Plata frenada","Dias max"],
+    filas,
+    [COL_T,COL_T,COL_T,COL_T,COL_N,COL_N,COL_N,COL_N,COL_N,COL_N],
+    [9,18,16,17,8,8,14,14,14,9]);
 }
 function exportarLineas(){
-  const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Precio","Valorizado",
-    "Fecha aging","De donde","HU","Fecha EM","Ajustada","Dias","Target","Tipo","Frenada","Atraso","Observacion"]];
-  for (const l of lineasFiltradas()) {
+  const filas = lineasFiltradas().map((l) => {
     const b = banda(l);
-    f.push([l.area, l.ubicacion, l.sku, l.descripcion, l.lote, dec(l.cantidad), l.um,
-      l.costo == null ? "" : dec(l.costo.toFixed(4)), l.sinCosto ? "" : dec(l.valorizado.toFixed(2)),
-      fechaAR(l.fechaAging), (CHIP_ORIGEN[l.origenFecha] || ["", ""])[1], l.hu || "",
-      fechaAR(l.fechaEM), l.ajustada ? "X" : "",
-      l.aging == null ? "" : l.aging, l.target == null ? "" : l.target,
+    return [l.area, l.ubicacion, l.sku, l.descripcion, l.lote, l.cantidad, l.um,
+      l.costo == null ? "" : l.costo, l.sinCosto ? "" : +l.valorizado.toFixed(2),
+      l.fechaAging, (CHIP_ORIGEN[l.origenFecha] || ["", ""])[1], l.hu || "", l.fechaEM,
+      l.ajustada ? "SI" : "", l.aging == null ? "" : l.aging, l.target == null ? "" : l.target,
       tipoUbic(l.ubicacion, l.area) === "retencion" ? "Stock retenido" : "Transito operativo",
-      l.fuera ? "X" : "",
-      b == null ? "" : BANDAS[b].rot,
+      l.fuera ? "SI" : "", b == null ? "" : BANDAS[b].rot,
       [l.sinCosto ? "sin precio" : "", l.costoAmbiguo ? "precio dudoso" : "",
-       l.sinFecha ? "sin fecha" : "", l.sinTarget ? "sin target" : ""].filter(Boolean).join(" / ")]);
-  }
-  bajarCSV("aging_lineas_" + fechaISO(estado.corte) + ".csv", f);
+       l.sinFecha ? "sin fecha" : "", l.sinTarget ? "sin target" : ""].filter(Boolean).join(" / ")];
+  });
+  bajarXLSX("aging_lineas_" + fechaISO(estado.corte), "Lineas",
+    ["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Precio unitario","Valorizado",
+     "Fecha aging","De donde","HU","Fecha EM","Ajustada","Dias","Target","Tipo","Frenada","Atraso","Observacion"],
+    filas,
+    [COL_T,COL_T,COL_T,COL_T,COL_T,COL_N,COL_T,COL_N,COL_N,COL_F,COL_T,COL_T,COL_F,COL_T,COL_N,COL_N,COL_T,COL_T,COL_T,COL_T],
+    [9,22,16,38,10,10,7,14,14,12,11,14,12,9,7,8,17,8,18,20]);
 }
 function exportarHistorico(){
   const hist = leer(LS.hist, []);
-  const met = ["lineas","valorizado","fueraLineas","fueraValorizado","diasMax"];
-  const f = [["Area","Corte","Lineas","Valorizado","Lineas frenadas","Plata frenada","Dias max"]];
-  hist.forEach((c) => c.areas.forEach((a) => f.push([a.area, c.fecha].concat(met.map((m) => dec(a[m]))))));
-  bajarCSV("aging_historico.csv", f);
+  const filas = [];
+  hist.forEach((c) => c.areas.forEach((a) => filas.push([a.area, new Date(c.fecha + "T00:00:00"),
+    a.lineas, a.valorizado, a.fueraLineas, a.fueraValorizado, a.diasMax])));
+  bajarXLSX("aging_historico", "Historico",
+    ["Area","Corte","Lineas","Valorizado","Lineas frenadas","Plata frenada","Dias max"],
+    filas, [COL_T,COL_F,COL_N,COL_N,COL_N,COL_N,COL_N], [9,12,9,14,14,14,9]);
 }
 
 /* ============================================================
@@ -2830,12 +2875,13 @@ $("#btnLimpiarHuerfanos").addEventListener("click", () => {
   guardar(LS.ajustes, estado.ajustes); calcular(); pintarTodo();
 });
 $("#btnCsvAjustes").addEventListener("click", () => {
-  const f = [["Ubicacion","SKU","Fecha aplicada","Ajustado el","Clave"]];
-  Object.keys(estado.ajustes).forEach((k) => {
+  const filas = Object.keys(estado.ajustes).map((k) => {
     const a = estado.ajustes[k];
-    f.push([a.ubicacion || "", a.sku || "", fechaAR(fecha(a.fecha)), a.creado ? fechaAR(fecha(a.creado)) : "", k]);
+    return [a.ubicacion || "", a.sku || "", fecha(a.fecha), a.creado ? fecha(a.creado) : "", k];
   });
-  bajarCSV("aging_fechas_ajustadas.csv", f);
+  bajarXLSX("aging_fechas_ajustadas", "Ajustes",
+    ["Ubicacion","SKU","Fecha aplicada","Ajustado el","Clave de la linea"],
+    filas, [COL_T,COL_T,COL_F,COL_F,COL_T], [22,16,13,13,46]);
 });
 
 /* --- evolucion --- */
@@ -2890,8 +2936,9 @@ $("#btnCopiarHU").addEventListener("click", () => {
   const b = $("#btnCopiarHU"), rot = b.textContent;
   alPortapapeles(hus.join("\n")).then((ok) => {
     if (ok) { b.textContent = "✓ " + entero(hus.length) + " HU copiadas"; }
-    else { bajarCSV("hu_del_stock.csv", [["Unidad manipulacion"]].concat(hus.map((h) => [h])));
-           b.textContent = "✓ bajadas en CSV"; }
+    else { bajarXLSX("hu_del_stock", "HU", ["Unidad manipulacion"],
+             hus.map((h) => [h]), [COL_T], [20]);
+           b.textContent = "✓ bajadas en Excel"; }
     setTimeout(() => { b.textContent = rot; }, 2600);
   });
 });
@@ -2982,11 +3029,12 @@ $("#btnMarcaRet").addEventListener("click", () => marcarFiltradas("retencion"));
 $("#btnMarcaTra").addEventListener("click", () => marcarFiltradas("transito"));
 $("#btnMarcaAuto").addEventListener("click", () => marcarFiltradas(""));
 $("#btnCsvUbic").addEventListener("click", () => {
-  const f = [["Ubicacion","Area","Target","Tipo","Fijado a mano"]];
-  estado.ubicaciones.forEach((u) => f.push([u.ubicacion, u.area, u.target,
+  const filas = estado.ubicaciones.map((u) => [u.ubicacion, u.area, u.target,
     tipoUbic(u.ubicacion, null) === "retencion" ? "Stock retenido" : "Transito operativo",
-    u.tipo ? "X" : ""]));
-  bajarCSV("ubicaciones_criticas.csv", f);
+    u.tipo ? "SI" : ""]);
+  bajarXLSX("ubicaciones_criticas", "Ubicaciones",
+    ["Ubicacion","Area","Target","Tipo","Fijado a mano"],
+    filas, [COL_T,COL_T,COL_N,COL_T,COL_T], [26,9,8,17,14]);
 });
 $("#btnBorrarUbic").addEventListener("click", () => {
   if (!confirm("Vaciar la lista de ubicaciones criticas?\n\nSin ubicaciones no se calcula nada.")) return;
@@ -3036,9 +3084,8 @@ $("#btnAddSku").addEventListener("click", () => {
   pintarTodo();
 });
 $("#btnCsvMaestro").addEventListener("click", () => {
-  const f = [["SKU","Precio"]];
-  estado.maestroCrudo.forEach(([s, c]) => f.push([s, dec(c)]));
-  bajarCSV("maestro_valorizado.csv", f);
+  bajarXLSX("maestro_valorizado", "Maestro", ["SKU","Precio unitario"],
+    estado.maestroCrudo.map(([s, c]) => [s, c]), [COL_T,COL_N], [18,16]);
 });
 $("#btnBorrarMaestro").addEventListener("click", () => {
   if (!confirm("Vaciar el maestro?\n\nTodo el valorizado va a dar $0.")) return;

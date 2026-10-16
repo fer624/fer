@@ -176,6 +176,22 @@ El panel de la derecha es mas ancho y arranca con una **rosca** del reparto por 
 el total de lineas en el centro: es parte-de-un-todo con cuatro tramos, el caso donde una
 rosca efectivamente sirve.
 
+### Las exportaciones
+
+Salen en **.xlsx**, no en CSV, por una razon concreta: los codigos del WMS son
+`12219274.327`, `3969703.000` o `1797778.002`, y Excel, al abrir un CSV, los lee como numero
+y les come los decimales. Lo mismo con los codigos de area: `0081` se vuelve `81`.
+
+En el .xlsx cada columna va tipada:
+
+| Columna | Tipo |
+|---|---|
+| SKU, HU, ubicacion, area | **texto**, con formato `@`, asi Excel no los reinterpreta |
+| cantidad, precio, valorizado, dias | numero, para poder sumarlos |
+| fechas | fecha de verdad, para poder ordenar y filtrar |
+
+Ademas sale con filtro automatico y los anchos de columna puestos.
+
 ### El respaldo
 
 Todo lo que se carga a mano vive en el LocalStorage de **ese** navegador: si se limpia o se
