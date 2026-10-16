@@ -128,6 +128,32 @@
         </div>
       </div>
 
+      <div class="seccion">
+        <div class="panel">
+          <div class="panel__cabecera">
+            <h2 class="seccion__titulo">Dónde se concentra</h2>
+            <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+              <div class="campo" style="max-width:200px;">
+                <label class="campo__etiqueta" for="rankAlcance">Período</label>
+                <select id="rankAlcance">
+                  <option value="mes">El mes elegido</option>
+                  <option value="todo">Todo el histórico</option>
+                </select>
+              </div>
+              <div class="campo" style="max-width:140px;">
+                <label class="campo__etiqueta" for="rankTope">Mostrar</label>
+                <select id="rankTope">
+                  <option value="10">Top 10</option>
+                  <option value="20">Top 20</option>
+                  <option value="0">Todos</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="panel__cuerpo rankings" id="rankings"></div>
+        </div>
+      </div>
+
     </section>
 
     <!-- ---------------------- Vista: Cíclicos ---------------------- -->

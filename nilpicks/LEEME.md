@@ -104,6 +104,23 @@ El selector **Contar** cambia la unidad:
 El mes de un caso es el de su **primer** intento, que es cuando empezó el
 problema.
 
+### Dónde se concentra
+
+Abajo del todo hay cuatro rankings: **usuarios**, **tipos de almacén**,
+**ubicaciones** y **productos**. Cada uno muestra el total y lo abre en Nil
+Picks y Repicking, porque no es lo mismo un usuario que genera muchas
+excepciones que después se recuperan solas que uno cuyas líneas terminan todas
+en conteo.
+
+Se pueden ver del mes elegido o de todo el histórico, y en top 10, top 20 o
+completos. Al exportar el Excel del KPI, los cuatro rankings van **enteros**,
+una hoja cada uno, sin importar el top elegido en pantalla.
+
+El ranking de usuarios tiene una particularidad: contando **por tareas** usa el
+usuario de cada intento, no el del último. Si la misma línea la pickearon tres
+personas distintas, cada una se lleva su ocurrencia. Contando **por casos**, el
+caso se le atribuye al último que lo intentó.
+
 ## Columnas que lee
 
 Los encabezados se reconocen sin distinguir mayúsculas, acentos ni puntos, así
@@ -112,7 +129,15 @@ que aguanta variaciones del layout. Las columnas que sobran se ignoran.
 - **Picking** (obligatorio): Documento, Código de excepción, Posición de
   documento, Tarea de almacén, Producto, Descripción de producto,
   Ctd.prev.proced.UMB, Ctd.real dest.UMB, Ubic.procedencia, Fecha confirmación,
-  Hora de confirmación, Confirmado por. Si está, suma Tipo de stocks.
+  Hora de confirmación, Confirmado por, **Tipo almacén origen**. Si está, suma
+  Tipo de stocks.
+
+  De esas, las imprescindibles son Documento, Código de excepción y
+  Ubic.procedencia: sin ellas no hay caso ni gaveta que contar. Las demás
+  pueden faltar, y la app te avisa cuáles al importar: el ranking que sale de
+  esa columna queda en "(sin dato)" y nada más. *Tipo almacén origen* es la que
+  alimenta el ranking por tipo de almacén; se busca primero la del **origen**,
+  porque la gaveta que falló es la de procedencia.
 - **Pedidos** (opcional): Documento, Documento ERP, Documento original de ERP,
   Destinatario mcía., Descripción destinatario de mercancías. **No cambia la
   clasificación**: solo trae el ERP y el destinatario para poder avisar que un

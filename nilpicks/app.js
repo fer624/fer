@@ -46,6 +46,20 @@ const COLS_PICKING = {
   autor: ['autor'],
   item: ['posiciondedocumento', 'posiciondocumento', 'posicion', 'item'],
   tipoStock: ['denominaciondetipodestocks', 'tipodestocks'],
+  /* Tipo de almacén de la ubicación de origen. SAP lo exporta con nombres
+     muy distintos según el layout, así que se prueban varios. Si no viene,
+     el ranking por tipo de almacén queda en "(sin dato)" y la importación
+     lo avisa. */
+  tipoAlmacen: [
+    // Primero los del origen: la gaveta que falló es la de procedencia.
+    // "Tipo almacén origen" es el encabezado que trae el reporte.
+    'tipoalmacenorigen', 'tipodealmacenorigen',
+    'tipoalmacenprocedencia', 'tipodealmacenprocedencia', 'tipodealmacendeprocedencia',
+    'tipoalmorigen', 'tipoalmprocedencia',
+    // Y recién después los genéricos
+    'tipodealmacen', 'tipoalmacen', 'tipoalm',
+    'denominaciondetipodealmacen', 'denominaciontipodealmacen', 'descripciontipodealmacen',
+  ],
 };
 
 /* El reporte de pedidos es opcional y solo aporta datos de contacto. */
@@ -368,6 +382,7 @@ function refrescar(caso) {
   caso.cantidad = ultimo.cantidad;
   caso.usuario = ultimo.usuario;
   caso.tipoStock = ultimo.tipoStock;
+  caso.tipoAlmacen = ultimo.tipoAlmacen || caso.tipoAlmacen || '';
   caso.documentoErp = ultimo.documentoErp || caso.documentoErp || '';
   caso.destinatario = ultimo.destinatario || caso.destinatario || '';
 
@@ -421,6 +436,7 @@ function construirIntentos(filas, pedidos) {
       descripcion: limpiar(valor(f, mapa, 'descripcion')),
       cantidad: aNumero(valor(f, mapa, 'cantidad')),
       tipoStock: limpiar(valor(f, mapa, 'tipoStock')),
+      tipoAlmacen: limpiar(valor(f, mapa, 'tipoAlmacen')),
       usuario: limpiar(valor(f, mapa, 'confirmadoPor'))
         || limpiar(valor(f, mapa, 'usuario'))
         || limpiar(valor(f, mapa, 'autor')),
@@ -544,6 +560,18 @@ function procesar(filasPicking, filasPedidos, casosExistentes) {
     aplicarRegla(caso);
   });
 
+  /* Columnas que no son obligatorias pero que, si faltan, dejan un ranking
+     o un dato en blanco. Se avisa en el resumen para que no parezca un bug. */
+  const OPCIONALES = {
+    tipoAlmacen: 'Tipo de almacén',
+    tipoStock: 'Tipo de stocks',
+    item: 'Posición de documento',
+    confirmadoPor: 'Confirmado por',
+  };
+  const faltantes = Object.entries(OPCIONALES)
+    .filter(([campo]) => !mapa[campo])
+    .map(([, nombre]) => nombre);
+
   const casos = [...tocados.values()];
   return {
     casos,
@@ -552,6 +580,7 @@ function procesar(filasPicking, filasPedidos, casosExistentes) {
     reintentos,
     duplicados,
     reclasificados,
+    faltantes,
     cerradosAuto: casos.filter((c) => c.cierreAutomatico).length,
   };
 }
@@ -675,7 +704,7 @@ async function procesarArchivos() {
     };
     await DB.logImportacion(registro);
 
-    mostrarResumen(registro, filasPic.length - r.bidf);
+    mostrarResumen(registro, filasPic.length - r.bidf, r.faltantes);
     await recargar();
     await pintarImportaciones();
     avisar(`${r.nuevos} casos nuevos, ${r.reintentos} reintentos, ${r.cerradosAuto} cerrados solos.`, 'ok');
@@ -688,7 +717,7 @@ async function procesarArchivos() {
   }
 }
 
-function mostrarResumen(r, tomasLimpias) {
+function mostrarResumen(r, tomasLimpias, faltantes = []) {
   const datos = [
     ['Tareas BIDF', numeroLindo(r.bidf)],
     ['Casos nuevos', numeroLindo(r.nuevos)],
@@ -703,10 +732,17 @@ function mostrarResumen(r, tomasLimpias) {
       <div class="resumen__clave">${k}</div>
     </div>`).join('');
 
-  $('#detalleImport').textContent = tomasLimpias > 0
-    ? `El archivo trajo ${numeroLindo(tomasLimpias)} tareas sin excepción, que son las que permiten detectar las retomas.`
-    : 'Atención: el archivo no trae ninguna tarea sin excepción. Sin esas filas no hay forma de detectar las retomas y todo va a quedar como Nil Pick. Exportá el reporte de picking completo, sin filtrar por código de excepción.';
+  const avisos = [
+    tomasLimpias > 0
+      ? `El archivo trajo ${numeroLindo(tomasLimpias)} tareas sin excepción, que son las que permiten detectar las retomas.`
+      : 'Atención: el archivo no trae ninguna tarea sin excepción. Sin esas filas no hay forma de detectar las retomas y todo va a quedar como Nil Pick. Exportá el reporte de picking completo, sin filtrar por código de excepción.',
+  ];
 
+  if (faltantes.length) {
+    avisos.push(`El reporte no trae ${faltantes.join(', ')}. Los casos se cargan igual, pero el ranking o el dato que sale de esa columna va a quedar en "(sin dato)". Si la necesitás, agregala al layout del export de SAP.`);
+  }
+
+  $('#detalleImport').innerHTML = avisos.map((t) => `<p>${esc(t)}</p>`).join('');
   $('#bloqueResumen').hidden = false;
 }
 
@@ -1296,6 +1332,134 @@ function pintarKpi() {
     </tr>`).join('');
 
   dibujarGrafico(meses.slice(-12), unidad);
+  pintarRankings();
+}
+
+/* ------------------------- Dónde se concentra -------------------------- */
+
+/* Las cuatro dimensiones que sirven para saber dónde atacar el problema.
+   `porIntento` marca las que cambian entre un intento y otro de la misma
+   línea: el usuario puede ser distinto cada vez, la gaveta no. */
+const DIMENSIONES = [
+  { campo: 'usuario', titulo: 'Usuarios', etiqueta: 'Usuario', porIntento: true },
+  { campo: 'tipoAlmacen', titulo: 'Tipos de almacén', etiqueta: 'Tipo', porIntento: false },
+  { campo: 'ubicacion', titulo: 'Ubicaciones', etiqueta: 'Gaveta', porIntento: false },
+  { campo: 'producto', titulo: 'Productos', etiqueta: 'Producto', porIntento: false },
+];
+
+/**
+ * Cuenta ocurrencias por una dimensión, separando Nil Pick de Repicking.
+ *
+ * Por tareas se cuenta cada intento fallido; por casos, cada problema una
+ * sola vez. Para el usuario, además, contar por tareas usa el usuario de
+ * cada intento y no el del último, que es lo que corresponde cuando la misma
+ * línea la pickearon personas distintas.
+ */
+function ranking(lista, dim, unidad, tope) {
+  const cuenta = new Map();
+
+  const sumar = (clave, nil, cant) => {
+    const r = cuenta.get(clave) || { clave, total: 0, nil: 0, repick: 0 };
+    r.total += cant;
+    if (nil) r.nil += cant; else r.repick += cant;
+    cuenta.set(clave, r);
+  };
+
+  lista.forEach((c) => {
+    const nil = c.clasificacion === 'Nil Pick';
+    if (unidad === 'tareas' && dim.porIntento) {
+      c.intentos.forEach((i) => sumar(limpiar(i[dim.campo]) || '(sin dato)', nil, 1));
+    } else {
+      const clave = limpiar(c[dim.campo]) || '(sin dato)';
+      sumar(clave, nil, unidad === 'tareas' ? (c.intentosCant || c.intentos.length) : 1);
+    }
+  });
+
+  const filas = [...cuenta.values()].sort((a, b) => b.total - a.total || String(a.clave).localeCompare(String(b.clave), 'es', { numeric: true }));
+  const total = filas.reduce((a, f) => a + f.total, 0);
+  const mostradas = tope > 0 ? filas.slice(0, tope) : filas;
+
+  return {
+    dim,
+    filas: mostradas,
+    total,
+    distintos: filas.length,
+    resto: filas.length - mostradas.length,
+    restoTotal: filas.slice(mostradas.length).reduce((a, f) => a + f.total, 0),
+    maximo: filas.length ? filas[0].total : 0,
+  };
+}
+
+/** Descripción del producto, para que el ranking no sea solo un código. */
+function descripcionDe(lista, producto) {
+  const c = lista.find((x) => x.producto === producto && x.descripcion);
+  return c ? c.descripcion : '';
+}
+
+function rankingsDelPeriodo() {
+  const alcance = $('#rankAlcance').value;
+  const clave = $('#kpiMes').value;
+  return alcance === 'todo'
+    ? App.casos
+    : App.casos.filter((c) => c.fecha && c.fecha.slice(0, 7) === clave);
+}
+
+function pintarRankings() {
+  const lista = rankingsDelPeriodo();
+  const unidad = $('#kpiUnidad').value;
+  const tope = Number($('#rankTope').value);
+  const palabra = unidad === 'tareas' ? 'tareas BIDF' : 'casos';
+
+  $('#rankings').innerHTML = DIMENSIONES.map((dim) => {
+    const r = ranking(lista, dim, unidad, tope);
+
+    if (!r.filas.length) {
+      return `
+        <div class="rank">
+          <div class="rank__titulo">${dim.titulo}</div>
+          <div class="rank__vacio">Sin datos en el período.</div>
+        </div>`;
+    }
+
+    const filas = r.filas.map((f) => {
+      const ancho = r.maximo ? Math.max(2, (f.total / r.maximo) * 100) : 0;
+      const porcentaje = r.total ? (f.total / r.total) * 100 : 0;
+      const detalle = dim.campo === 'producto' ? descripcionDe(lista, f.clave) : '';
+      return `
+        <tr>
+          <td class="rank__celda">
+            <span class="rank__barra" style="width:${ancho.toFixed(1)}%"></span>
+            <span class="rank__texto">${esc(f.clave)}</span>
+            ${detalle ? `<div class="menudo">${esc(detalle)}</div>` : ''}
+          </td>
+          <td class="num"><strong>${numeroLindo(f.total)}</strong><div class="menudo">${porcentaje.toFixed(0)}%</div></td>
+          <td class="num">${numeroLindo(f.nil)}</td>
+          <td class="num">${numeroLindo(f.repick)}</td>
+        </tr>`;
+    }).join('');
+
+    const pie = r.resto > 0
+      ? `<tr class="rank__resto"><td>Otros ${numeroLindo(r.resto)}</td><td class="num">${numeroLindo(r.restoTotal)}</td><td colspan="2"></td></tr>`
+      : '';
+
+    return `
+      <div class="rank">
+        <div class="rank__titulo">${dim.titulo}
+          <span class="rank__sub">${numeroLindo(r.distintos)} distintos · ${numeroLindo(r.total)} ${palabra}</span>
+        </div>
+        <table class="tabla tabla--rank">
+          <thead>
+            <tr>
+              <th>${dim.etiqueta}</th>
+              <th class="num">Total</th>
+              <th class="num">Nil</th>
+              <th class="num">Repick</th>
+            </tr>
+          </thead>
+          <tbody>${filas}${pie}</tbody>
+        </table>
+      </div>`;
+  }).join('');
 }
 
 function dibujarGrafico(meses, unidad) {
@@ -1413,6 +1577,27 @@ function filasMeses() {
   }));
 }
 
+/** Los cuatro rankings, cada uno como una hoja del Excel. */
+function hojasRankings() {
+  const lista = rankingsDelPeriodo();
+  const unidad = $('#kpiUnidad').value;
+  const hojas = {};
+
+  DIMENSIONES.forEach((dim) => {
+    const r = ranking(lista, dim, unidad, 0);          // en el Excel va todo
+    hojas[`Por ${dim.titulo.toLowerCase()}`] = r.filas.map((f) => ({
+      [dim.etiqueta]: f.clave,
+      ...(dim.campo === 'producto' ? { 'Descripción': descripcionDe(lista, f.clave) } : {}),
+      'Total': f.total,
+      'Nil Picks': f.nil,
+      'Repicking': f.repick,
+      '% del total': r.total ? Number(((f.total / r.total) * 100).toFixed(1)) : 0,
+    }));
+  });
+
+  return hojas;
+}
+
 /** Planilla para imprimir y darle al contador: sin la cantidad del sistema. */
 function filasPlanilla() {
   return unidadesFiltradas().map((u) => ({
@@ -1494,7 +1679,9 @@ function irA(vista) {
     btn.addEventListener('click', () => {
       switch (btn.dataset.exp) {
         case 'meses-csv': bajarCsv(filasMeses(), 'NilPicks_KPI_mensual'); break;
-        case 'meses-xlsx': bajarExcel({ 'KPI mensual': filasMeses() }, 'NilPicks_KPI_mensual'); break;
+        case 'meses-xlsx':
+          bajarExcel({ 'KPI mensual': filasMeses(), ...hojasRankings() }, 'NilPicks_KPI_mensual');
+          break;
         case 'casos-csv': bajarCsv(filasCasos(App.filtrados), 'NilPicks_Casos'); break;
         case 'casos-xlsx': bajarExcel({ Casos: filasCasos(App.filtrados), 'KPI mensual': filasMeses() }, 'NilPicks_Casos'); break;
         case 'ciclicos-xlsx': {
@@ -1552,6 +1739,8 @@ async function iniciar() {
   prepararSite();
   $('#kpiMes').addEventListener('change', pintarKpi);
   $('#kpiUnidad').addEventListener('change', pintarKpi);
+  $('#rankAlcance').addEventListener('change', pintarRankings);
+  $('#rankTope').addEventListener('change', pintarRankings);
 
   await DB.open();
 
