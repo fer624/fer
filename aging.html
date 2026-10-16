@@ -3,695 +3,621 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monitoreo Aging</title>
+<title>Aging</title>
 <style>
 /* ============================================================
-   AGING.HTML — Monitoreo de aging en ubicaciones criticas
-   Replica el calculo del libro Excel:
-     Aging           = NETWORKDAYS(Fecha Aging; corte)  lun-vie, sin feriados
-     Valorizado      = Costo x Cantidad
-     Fuera de Target = Aging >= Target
-   Sin backend. La configuracion vive en LocalStorage.
+   AGING — interfaz
+   Columna de navegacion fija, barra de contexto y un lienzo.
+   Cero tablas de reporte: la pantalla principal es el mapa.
    ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+/* .lienzo.pleno usa display:flex, que por especificidad le gana al [hidden] del
+   navegador: sin esto las vistas ocultas se siguen viendo */
+[hidden]{display:none !important}
 
 :root{
-  --acero-900:#182029;
-  --acero-700:#2b3742;
-  --acero-500:#5a6a78;
-  --acero-300:#a9b6c1;
-  --acero-100:#e6ebef;
-  --papel:#f4f6f8;
-  --blanco:#ffffff;
-  --navy:#101f49;
+  /* superficies */
+  --fondo:#f6f7f9;
+  --panel:#ffffff;
+  --panel-2:#fbfcfd;
+  --borde:#e7eaf0;
+  --borde-fuerte:#d6dbe4;
 
-  --verde:#18794e;
-  --verde-suave:#e2f4ea;
-  --verde-semaforo:#7cb342;
-  --verde-tinta:#17320a;
+  /* tinta */
+  --t1:#0f172a;
+  --t2:#59637a;
+  --t3:#99a1b3;
 
-  --amarillo:#9a6700;
-  --amarillo-suave:#fdf3d7;
+  /* acento */
+  --ac:#2563eb;
+  --ac-fuerte:#1d4ed8;
+  --ac-suave:#eef3ff;
+  --ac-borde:#c9dbff;
 
-  --rojo:#c0261f;
-  --rojo-suave:#fbe5e3;
-  --rojo-semaforo:#d32f2f;
+  /* estado */
+  --ok:#0f7a4e;
+  --ok-suave:#e6f6ee;
+  --mal:#c0261f;
+  --mal-suave:#fdeceb;
+  --avisa:#9a6700;
+  --avisa-suave:#fdf4de;
 
-  --azul:#1f5c9e;
-  --azul-suave:#e8f0f9;
+  /* rampa ordinal de atraso — un solo hue, validada sobre blanco */
+  --b0:#9fb0bd;
+  --b1:#e89189;
+  --b2:#bf3630;
+  --b3:#85201b;
 
-  --inbound:#bfe6f7;
-  --inbound-tinta:#0b4a66;
-  --outbound:#f7b733;
-  --outbound-tinta:#5a3b00;
-  --gestion:#f6d9ea;
-  --gestion-tinta:#6b2b4e;
-
-  --radio:14px;
-  --sombra:0 1px 2px rgba(24,32,41,.08), 0 8px 24px rgba(24,32,41,.06);
-  --borde:1px solid var(--acero-100);
-  --fuente:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --r:10px;
+  --r-g:16px;
+  --sombra:0 1px 2px rgba(15,23,42,.04), 0 2px 10px rgba(15,23,42,.05);
+  --sombra-alta:0 8px 30px rgba(15,23,42,.12);
+  --fuente:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
+  --rail:236px;
+  --ctx:330px;
 }
 
-*{box-sizing:border-box}
-html,body{margin:0}
+html,body{height:100%;margin:0}
 body{
   font-family:var(--fuente);
-  background:var(--papel);
-  color:var(--acero-900);
+  background:var(--fondo);
+  color:var(--t1);
   font-size:14px;
-  line-height:1.45;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  display:grid;
+  grid-template-columns:var(--rail) 1fr;
+  overflow:hidden;
 }
-:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
+h1,h2,h3{margin:0;letter-spacing:-.018em}
+button{font:inherit}
 
-/* ---------- Encabezado ---------- */
-.barra{
-  background:var(--acero-900);
-  color:var(--blanco);
-  padding:14px 22px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:18px;
-  flex-wrap:wrap;
+/* ---------- columna de navegacion ---------- */
+.rail{
+  background:var(--panel);
+  border-right:1px solid var(--borde);
+  display:flex;flex-direction:column;
+  height:100vh;overflow:hidden;
 }
-.barra h1{margin:0;font-size:19px;letter-spacing:.3px}
-.barra p{margin:2px 0 0;font-size:12.5px;color:var(--acero-300)}
-.corte{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.corte label{font-size:12px;color:var(--acero-300);display:block;margin-bottom:3px}
-.corte input[type=date]{
-  padding:7px 10px;border-radius:9px;border:1px solid var(--acero-700);
-  background:var(--acero-700);color:var(--blanco);font:inherit;font-size:13px;
+.marca{padding:20px 18px 14px;display:flex;gap:11px;align-items:center}
+.marca .cubo{
+  width:32px;height:32px;border-radius:9px;flex:none;
+  background:linear-gradient(145deg,var(--ac),#5b8def);
+  display:grid;place-items:center;color:#fff;
 }
+.marca h1{font-size:15px;font-weight:650;line-height:1.15}
+.marca p{margin:1px 0 0;font-size:11.5px;color:var(--t3)}
 
-/* ---------- Solapas ---------- */
-.solapas{
-  display:flex;gap:2px;background:var(--acero-700);
-  padding:0 14px;overflow-x:auto;
+.nav{padding:6px 10px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
+.nav .grupo{
+  font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:.07em;
+  text-transform:uppercase;padding:14px 8px 5px;
 }
-.solapa{
-  appearance:none;border:0;background:transparent;color:var(--acero-300);
-  font:inherit;font-size:13.5px;padding:11px 16px;cursor:pointer;
-  border-bottom:3px solid transparent;white-space:nowrap;
+.nav button{
+  display:flex;align-items:center;gap:10px;width:100%;
+  border:0;background:transparent;color:var(--t2);
+  padding:8px 10px;border-radius:var(--r);cursor:pointer;
+  font-size:13.5px;font-weight:500;text-align:left;transition:.12s;
 }
-.solapa:hover{color:var(--blanco)}
-.solapa[aria-selected=true]{color:var(--blanco);border-bottom-color:var(--azul);font-weight:600}
-.conteo-solapa{
-  display:inline-block;margin-left:6px;background:var(--rojo);color:#fff;
-  border-radius:20px;padding:0 6px;font-size:11px;font-weight:700;
+.nav button:hover{background:var(--panel-2);color:var(--t1)}
+.nav button[aria-current=true]{background:var(--ac-suave);color:var(--ac-fuerte);font-weight:600}
+.nav button svg{flex:none;opacity:.85}
+.nav .pico{
+  margin-left:auto;font-size:10.5px;font-weight:700;border-radius:20px;
+  padding:1px 7px;background:var(--mal-suave);color:var(--mal);
 }
+.nav button[aria-current=true] .pico{background:#fff}
 
-/* ---------- Layout ---------- */
-main{padding:20px 22px 60px;max-width:1500px;margin:0 auto}
-section[hidden]{display:none}
-.panel{
-  background:var(--blanco);border:var(--borde);border-radius:var(--radio);
-  box-shadow:var(--sombra);padding:18px;margin-bottom:18px;
+.pie-rail{padding:12px 14px 16px;border-top:1px solid var(--borde)}
+.pie-rail label{display:block;font-size:11px;color:var(--t3);font-weight:600;margin-bottom:5px}
+.pie-rail input[type=date]{
+  width:100%;padding:7px 9px;border-radius:9px;border:1px solid var(--borde-fuerte);
+  font:inherit;font-size:13px;color:var(--t1);background:var(--panel);
 }
-.panel h2{margin:0 0 4px;font-size:16px}
-.panel h2 + .ayuda{margin:0 0 14px}
-.ayuda{font-size:12.5px;color:var(--acero-500);margin:0 0 12px}
-.fila{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.pie-rail .fuente{font-size:11px;color:var(--t3);margin-top:9px;line-height:1.45}
 
-/* ---------- Botones ---------- */
+/* ---------- area principal ---------- */
+.obra{height:100vh;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.barra-ctx{
+  height:58px;flex:none;display:flex;align-items:center;gap:14px;
+  padding:0 20px;border-bottom:1px solid var(--borde);background:var(--panel);
+}
+.migas{display:flex;align-items:center;gap:5px;font-size:13.5px;min-width:0;flex-wrap:wrap}
+.migas button{
+  border:0;background:transparent;color:var(--t2);cursor:pointer;
+  padding:4px 8px;border-radius:7px;font-size:13.5px;transition:.12s;
+}
+.migas button:hover{background:var(--panel-2);color:var(--t1)}
+.migas .sep{color:var(--t3);font-size:12px}
+.migas .hoy{font-weight:650;color:var(--t1);padding:4px 8px}
+.derecha{margin-left:auto;display:flex;align-items:center;gap:9px}
+
+.lienzo{flex:1;overflow-y:auto;padding:20px;min-height:0}
+.lienzo.pleno{padding:0;overflow:hidden;display:flex;min-height:0}
+
+/* ---------- controles ---------- */
 .btn{
-  appearance:none;border:0;border-radius:10px;padding:9px 15px;
-  font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;
-  background:var(--acero-900);color:var(--blanco);
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid transparent;border-radius:9px;padding:7px 13px;
+  font-size:13px;font-weight:550;cursor:pointer;transition:.12s;
+  background:var(--ac);color:#fff;white-space:nowrap;
 }
-.btn:hover{background:var(--acero-700)}
+.btn:hover{background:var(--ac-fuerte)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-.btn.claro{background:var(--acero-100);color:var(--acero-900)}
-.btn.claro:hover{background:var(--acero-300)}
-.btn.peligro{background:var(--rojo-suave);color:var(--rojo)}
-.btn.peligro:hover{background:#f6cfcb}
-.btn.chico{padding:5px 10px;font-size:12.5px;border-radius:8px}
+.btn.suave{background:var(--panel);color:var(--t1);border-color:var(--borde-fuerte)}
+.btn.suave:hover{background:var(--panel-2);border-color:var(--t3)}
+.btn.fantasma{background:transparent;color:var(--t2)}
+.btn.fantasma:hover{background:var(--panel-2);color:var(--t1)}
+.btn.riesgo{background:var(--mal-suave);color:var(--mal);border-color:#f3cdca}
+.btn.riesgo:hover{background:#fbdbd8}
+.btn.chico{padding:4px 9px;font-size:12px;border-radius:7px}
 
-/* ---------- Formularios ---------- */
-label.campo{display:block;font-size:12.5px;color:var(--acero-700);margin-bottom:5px;font-weight:600}
-textarea{
-  padding:7px 9px;border-radius:9px;border:1px solid var(--acero-300);
-  font:inherit;font-size:12.5px;background:var(--blanco);color:var(--acero-900);
-  resize:vertical;width:240px;line-height:1.35;
+.grupo-btn{display:inline-flex;background:var(--panel-2);border:1px solid var(--borde);border-radius:10px;padding:2px;gap:2px}
+.grupo-btn button{
+  border:0;background:transparent;color:var(--t2);cursor:pointer;
+  padding:5px 12px;border-radius:8px;font-size:12.5px;font-weight:550;transition:.12s;
 }
-input[type=text],input[type=number],input[type=search],select{
-  padding:8px 10px;border-radius:9px;border:1px solid var(--acero-300);
-  font:inherit;font-size:13.5px;background:var(--blanco);color:var(--acero-900);
-}
-input::placeholder{color:var(--acero-300)}
+.grupo-btn button:hover{color:var(--t1)}
+.grupo-btn button[aria-pressed=true]{background:var(--panel);color:var(--t1);box-shadow:var(--sombra)}
 
-/* ---------- Zona de carga ---------- */
-.zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
-.zona{
-  border:2px dashed var(--acero-300);border-radius:var(--radio);
-  padding:16px;text-align:center;background:var(--papel);transition:.15s;
+input[type=text],input[type=search],input[type=number],select,textarea{
+  padding:7px 10px;border-radius:9px;border:1px solid var(--borde-fuerte);
+  font:inherit;font-size:13px;background:var(--panel);color:var(--t1);transition:.12s;
 }
-.zona.encima{border-color:var(--azul);background:var(--azul-suave)}
-.zona.listo{border-style:solid;border-color:var(--verde);background:var(--verde-suave)}
-.zona h3{margin:0 0 4px;font-size:14px}
-.zona p{margin:0 0 10px;font-size:12.5px;color:var(--acero-500)}
-.zona .estado{font-size:12.5px;font-weight:600;margin-top:9px;color:var(--verde)}
-.zona .estado.vacio{color:var(--acero-500);font-weight:400}
-.zona .estado.error{color:var(--rojo)}
-input[type=file]{display:none}
+input:focus,select:focus,textarea:focus{border-color:var(--ac);outline:0;box-shadow:0 0 0 3px var(--ac-suave)}
+input::placeholder{color:var(--t3)}
+label.campo{display:block;font-size:11.5px;color:var(--t2);font-weight:600;margin-bottom:5px}
 
-/* ---------- KPI ---------- */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin-bottom:18px}
-.kpi{
-  background:var(--blanco);border:var(--borde);border-radius:var(--radio);
-  box-shadow:var(--sombra);padding:15px 17px;
+/* ---------- tarjetas ---------- */
+.tarjeta{
+  background:var(--panel);border:1px solid var(--borde);
+  border-radius:var(--r-g);box-shadow:var(--sombra);padding:18px;margin-bottom:16px;
 }
-.kpi .valor{font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.15}
-.kpi .rotulo{font-size:12.5px;color:var(--acero-500);margin-top:3px}
-.kpi .pie{font-size:11.5px;color:var(--acero-300);margin-top:5px}
-.kpi.r .valor{color:var(--rojo)}
-.kpi.v .valor{color:var(--verde)}
-.kpi.a .valor{color:var(--amarillo)}
+.tarjeta h2{font-size:15px;font-weight:650}
+.tarjeta .sub{font-size:12.5px;color:var(--t2);margin:4px 0 14px;max-width:72ch}
+.sep{height:1px;background:var(--borde);margin:16px 0}
 
-/* ---------- Avisos ---------- */
+/* ---------- cintas de numeros ---------- */
+.cinta{display:flex;gap:0;background:var(--panel);border:1px solid var(--borde);
+  border-radius:var(--r-g);box-shadow:var(--sombra);overflow:hidden;margin-bottom:16px}
+.cinta .celda{flex:1;padding:14px 18px;border-right:1px solid var(--borde);min-width:0}
+.cinta .celda:last-child{border-right:0}
+.cinta .n{font-size:21px;font-weight:680;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.2}
+.cinta .n.mal{color:var(--mal)}
+.cinta .n.ok{color:var(--ok)}
+.cinta .r{font-size:11.5px;color:var(--t2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- mapa ---------- */
+.zona-mapa{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--fondo)}
+.mandos{
+  display:flex;align-items:center;gap:12px;padding:12px 18px;flex-wrap:wrap;
+  border-bottom:1px solid var(--borde);background:var(--panel);
+}
+.leyenda{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--t2);margin-left:auto}
+.leyenda span{display:flex;align-items:center;gap:5px}
+.leyenda i{width:10px;height:10px;border-radius:3px;flex:none}
+#mapa{flex:1;min-height:0;position:relative;padding:14px}
+#mapaSvg{width:100%;height:100%;display:block}
+.celda-mapa{cursor:pointer}
+.celda-mapa rect{transition:filter .13s, stroke .13s}
+.celda-mapa:hover rect{filter:brightness(1.07)}
+.celda-mapa.sel rect{stroke:var(--t1);stroke-width:2.5}
+.celda-mapa text{pointer-events:none;font-family:var(--fuente)}
+.celda-mapa .tit{font-size:13px;font-weight:650;letter-spacing:-.01em}
+.celda-mapa .cif{font-size:11.5px;font-variant-numeric:tabular-nums;opacity:.9}
+.celda-mapa .mini{font-size:10.5px;opacity:.8}
+@keyframes entrar{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+#mapaSvg > g{animation:entrar .22s ease-out;transform-origin:center}
+
+/* ---------- panel de contexto ---------- */
+.ctx{
+  width:var(--ctx);flex:none;border-left:1px solid var(--borde);
+  background:var(--panel);display:flex;flex-direction:column;overflow:hidden;
+}
+.ctx-cab{padding:16px 18px 13px;border-bottom:1px solid var(--borde)}
+.ctx-cab .eti{font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:.07em;text-transform:uppercase}
+.ctx-cab h2{font-size:17px;font-weight:680;margin-top:3px;word-break:break-word}
+.ctx-cab .bajo{font-size:12.5px;color:var(--t2);margin-top:3px}
+.ctx-cuerpo{flex:1;overflow-y:auto;padding:14px 18px 20px}
+.par{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--borde);font-size:13px}
+.par:last-of-type{border-bottom:0}
+.par .k{color:var(--t2)}
+.par .v{font-weight:620;font-variant-numeric:tabular-nums;text-align:right}
+.par .v.mal{color:var(--mal)}
+.barra-mezcla{display:flex;height:9px;border-radius:5px;overflow:hidden;margin:12px 0 8px;gap:2px;background:var(--fondo)}
+.barra-mezcla i{display:block;height:100%;border-radius:3px}
+.ctx h3{font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin:20px 0 9px}
+.lista-lineas{display:flex;flex-direction:column;gap:6px}
+.ficha{
+  display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:var(--r);
+  background:var(--panel-2);border:1px solid var(--borde);cursor:pointer;transition:.12s;text-align:left;width:100%;
+}
+.ficha:hover{border-color:var(--ac-borde);background:var(--ac-suave)}
+.ficha .pip{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none}
+.ficha .cuerpo{min-width:0;flex:1}
+.ficha .n1{display:block;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ficha .n2{display:block;font-size:11.5px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.ficha .plata{font-size:12.5px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- tablas ---------- */
+.marco{background:var(--panel);border:1px solid var(--borde);border-radius:var(--r-g);overflow:hidden;box-shadow:var(--sombra)}
+.marco.alto{max-height:60vh;overflow:auto}
+table.datos{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+table.datos th{
+  background:var(--panel-2);color:var(--t2);text-align:left;font-weight:600;
+  padding:9px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+  position:sticky;top:0;z-index:2;border-bottom:1px solid var(--borde);white-space:nowrap;
+}
+table.datos td{padding:8px 12px;border-bottom:1px solid var(--borde);vertical-align:middle}
+table.datos tbody tr:last-child td{border-bottom:0}
+table.datos tbody tr:hover{background:var(--panel-2)}
+table.datos td.cifra,table.datos th.cifra{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:12px}
+.vacio{padding:52px 24px;text-align:center;color:var(--t2)}
+.vacio .icono{font-size:28px;margin-bottom:10px;opacity:.5}
+.vacio h3{font-size:15px;margin-bottom:5px;color:var(--t1);text-transform:none;letter-spacing:-.01em}
+.vacio p{font-size:13px;margin:0 auto;max-width:46ch}
+
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:650}
+.chip.mal{background:var(--mal-suave);color:var(--mal)}
+.chip.ok{background:var(--ok-suave);color:var(--ok)}
+.chip.neutro{background:var(--fondo);color:var(--t2)}
+.chip.avisa{background:var(--avisa-suave);color:var(--avisa)}
+
+/* ---------- avisos ---------- */
 .aviso{
-  border-radius:11px;padding:11px 14px;margin-bottom:11px;font-size:13px;
-  display:flex;gap:10px;align-items:flex-start;
+  display:flex;gap:11px;align-items:flex-start;padding:11px 14px;
+  border-radius:var(--r);margin-bottom:10px;font-size:13px;border:1px solid;
 }
-.aviso.alerta{background:var(--amarillo-suave);color:#6b4700;border:1px solid #f0dca8}
-.aviso.malo{background:var(--rojo-suave);color:var(--rojo);border:1px solid #f3c6c2}
-.aviso.ok{background:var(--verde-suave);color:var(--verde);border:1px solid #bfe4d1}
-.aviso.info{background:var(--azul-suave);color:#13456f;border:1px solid #c6daf0}
-.aviso b{font-weight:700}
+.aviso.alerta{background:var(--avisa-suave);color:#6b4a00;border-color:#f0e0b4}
+.aviso.malo{background:var(--mal-suave);color:var(--mal);border-color:#f3cdca}
+.aviso.ok{background:var(--ok-suave);color:var(--ok);border-color:#c3e8d5}
+.aviso.info{background:var(--ac-suave);color:#1a3f80;border-color:var(--ac-borde)}
 .aviso .btn{margin-left:auto;flex:none}
 
-/* ---------- Tabla tablero ---------- */
-.marco{overflow-x:auto;border-radius:var(--radio);border:var(--borde);background:var(--blanco)}
-table.tablero{border-collapse:collapse;width:100%;font-size:12.5px;min-width:1050px}
-table.tablero th{
-  background:var(--navy);color:#fff;font-weight:600;padding:9px 8px;
-  text-align:center;font-size:11.5px;letter-spacing:.3px;border:1px solid #2a3c6b;
+/* ---------- zonas de carga ---------- */
+.zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.zona{
+  border:1.5px dashed var(--borde-fuerte);border-radius:var(--r-g);
+  padding:20px;text-align:center;background:var(--panel-2);transition:.15s;
 }
-table.tablero td{border:1px solid var(--acero-100);padding:7px 8px;vertical-align:middle;text-align:center}
-td.area{
-  background:var(--navy);color:#fff;font-weight:700;font-size:15px;
-  letter-spacing:.5px;border-color:#2a3c6b;
-}
-td.resp,td.desc{text-align:left;font-weight:600;color:var(--acero-700)}
-td.desc{font-size:11px;white-space:pre-line;color:var(--acero-500);font-weight:500;max-width:230px}
-td.proceso{font-weight:700;font-size:11.5px;letter-spacing:.3px}
-td.proceso.inbound{background:var(--inbound);color:var(--inbound-tinta)}
-td.proceso.outbound{background:var(--outbound);color:var(--outbound-tinta)}
-td.proceso.gestion{background:var(--gestion);color:var(--gestion-tinta)}
-td.proceso.otro{background:var(--acero-100);color:var(--acero-700)}
-td.target{font-weight:700;font-size:14px}
-td.rotulo-fila{font-weight:600;text-align:left;color:var(--acero-700)}
-td.cifra{text-align:right;font-variant-numeric:tabular-nums}
-tr.fuera td.cifra,tr.fuera td.rotulo-fila{color:var(--rojo);font-weight:700}
-td.semaforo{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
-td.semaforo.ok{background:var(--verde-semaforo);color:var(--verde-tinta)}
-td.semaforo.mal{background:var(--rojo-semaforo);color:#fff}
-td.semaforo.nulo{background:var(--acero-100);color:var(--acero-500)}
-td.semaforo small{display:block;font-size:9.5px;font-weight:700;letter-spacing:.6px;opacity:.85}
-tr.grupo-fin td{border-bottom:3px solid var(--acero-300)}
-tr.clicable{cursor:pointer}
-tr.clicable:hover td:not(.area):not(.proceso):not(.semaforo){background:var(--azul-suave)}
+.zona.encima{border-color:var(--ac);background:var(--ac-suave)}
+.zona.listo{border-style:solid;border-color:#bfe4d1;background:var(--ok-suave)}
+.zona h3{font-size:13.5px;margin-bottom:4px}
+.zona p{margin:0 0 12px;font-size:12.5px;color:var(--t2)}
+.zona .estado{font-size:12.5px;margin-top:10px;color:var(--ok);font-weight:600}
+.zona .estado.vacio{color:var(--t3);font-weight:400;padding:0}
+.zona .estado.error{color:var(--mal);font-weight:600}
+input[type=file]{display:none}
 
-/* ---------- Tablas genericas ---------- */
-table.datos{border-collapse:collapse;width:100%;font-size:12.5px}
-table.datos th{
-  background:var(--acero-100);color:var(--acero-700);text-align:left;
-  padding:8px 9px;font-size:11.5px;letter-spacing:.3px;position:sticky;top:0;z-index:2;
-}
-table.datos td{border-top:1px solid var(--acero-100);padding:6px 9px;vertical-align:middle}
-table.datos tbody tr:hover{background:var(--papel)}
-table.datos td.cifra{text-align:right;font-variant-numeric:tabular-nums}
-.marco-alto{max-height:560px;overflow:auto;border:var(--borde);border-radius:var(--radio);background:var(--blanco)}
-.pastilla{
-  display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700;
-}
-.pastilla.mal{background:var(--rojo-suave);color:var(--rojo)}
-.pastilla.ok{background:var(--verde-suave);color:var(--verde)}
-.pastilla.neutro{background:var(--acero-100);color:var(--acero-700)}
-.vacio-tabla{padding:34px;text-align:center;color:var(--acero-500);font-size:13.5px}
-input.fecha-aging{
-  padding:3px 6px;border-radius:7px;border:1px solid var(--acero-100);
-  font:inherit;font-size:12px;background:transparent;color:var(--acero-900);width:132px;
-}
-input.fecha-aging:hover{border-color:var(--acero-300);background:var(--blanco)}
-input.fecha-aging.ajustada{
-  background:var(--amarillo-suave);border-color:#e8d3a0;color:#6b4700;font-weight:700;
-}
-
-/* ---------- Panorama ---------- */
-:root{
-  /* rampa ordinal de atraso: un solo hue, validada sobre blanco */
-  --banda-0:#9fb0bd;   /* dentro del target (contexto) */
-  --banda-1:#e89189;   /* hasta 2x */
-  --banda-2:#bf3630;   /* 2 a 5x */
-  --banda-3:#85201b;   /* mas de 5x */
-  --tinta-eje:#898781;
-  --linea-grilla:#e9ecef;
-}
-.hero{
-  display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;
-  padding:4px 2px 2px;
-}
-.hero .cifra-gigante{
-  font-size:46px;font-weight:700;letter-spacing:-1.4px;line-height:1;
-  color:var(--rojo);font-variant-numeric:tabular-nums;
-}
-.hero .cifra-gigante.bien{color:var(--verde)}
-.hero .bajada{font-size:13px;color:var(--acero-500);margin-top:6px;max-width:430px}
-.hero .secundario{display:flex;gap:26px;flex-wrap:wrap}
-.hero .secundario div{min-width:92px}
-.hero .secundario .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
-.hero .secundario .r{font-size:12px;color:var(--acero-500);margin-top:1px}
-
-.leyenda{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 14px;font-size:12.5px}
-.leyenda span{display:flex;align-items:center;gap:6px;color:var(--acero-700)}
-.leyenda i{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none}
-
-.grafico{width:100%;overflow:visible;display:block}
-.grafico .seg{cursor:pointer;transition:opacity .12s}
-.grafico .seg:hover{opacity:.78}
-.grafico .rot{font-size:12px;fill:var(--acero-700);font-weight:600}
-.grafico .rot-chico{font-size:10.5px;fill:var(--tinta-eje)}
-.grafico .val{font-size:11.5px;fill:var(--acero-500);font-variant-numeric:tabular-nums}
-.grafico .val-fuerte{font-size:12px;fill:var(--acero-900);font-weight:700;font-variant-numeric:tabular-nums}
-.grafico .delta-bien{font-size:12px;fill:var(--verde);font-weight:700;font-variant-numeric:tabular-nums}
-.grafico .delta-mal{font-size:12px;fill:var(--rojo);font-weight:700;font-variant-numeric:tabular-nums}
-.grafico .grilla{stroke:var(--linea-grilla);stroke-width:1}
-.grafico .eje{stroke:#c3c2b7;stroke-width:1}
-.grafico .linea-serie{fill:none;stroke:var(--azul);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.grafico .punto{fill:var(--azul);stroke:#fff;stroke-width:2}
-.selector{display:inline-flex;border:1px solid var(--acero-300);border-radius:10px;overflow:hidden}
-.selector button{
-  appearance:none;border:0;background:var(--blanco);color:var(--acero-700);
-  font:inherit;font-size:12.5px;padding:6px 13px;cursor:pointer;
-}
-.selector button[aria-pressed=true]{background:var(--acero-900);color:#fff;font-weight:600}
-.cabecera-panel{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
-.nota{font-size:12.5px;color:var(--acero-500);margin:10px 0 0}
-.nota b{color:var(--acero-900)}
-
-/* ---------- Grafico ---------- */
-.grafico{width:100%;overflow:visible}
-.grafico .barra-dato{transition:opacity .12s}
-.grafico .barra-dato:hover{opacity:.82}
-.eje{stroke:var(--acero-100);stroke-width:1}
-.rotulo-eje{font-size:11.5px;fill:var(--acero-700);font-weight:600}
-.valor-barra{font-size:11.5px;fill:var(--acero-500);font-variant-numeric:tabular-nums}
+/* ---------- globo ---------- */
 #tip{
-  position:fixed;pointer-events:none;background:var(--acero-900);color:#fff;
-  padding:7px 10px;border-radius:8px;font-size:12px;z-index:60;opacity:0;
-  transition:opacity .1s;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,.25);
+  position:fixed;pointer-events:none;z-index:90;opacity:0;transition:opacity .1s;
+  background:rgba(15,23,42,.96);color:#fff;padding:9px 12px;border-radius:10px;
+  font-size:12px;line-height:1.5;max-width:280px;box-shadow:var(--sombra-alta);
 }
-#tip b{display:block;margin-bottom:2px}
+#tip b{display:block;margin-bottom:3px;font-size:12.5px}
+#tip .mut{color:#aab4c8}
 
-/* ---------- Filtros ---------- */
-.filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:13px}
+/* ---------- graficos ---------- */
+.grafico{width:100%;display:block;overflow:visible}
+.grafico .grilla{stroke:var(--borde);stroke-width:1}
+.grafico .serie{fill:none;stroke:var(--ac);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.grafico .punto{fill:var(--ac);stroke:#fff;stroke-width:2.5}
+.grafico .eti{font-size:11px;fill:var(--t3);font-variant-numeric:tabular-nums}
+.grafico .eti-f{font-size:12px;fill:var(--t1);font-weight:650;font-variant-numeric:tabular-nums}
+.grafico .d-bien{font-size:12px;fill:var(--ok);font-weight:680}
+.grafico .d-mal{font-size:12px;fill:var(--mal);font-weight:680}
+
+/* ---------- filtros ---------- */
+.filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
 .filtros > div{display:flex;flex-direction:column}
-.check{display:flex;align-items:center;gap:7px;font-size:13px;padding-bottom:9px;cursor:pointer}
-.check input{width:16px;height:16px;cursor:pointer}
-
-/* ---------- Varios ---------- */
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:12px}
-.sep{height:1px;background:var(--acero-100);margin:16px 0}
-.pie-tabla{font-size:12px;color:var(--acero-500);margin-top:9px}
-.acciones{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
-.tag-fuente{font-size:11.5px;color:var(--acero-500);margin-top:5px}
-
-/* ---------- Impresion ---------- */
-@media print{
-  body{background:#fff;font-size:11px}
-  .barra{background:#fff;color:#000;border-bottom:2px solid #000;padding:8px 0}
-  .barra p,.corte,.solapas,.acciones,.filtros,.no-imprimir{display:none !important}
-  main{padding:0;max-width:none}
-  .panel{box-shadow:none;border:0;padding:0;margin:0 0 10px}
-  .marco{border:0;overflow:visible}
-  table.tablero{min-width:0;font-size:9.5px}
-  td.area,table.tablero th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  td.semaforo,td.proceso{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .kpis{grid-template-columns:repeat(4,1fr)}
-  .kpi{box-shadow:none;border:1px solid #999}
+.chk{display:flex;align-items:center;gap:7px;font-size:13px;padding-bottom:8px;cursor:pointer;color:var(--t2)}
+.chk input{width:15px;height:15px;cursor:pointer;accent-color:var(--ac)}
+.pie-tabla{font-size:12px;color:var(--t2);margin-top:10px}
+.acciones{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+input.fecha-ed{
+  padding:3px 7px;border-radius:7px;border:1px solid transparent;background:transparent;
+  font:inherit;font-size:12px;width:138px;color:var(--t1);
 }
+input.fecha-ed:hover{border-color:var(--borde-fuerte);background:var(--panel)}
+input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#6b4a00;font-weight:650}
+
+@media (max-width:1180px){
+  :root{--ctx:290px}
+}
+@media (max-width:960px){
+  body{grid-template-columns:1fr}
+  .rail{position:fixed;z-index:50;width:var(--rail);transform:translateX(-100%);transition:.2s}
+  body.rail-abierto .rail{transform:none;box-shadow:var(--sombra-alta)}
+  .ctx{display:none}
+  .abre-rail{display:inline-flex !important}
+}
+.abre-rail{display:none}
 </style>
 </head>
 <body>
 
-<header class="barra">
-  <div>
-    <h1>Monitoreo Aging</h1>
-    <p>Ubicaciones criticas &middot; dias habiles lun-vie, sin feriados &middot; fuera de aging cuando dias &ge; target</p>
-  </div>
-  <div class="corte">
+<aside class="rail">
+  <div class="marca">
+    <div class="cubo">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3h7v7H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 14h7v7H3z"/>
+      </svg>
+    </div>
     <div>
-      <label for="fCorte">Fecha de corte</label>
-      <input type="date" id="fCorte">
-    </div>
-    <button class="btn claro" id="btnHoy" type="button">Hoy</button>
-    <button class="btn" id="btnGuardarCorte" type="button" disabled>Guardar corte</button>
-  </div>
-</header>
-
-<nav class="solapas" role="tablist">
-  <button class="solapa" role="tab" aria-selected="true"  data-vista="panorama">Panorama</button>
-  <button class="solapa" role="tab" aria-selected="false" data-vista="tablero">Tablero</button>
-  <button class="solapa" role="tab" aria-selected="false" data-vista="detalle">Detalle</button>
-  <button class="solapa" role="tab" aria-selected="false" data-vista="datos">Datos</button>
-  <button class="solapa" role="tab" aria-selected="false" data-vista="ubicaciones">Ubicaciones criticas</button>
-  <button class="solapa" role="tab" aria-selected="false" data-vista="maestro">Maestro valorizado</button>
-  <button class="solapa" role="tab" aria-selected="false" data-vista="historico">Historico</button>
-</nav>
-
-<main>
-
-<!-- ===================== PANORAMA ===================== -->
-<section id="v-panorama">
-  <div id="avisos"></div>
-
-  <div class="panel" id="panelHero">
-    <div class="hero">
-      <div>
-        <div class="cifra-gigante" id="heroCifra">—</div>
-        <div class="bajada" id="heroBajada">Carga la base del WMS para ver el panorama.</div>
-      </div>
-      <div class="secundario" id="heroSec"></div>
+      <h1>Aging</h1>
+      <p>Ubicaciones criticas</p>
     </div>
   </div>
 
-  <div class="panel" id="panelBandas" hidden>
-    <div class="cabecera-panel">
-      <div>
-        <h2>Cuanto se pasa cada area de su target</h2>
-        <p class="ayuda">
-          Cada barra es un area. El color dice cuanto se paso del target propio de esa area,
-          no cuantos dias lleva: asi 8030, con target 2, se compara con 0900, que tiene 90.
-          Toca un tramo para ver esas lineas.
-        </p>
-      </div>
-      <div class="selector" role="group" aria-label="Que medir">
-        <button type="button" data-modo="lineas" aria-pressed="true">Lineas</button>
-        <button type="button" data-modo="valorizado" aria-pressed="false">Valorizado</button>
-      </div>
-    </div>
-    <div class="leyenda" id="leyendaBandas"></div>
-    <svg class="grafico" id="gBandas" role="img"></svg>
+  <nav class="nav" id="nav">
+    <button data-v="mapa" aria-current="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8v8H3zM13 3h8v4h-8zM13 11h8v10h-8zM3 15h8v6H3z"/></svg>
+      Mapa
+    </button>
+    <button data-v="lineas">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      Lineas
+    </button>
+    <button data-v="evolucion">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8M16 8h5v5"/></svg>
+      Evolucion
+    </button>
+
+    <div class="grupo">Configuracion</div>
+    <button data-v="datos">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      Datos
+      <span class="pico" id="picoDatos" hidden>0</span>
+    </button>
+    <button data-v="ubicaciones">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      Ubicaciones
+    </button>
+    <button data-v="maestro">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-4 8 4-8 4-8-4zM4 12l8 4 8-4M4 17l8 4 8-4"/></svg>
+      Maestro
+    </button>
+  </nav>
+
+  <div class="pie-rail">
+    <label for="fCorte">Fecha de corte</label>
+    <input type="date" id="fCorte">
+    <div class="fuente" id="estadoFuente">Sin datos cargados</div>
   </div>
+</aside>
 
-  <div class="panel" id="panelPlata" hidden>
-    <h2>Donde esta la plata</h2>
-    <p class="ayuda">
-      Las lineas fuera de aging mas caras, de mayor a menor. Toca una para verla en el detalle.
-    </p>
-    <svg class="grafico" id="gPlata" role="img"></svg>
-    <p class="nota" id="notaPlata"></p>
-  </div>
-
-  <div class="panel" id="panelTendencia" hidden>
-    <h2>Como viene evolucionando</h2>
-    <p class="ayuda" id="ayudaTendencia">Valorizado fuera de aging en cada corte guardado.</p>
-    <svg class="grafico" id="gTendencia" role="img"></svg>
-  </div>
-</section>
-
-<!-- ===================== TABLERO ===================== -->
-<section id="v-tablero" hidden>
-  <div class="kpis" id="kpis"></div>
-
-  <div class="panel">
-    <h2 id="tituloTablero">Tablero</h2>
-    <p class="ayuda" id="subtituloTablero">Carga el libro de aging para ver el tablero.</p>
-    <div class="marco">
-      <table class="tablero" id="tablaTablero"></table>
+<div class="obra">
+  <header class="barra-ctx">
+    <button class="btn fantasma abre-rail" id="btnRail" aria-label="Menu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="migas" id="migas"></div>
+    <div class="derecha">
+      <button class="btn suave chico" id="btnAvisos" hidden></button>
+      <button class="btn suave" id="btnExportar" disabled>Exportar</button>
+      <button class="btn" id="btnGuardarCorte" disabled>Guardar corte</button>
     </div>
-    <div class="acciones no-imprimir">
-      <button class="btn claro" id="btnCsvTablero" type="button" disabled>Exportar tablero (CSV)</button>
-      <button class="btn claro" id="btnImprimir" type="button">Imprimir / PDF</button>
-    </div>
-  </div>
-</section>
+  </header>
 
-<!-- ===================== DETALLE ===================== -->
-<section id="v-detalle" hidden>
-  <div class="panel">
-    <h2>Detalle por linea</h2>
-    <p class="ayuda">
-      Las lineas que ensucian cada area, ordenadas por dias de aging.
-      La <b>Fecha Aging</b> se puede editar: el ajuste queda guardado y se vuelve a aplicar
-      cada semana sobre la misma linea. Para volver a la fecha del archivo, borra el campo.
-    </p>
-    <div class="filtros">
-      <div>
-        <label class="campo" for="fArea">Area</label>
-        <select id="fArea"><option value="">Todas</option></select>
-      </div>
-      <div>
-        <label class="campo" for="fResp">Responsable</label>
-        <select id="fResp"><option value="">Todos</option></select>
-      </div>
-      <div>
-        <label class="campo" for="fProceso">Proceso</label>
-        <select id="fProceso"><option value="">Todos</option></select>
-      </div>
-      <div>
-        <label class="campo" for="fBanda">Atraso</label>
-        <select id="fBanda">
-          <option value="">Todos</option>
-          <option value="0">Dentro del target</option>
-          <option value="1">Hasta 2x el target</option>
-          <option value="2">2 a 5x el target</option>
-          <option value="3">Mas de 5x el target</option>
-        </select>
-      </div>
-      <div>
-        <label class="campo" for="fBuscar">Buscar</label>
-        <input type="search" id="fBuscar" placeholder="SKU, descripcion o ubicacion" size="26">
-      </div>
-      <label class="check"><input type="checkbox" id="fSoloFuera"> Solo fuera de aging</label>
-      <label class="check"><input type="checkbox" id="fSoloProblemas"> Solo con problemas</label>
-      <button class="btn claro" id="btnLimpiar" type="button">Limpiar</button>
-    </div>
-    <div class="marco-alto">
-      <table class="datos" id="tablaDetalle"></table>
-    </div>
-    <p class="pie-tabla" id="pieDetalle"></p>
-    <div class="acciones">
-      <button class="btn claro" id="btnCsvDetalle" type="button" disabled>Exportar detalle (CSV)</button>
-    </div>
-  </div>
-
-  <div class="panel" id="panelAjustes" hidden>
-    <h2>Fechas ajustadas a mano</h2>
-    <p class="ayuda">
-      Estas fechas pisan lo que diga el archivo y se vuelven a aplicar cada lunes.
-      El WMS no exporta un numero de linea, asi que la linea se reconoce por ubicacion,
-      producto, la Fecha Aging del archivo, tipo de stock y cantidad.
-    </p>
-    <div class="marco-alto" style="max-height:340px">
-      <table class="datos" id="tablaAjustes"></table>
-    </div>
-    <div class="acciones">
-      <button class="btn claro" id="btnCsvAjustes" type="button">Exportar (CSV)</button>
-      <button class="btn peligro" id="btnLimpiarHuerfanos" type="button">Borrar los que no coinciden</button>
-      <button class="btn peligro" id="btnBorrarAjustes" type="button">Borrar todos</button>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== DATOS ===================== -->
-<section id="v-datos" hidden>
-  <div class="panel">
-    <h2>Cargar datos</h2>
-    <p class="ayuda">
-      Arrastra los archivos o hace clic para elegirlos. Nada se sube a ningun servidor:
-      todo el procesamiento ocurre en este navegador.
-    </p>
-    <div class="zonas">
-
-      <div class="zona" id="zonaLibro">
-        <h3>1. Base del WMS</h3>
-        <p>El <span class="mono">Base_Aging_ddmmaa.XLSX</span> que actualizas los lunes.
-           Tambien acepta el libro completo <span class="mono">Aging_ddmmaa.xlsx</span>,
-           del que ademas lee las hojas de configuracion.</p>
-        <button class="btn" type="button" data-abre="inLibro">Elegir archivo</button>
-        <input type="file" id="inLibro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
-        <div class="estado vacio" id="estLibro">Sin cargar</div>
-      </div>
-
-      <div class="zona" id="zonaMaestro">
-        <h3>2. Maestro de items valorizados</h3>
-        <p><span class="mono">Base Item Valorizados.xlsx</span>. Se guarda en este navegador,
-           asi que solo lo volves a cargar cuando cambien los costos.</p>
-        <button class="btn" type="button" data-abre="inMaestro">Elegir archivo</button>
-        <input type="file" id="inMaestro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
-        <div class="estado vacio" id="estMaestro">Sin cargar</div>
-      </div>
-
-    </div>
-
-    <div id="mapeoMaestro" hidden>
-      <div class="sep"></div>
-      <h2>Columnas del maestro</h2>
-      <p class="ayuda">En el libro original el SKU esta en la columna A y el costo en la H. Corregilo si tu archivo cambio.</p>
-      <div class="fila">
-        <div>
-          <label class="campo" for="mSku">Columna del SKU</label>
-          <select id="mSku"></select>
+  <!-- ============ MAPA ============ -->
+  <div class="lienzo pleno" id="v-mapa">
+    <div class="zona-mapa">
+      <div class="mandos">
+        <div class="grupo-btn" id="mandoAlcance" role="group" aria-label="Que mostrar">
+          <button type="button" data-alcance="fuera" aria-pressed="true">Solo lo frenado</button>
+          <button type="button" data-alcance="todo" aria-pressed="false">Todo el stock</button>
         </div>
-        <div>
-          <label class="campo" for="mCosto">Columna del costo</label>
-          <select id="mCosto"></select>
+        <div class="grupo-btn" id="mandoMedida" role="group" aria-label="Como medir">
+          <button type="button" data-medida="valorizado" aria-pressed="true">Por plata</button>
+          <button type="button" data-medida="lineas" aria-pressed="false">Por lineas</button>
         </div>
-        <div>
-          <label class="campo" for="mHoja">Hoja</label>
-          <select id="mHoja"></select>
+        <div class="leyenda" id="leyenda"></div>
+      </div>
+      <div id="mapa"><svg id="mapaSvg" role="img" aria-label="Mapa de superficie del stock frenado"></svg></div>
+    </div>
+    <aside class="ctx" id="ctx"></aside>
+  </div>
+
+  <!-- ============ LINEAS ============ -->
+  <div class="lienzo" id="v-lineas" hidden>
+    <div class="tarjeta">
+      <h2>Lineas</h2>
+      <p class="sub">
+        Cada registro de stock en una ubicacion critica. La <b>Fecha Aging</b> se puede editar:
+        el ajuste queda guardado y se vuelve a aplicar cada semana sobre la misma linea.
+        Para volver a la del archivo, borra el campo.
+      </p>
+      <div class="filtros">
+        <div><label class="campo" for="fArea">Area</label><select id="fArea"><option value="">Todas</option></select></div>
+        <div><label class="campo" for="fResp">Responsable</label><select id="fResp"><option value="">Todos</option></select></div>
+        <div><label class="campo" for="fBanda">Atraso</label>
+          <select id="fBanda">
+            <option value="">Todos</option>
+            <option value="0">Dentro del target</option>
+            <option value="1">Hasta 2x el target</option>
+            <option value="2">2 a 5x el target</option>
+            <option value="3">Mas de 5x el target</option>
+          </select>
         </div>
-        <button class="btn" id="btnAplicarMaestro" type="button">Aplicar</button>
+        <div><label class="campo" for="fBuscar">Buscar</label><input type="search" id="fBuscar" placeholder="SKU, descripcion o ubicacion" size="26"></div>
+        <label class="chk"><input type="checkbox" id="fSoloProblemas"> Solo con problemas</label>
+        <button class="btn fantasma" id="btnLimpiar" type="button">Limpiar</button>
       </div>
-      <p class="tag-fuente" id="vistaMaestro"></p>
+      <div class="marco alto"><table class="datos" id="tablaLineas"></table></div>
+      <p class="pie-tabla" id="pieLineas"></p>
     </div>
 
-    <div class="sep"></div>
-    <h2>Pegar desde Excel</h2>
-    <p class="ayuda">
-      Alternativa sin archivo: copia el rango en Excel (con encabezados) y pegalo aca.
-      Sirve para la hoja Stock cuando no tenes el libro completo a mano.
-    </p>
-    <div class="fila">
-      <textarea id="pegado" rows="4" style="flex:1;min-width:300px;padding:9px;border-radius:9px;border:1px solid var(--acero-300);font:inherit;font-size:12.5px" placeholder="Pega aca el rango copiado de la hoja Stock..."></textarea>
-      <button class="btn" id="btnPegar" type="button">Procesar pegado</button>
+    <div class="tarjeta" id="tarjetaAjustes" hidden>
+      <h2>Fechas ajustadas a mano</h2>
+      <p class="sub">
+        Pisan lo que diga el archivo y se vuelven a aplicar cada lunes. El WMS no exporta un
+        numero de linea, asi que se reconoce por ubicacion, producto, la Fecha Aging del
+        archivo, tipo de stock y cantidad.
+      </p>
+      <div class="marco alto"><table class="datos" id="tablaAjustes"></table></div>
+      <div class="acciones">
+        <button class="btn suave" id="btnCsvAjustes" type="button">Exportar</button>
+        <button class="btn riesgo" id="btnLimpiarHuerfanos" type="button">Borrar los que no coinciden</button>
+        <button class="btn riesgo" id="btnBorrarAjustes" type="button">Borrar todos</button>
+      </div>
     </div>
   </div>
 
-  <div class="panel">
-    <h2>Estado de las fuentes</h2>
-    <div class="marco-alto" style="max-height:none">
-      <table class="datos" id="tablaFuentes"></table>
+  <!-- ============ EVOLUCION ============ -->
+  <div class="lienzo" id="v-evolucion" hidden>
+    <div class="tarjeta">
+      <h2>Plata frenada en cada corte</h2>
+      <p class="sub" id="subEvolucion">Guarda el corte de cada lunes y aca vas viendo si mejora o empeora.</p>
+      <svg class="grafico" id="gTendencia" role="img"></svg>
     </div>
-  </div>
-</section>
-
-<!-- ===================== UBICACIONES ===================== -->
-<section id="v-ubicaciones" hidden>
-  <div class="panel">
-    <h2>Areas</h2>
-    <p class="ayuda">Responsable, proceso y target por area. Equivale a la hoja <b>Resp. Alm.</b></p>
-    <div class="marco-alto" style="max-height:none">
-      <table class="datos" id="tablaAreas"></table>
-    </div>
-    <div class="sep"></div>
-    <h2>Agregar area</h2>
-    <div class="fila">
-      <div><label class="campo" for="nArea">Area</label><input type="text" id="nArea" size="8" placeholder="8035"></div>
-      <div><label class="campo" for="nResp">Responsable</label><input type="text" id="nResp" size="20" placeholder="Nombre"></div>
-      <div><label class="campo" for="nProceso">Proceso</label>
-        <select id="nProceso">
-          <option>INBOUND</option><option>OUTBOND</option><option>Gestion de Stock</option>
-        </select>
-      </div>
-      <div><label class="campo" for="nTargetA">Target (dias)</label><input type="number" id="nTargetA" size="5" min="0" value="3"></div>
-      <div><label class="campo" for="nDescA">Descripcion</label><input type="text" id="nDescA" size="24" placeholder="(opcional: si la dejas vacia lista las ubicaciones)"></div>
-      <button class="btn" id="btnAddArea" type="button">Agregar</button>
-    </div>
-    <p class="error" id="errArea" style="color:var(--rojo);font-size:12.5px;min-height:17px;margin:8px 0 0"></p>
-  </div>
-
-  <div class="panel">
-    <h2>Ubicaciones criticas</h2>
-    <p class="ayuda">
-      Equivale a la hoja <b>Depositos Virtuales</b>. Una ubicacion que no este en esta lista
-      no entra al calculo: su stock se ignora, igual que hoy.
-    </p>
-    <div class="filtros">
-      <div>
-        <label class="campo" for="fUbicArea">Area</label>
-        <select id="fUbicArea"><option value="">Todas</option></select>
-      </div>
-      <div>
-        <label class="campo" for="fUbicBuscar">Buscar</label>
-        <input type="search" id="fUbicBuscar" placeholder="Nombre de ubicacion" size="24">
-      </div>
-      <button class="btn claro" id="btnCsvUbic" type="button">Exportar (CSV)</button>
-      <button class="btn claro" id="btnRestaurar" type="button">Restaurar originales</button>
-      <button class="btn peligro" id="btnBorrarUbic" type="button">Vaciar lista</button>
-    </div>
-    <div class="marco-alto">
-      <table class="datos" id="tablaUbic"></table>
-    </div>
-    <p class="pie-tabla" id="pieUbic"></p>
-    <div class="sep"></div>
-    <h2>Agregar ubicacion</h2>
-    <div class="fila">
-      <div><label class="campo" for="nUbic">Ubicacion</label><input type="text" id="nUbic" size="26" placeholder="8035-PENDIENTE"></div>
-      <div><label class="campo" for="nUbicArea">Area</label><input type="text" id="nUbicArea" size="8" placeholder="8035"></div>
-      <div><label class="campo" for="nTargetU">Target (dias)</label><input type="number" id="nTargetU" size="5" min="0" value="3"></div>
-      <button class="btn" id="btnAddUbic" type="button">Agregar</button>
-    </div>
-    <p class="error" id="errUbic" style="color:var(--rojo);font-size:12.5px;min-height:17px;margin:8px 0 0"></p>
-  </div>
-</section>
-
-<!-- ===================== MAESTRO ===================== -->
-<section id="v-maestro" hidden>
-  <div class="panel">
-    <h2>Maestro de items valorizados</h2>
-    <p class="ayuda">
-      El costo unitario con el que se valoriza cada linea. Queda guardado en este navegador;
-      cargar un archivo nuevo lo actualiza.
-    </p>
-    <div class="filtros">
-      <div>
-        <label class="campo" for="fSku">Buscar SKU</label>
-        <input type="search" id="fSku" placeholder="Numero de parte" size="22">
-      </div>
-      <label class="check"><input type="checkbox" id="fSoloUsados"> Solo los SKU del stock actual</label>
-      <label class="check"><input type="checkbox" id="fSoloSinCosto"> Solo los que faltan</label>
-      <label class="check"><input type="checkbox" id="fSoloAmbiguos"> Solo precios dudosos</label>
-      <button class="btn claro" id="btnCsvMaestro" type="button">Exportar (CSV)</button>
-      <button class="btn peligro" id="btnBorrarMaestro" type="button">Vaciar maestro</button>
-    </div>
-    <div class="marco-alto">
-      <table class="datos" id="tablaMaestro"></table>
-    </div>
-    <p class="pie-tabla" id="pieMaestro"></p>
-    <div class="sep"></div>
-    <h2>Cargar o corregir un costo</h2>
-    <div class="fila">
-      <div><label class="campo" for="nSku">SKU</label><input type="text" id="nSku" size="20" placeholder="3969703"></div>
-      <div><label class="campo" for="nCosto">Costo unitario</label><input type="text" id="nCosto" size="14" placeholder="5151,56"></div>
-      <button class="btn" id="btnAddSku" type="button">Guardar</button>
-    </div>
-    <p class="error" id="errSku" style="color:var(--rojo);font-size:12.5px;min-height:17px;margin:8px 0 0"></p>
-  </div>
-</section>
-
-<!-- ===================== HISTORICO ===================== -->
-<section id="v-historico" hidden>
-  <div class="panel">
-    <h2>Historico de cortes</h2>
-    <p class="ayuda">
-      Cada vez que toques <b>Guardar corte</b> se agrega una columna, como las que hoy pegas a mano en la hoja KPI.
-      Se guarda en este navegador.
-    </p>
-    <div class="fila" style="margin-bottom:13px">
-      <div>
-        <label class="campo" for="hMetrica">Metrica</label>
+    <div class="tarjeta">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+        <h2 style="margin-right:auto">Detalle por area</h2>
         <select id="hMetrica">
           <option value="diasMax">Dias maximos</option>
-          <option value="lineas">Lineas totales</option>
-          <option value="fueraLineas">Lineas fuera de aging</option>
+          <option value="fueraValorizado">Plata frenada</option>
+          <option value="fueraLineas">Lineas frenadas</option>
           <option value="valorizado">Valorizado total</option>
-          <option value="fueraValorizado">Valorizado fuera de aging</option>
+          <option value="lineas">Lineas totales</option>
         </select>
+        <button class="btn suave" id="btnCsvHist" type="button">Exportar</button>
+        <button class="btn riesgo" id="btnBorrarHist" type="button">Vaciar</button>
       </div>
-      <button class="btn claro" id="btnCsvHist" type="button">Exportar (CSV)</button>
-      <button class="btn peligro" id="btnBorrarHist" type="button">Vaciar historico</button>
-    </div>
-    <div class="marco">
-      <table class="datos" id="tablaHist"></table>
+      <div class="marco"><table class="datos" id="tablaHist"></table></div>
     </div>
   </div>
-</section>
 
-</main>
+  <!-- ============ DATOS ============ -->
+  <div class="lienzo" id="v-datos" hidden>
+    <div id="avisos"></div>
+    <div class="tarjeta">
+      <h2>Cargar</h2>
+      <p class="sub">
+        Arrastra los archivos o hace clic. Nada se sube a ningun servidor: todo se procesa
+        en este navegador y los datos no salen de la maquina.
+      </p>
+      <div class="zonas">
+        <div class="zona" id="zonaLibro">
+          <h3>Base del WMS</h3>
+          <p>El <span class="mono">Base_Aging_ddmmaa.XLSX</span> de cada lunes, con la columna
+             <span class="mono">Fecha Aging</span> completada.</p>
+          <button class="btn" type="button" data-abre="inLibro">Elegir archivo</button>
+          <input type="file" id="inLibro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
+          <div class="estado vacio" id="estLibro">Sin cargar</div>
+        </div>
+        <div class="zona" id="zonaMaestro">
+          <h3>Maestro valorizado</h3>
+          <p><span class="mono">Base Item Valorizados.xlsx</span>. Queda guardado en este
+             navegador: solo lo volves a cargar cuando cambian los precios.</p>
+          <button class="btn" type="button" data-abre="inMaestro">Elegir archivo</button>
+          <input type="file" id="inMaestro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
+          <div class="estado vacio" id="estMaestro">Sin cargar</div>
+        </div>
+      </div>
+
+      <div id="mapeoMaestro" hidden>
+        <div class="sep"></div>
+        <h2>Columnas del maestro</h2>
+        <p class="sub">El SKU va en la columna A y el precio en la H. Corregilo si tu archivo cambio.</p>
+        <div class="filtros">
+          <div><label class="campo" for="mHoja">Hoja</label><select id="mHoja"></select></div>
+          <div><label class="campo" for="mSku">Columna del SKU</label><select id="mSku"></select></div>
+          <div><label class="campo" for="mCosto">Columna del precio</label><select id="mCosto"></select></div>
+          <button class="btn" id="btnAplicarMaestro" type="button">Aplicar</button>
+        </div>
+        <p class="pie-tabla" id="vistaMaestro"></p>
+      </div>
+
+      <div class="sep"></div>
+      <h2>Pegar desde Excel</h2>
+      <p class="sub">Alternativa sin archivo: copia el rango con encabezados y pegalo aca.</p>
+      <div class="filtros">
+        <textarea id="pegado" rows="3" style="flex:1;min-width:300px" placeholder="Pega aca el rango copiado..."></textarea>
+        <button class="btn" id="btnPegar" type="button">Procesar</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Fuentes</h2>
+      <div class="marco"><table class="datos" id="tablaFuentes"></table></div>
+    </div>
+  </div>
+
+  <!-- ============ UBICACIONES ============ -->
+  <div class="lienzo" id="v-ubicaciones" hidden>
+    <div class="tarjeta">
+      <h2>Areas</h2>
+      <p class="sub">Responsable, proceso y target por area.</p>
+      <div class="marco"><table class="datos" id="tablaAreas"></table></div>
+      <div class="sep"></div>
+      <div class="filtros">
+        <div><label class="campo" for="nArea">Area</label><input type="text" id="nArea" size="8" placeholder="8035"></div>
+        <div><label class="campo" for="nResp">Responsable</label><input type="text" id="nResp" size="18" placeholder="Nombre"></div>
+        <div><label class="campo" for="nProceso">Proceso</label>
+          <select id="nProceso"><option>INBOUND</option><option>OUTBOND</option><option>Gestion de Stock</option></select></div>
+        <div><label class="campo" for="nTargetA">Target</label><input type="number" id="nTargetA" min="0" value="3" style="width:76px"></div>
+        <button class="btn" id="btnAddArea" type="button">Agregar area</button>
+      </div>
+      <p class="pie-tabla" id="errArea" style="color:var(--mal)"></p>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Ubicaciones criticas</h2>
+      <p class="sub">
+        Una ubicacion que no este en esta lista no entra al calculo: su stock se ignora.
+      </p>
+      <div class="filtros">
+        <div><label class="campo" for="fUbicArea">Area</label><select id="fUbicArea"><option value="">Todas</option></select></div>
+        <div><label class="campo" for="fUbicBuscar">Buscar</label><input type="search" id="fUbicBuscar" placeholder="Nombre" size="22"></div>
+        <button class="btn suave" id="btnCsvUbic" type="button">Exportar</button>
+        <button class="btn suave" id="btnRestaurar" type="button">Restaurar originales</button>
+        <button class="btn riesgo" id="btnBorrarUbic" type="button">Vaciar</button>
+      </div>
+      <div class="marco alto"><table class="datos" id="tablaUbic"></table></div>
+      <p class="pie-tabla" id="pieUbic"></p>
+      <div class="sep"></div>
+      <div class="filtros">
+        <div><label class="campo" for="nUbic">Ubicacion</label><input type="text" id="nUbic" size="26" placeholder="8035-PENDIENTE"></div>
+        <div><label class="campo" for="nUbicArea">Area</label><input type="text" id="nUbicArea" size="8" placeholder="8035"></div>
+        <div><label class="campo" for="nTargetU">Target</label><input type="number" id="nTargetU" min="0" value="3" style="width:76px"></div>
+        <button class="btn" id="btnAddUbic" type="button">Agregar ubicacion</button>
+      </div>
+      <p class="pie-tabla" id="errUbic" style="color:var(--mal)"></p>
+    </div>
+  </div>
+
+  <!-- ============ MAESTRO ============ -->
+  <div class="lienzo" id="v-maestro" hidden>
+    <div class="tarjeta">
+      <h2>Maestro valorizado</h2>
+      <p class="sub">El precio unitario con el que se valoriza cada linea. Queda guardado en este navegador.</p>
+      <div class="filtros">
+        <div><label class="campo" for="fSku">Buscar SKU</label><input type="search" id="fSku" placeholder="Numero de parte" size="20"></div>
+        <label class="chk"><input type="checkbox" id="fSoloUsados"> Solo los del stock</label>
+        <label class="chk"><input type="checkbox" id="fSoloSinCosto"> Solo los que faltan</label>
+        <label class="chk"><input type="checkbox" id="fSoloAmbiguos"> Solo precios dudosos</label>
+        <button class="btn suave" id="btnCsvMaestro" type="button">Exportar</button>
+        <button class="btn riesgo" id="btnBorrarMaestro" type="button">Vaciar</button>
+      </div>
+      <div class="marco alto"><table class="datos" id="tablaMaestro"></table></div>
+      <p class="pie-tabla" id="pieMaestro"></p>
+      <div class="sep"></div>
+      <div class="filtros">
+        <div><label class="campo" for="nSku">SKU</label><input type="text" id="nSku" size="18" placeholder="3969703"></div>
+        <div><label class="campo" for="nCosto">Precio unitario</label><input type="text" id="nCosto" size="14" placeholder="5151,56"></div>
+        <button class="btn" id="btnAddSku" type="button">Guardar</button>
+      </div>
+      <p class="pie-tabla" id="errSku" style="color:var(--mal)"></p>
+    </div>
+  </div>
+</div>
 
 <div id="tip" role="status" aria-live="polite"></div>
+
 <!-- ============================================================
      SheetJS 0.18.5 (build mini) para leer los .xlsx, embebido en base64.
      Va embebido, y no como <script src>, para que esta pagina sea un unico
@@ -714,6 +640,7 @@ input.fecha-aging.ajustada{
 })();
 </script>
 <script>
+
 "use strict";
 /* ============================================================
    1. UTILIDADES
@@ -1333,195 +1260,15 @@ function calcular(){
 }
 
 /* ============================================================
-   6. RENDER
+   6. BANDAS DE ATRASO
+   Ordinales: una sola rampa de un hue, de claro a oscuro.
+   Lo que esta dentro del target es contexto y va en gris.
    ============================================================ */
-function claseProceso(p){
-  const n = norm(p);
-  if (n.includes("inbound")) return "inbound";
-  if (n.includes("outbo"))   return "outbound";
-  if (n.includes("gestion")) return "gestion";
-  return "otro";
-}
-
-function pintarTodo(){
-  if (estado.stock.length) calcular();
-  pintarAvisos();
-  pintarKpis();
-  pintarTablero();
-  pintarPanorama();
-  poblarFiltros();
-  pintarDetalle();
-  pintarAjustes();
-  pintarAreas();
-  pintarUbicaciones();
-  pintarMaestro();
-  pintarHistorico();
-  pintarFuentes();
-  const hay = estado.lineas.length > 0;
-  $("#btnCsvTablero").disabled = !hay;
-  $("#btnCsvDetalle").disabled = !hay;
-  $("#btnGuardarCorte").disabled = !hay;
-}
-
-/* ---------- avisos ---------- */
-function pintarAvisos(){
-  const d = estado.diag, c = [];
-  if (!estado.stock.length) {
-    c.push(aviso("info", "Para empezar, carga el libro de aging en la solapa <b>Datos</b>."));
-  } else {
-    if (!estado.maestro.size) {
-      c.push(aviso("malo", "No hay maestro de costos cargado: <b>todo el valorizado da $0</b>. Cargalo en la solapa Datos."));
-    } else if (d.lineasSinCosto) {
-      c.push(aviso("malo",
-        "<b>" + entero(d.lineasSinCosto) + " lineas sin costo en el maestro</b> (" +
-        entero(d.skusSinCosto.length) + " SKU distintos). Su valorizado cuenta como $0, " +
-        "asi que el total esta subestimado.",
-        "Ver cuales", () => { irA("maestro"); $("#fSoloSinCosto").checked = true; $("#fSoloUsados").checked = true; pintarMaestro(); }));
-    }
-    if (d.lineasCostoAmbiguo) {
-      const peor = (d.skusAmbiguosEnUso || []).map((k) => estado.maestroAmbiguos[k])
-        .filter(Boolean).sort((a, b) => (b.max - b.min) - (a.max - a.min))[0];
-      c.push(aviso("alerta",
-        "<b>" + entero(d.lineasCostoAmbiguo) + " lineas valorizadas con un precio dudoso</b>: " +
-        "su material aparece repetido en el maestro con precios distintos" +
-        (peor ? " (el peor caso va de " + plata(peor.min) + " a " + plata(peor.max) + ")" : "") +
-        ". Se toma el primero, igual que el XLOOKUP del Excel.",
-        "Ver cuales", () => { irA("maestro"); $("#fSoloAmbiguos").checked = true; pintarMaestro(); }));
-    }
-    if (d.lineasSinFecha) {
-      c.push(aviso("alerta",
-        "<b>" + entero(d.lineasSinFecha) + " lineas sin Fecha Aging</b>. No se les puede calcular antiguedad: " +
-        "no cuentan como fuera de aging ni entran en los dias maximos.",
-        "Ver cuales", () => { irA("detalle"); $("#fSoloProblemas").checked = true; pintarDetalle(); }));
-    }
-    if (d.lineasAjustadas) {
-      c.push(aviso("info",
-        "<b>" + entero(d.lineasAjustadas) + " lineas con Fecha Aging ajustada a mano</b>" +
-        (d.ajustesCompartidos ? ", " + entero(d.ajustesCompartidos) + " de ellas sobre lineas identicas entre si" : "") +
-        ". Esas fechas pisan lo que dice el archivo.",
-        "Ver", () => { irA("detalle"); $("#panelAjustes").scrollIntoView({ behavior: "smooth" }); }));
-    }
-    if (d.ajustesHuerfanos && d.ajustesHuerfanos.length) {
-      c.push(aviso("alerta",
-        "<b>" + entero(d.ajustesHuerfanos.length) + " ajustes de fecha no coinciden con ninguna linea</b> " +
-        "de esta base. Puede ser que ese stock ya se haya movido.",
-        "Revisar", () => { irA("detalle"); $("#panelAjustes").scrollIntoView({ behavior: "smooth" }); }));
-    }
-    if (d.areasSinConfig.length) {
-      c.push(aviso("alerta",
-        "<b>Area sin configurar: " + d.areasSinConfig.map(esc).join(", ") + "</b>. " +
-        "Tiene stock en ubicaciones criticas pero no tiene responsable ni proceso cargado, " +
-        "asi que en el Excel no aparece en el reporte.",
-        "Configurar", () => irA("ubicaciones")));
-    }
-    if (!c.length) c.push(aviso("ok", "Sin inconsistencias: todas las lineas tienen fecha, costo y area configurada."));
-  }
-  $("#avisos").innerHTML = "";
-  c.forEach((n) => $("#avisos").appendChild(n));
-}
-function aviso(tipo, html, textoBtn, accion){
-  const d = document.createElement("div");
-  d.className = "aviso " + tipo;
-  d.innerHTML = "<div>" + html + "</div>";
-  if (textoBtn) {
-    const b = document.createElement("button");
-    b.className = "btn claro chico no-imprimir";
-    b.type = "button";
-    b.textContent = textoBtn;
-    b.addEventListener("click", accion);
-    d.appendChild(b);
-  }
-  return d;
-}
-
-/* ---------- KPIs ---------- */
-function pintarKpis(){
-  const r = estado.resumen;
-  if (!estado.stock.length) { $("#kpis").innerHTML = ""; return; }
-  const val    = r.reduce((a, x) => a + x.valorizado, 0);
-  const fVal   = r.reduce((a, x) => a + x.fueraValorizado, 0);
-  const lin    = r.reduce((a, x) => a + x.lineas, 0);
-  const fLin   = r.reduce((a, x) => a + x.fueraLineas, 0);
-  const rojas  = r.filter((x) => x.rojo).length;
-  const conDatos = r.filter((x) => x.lineas > 0).length;
-  const pct    = val > 0 ? (fVal / val) * 100 : 0;
-
-  const tarjeta = (clase, valor, rotulo, pie) =>
-    '<div class="kpi ' + clase + '"><div class="valor">' + valor + '</div>' +
-    '<div class="rotulo">' + rotulo + '</div>' +
-    (pie ? '<div class="pie">' + pie + "</div>" : "") + "</div>";
-
-  $("#kpis").innerHTML =
-    tarjeta("", plata(val), "Valorizado inmovilizado", entero(lin) + " lineas en ubicaciones criticas") +
-    tarjeta(fVal > 0 ? "r" : "v", plata(fVal), "Valorizado fuera de aging", fmtMoneda.format(pct) + " % del total") +
-    tarjeta(fLin > 0 ? "r" : "v", entero(fLin), "Lineas fuera de aging", "sobre " + entero(lin) + " lineas") +
-    tarjeta(rojas > 0 ? "r" : "v", entero(rojas), "Areas en rojo", "sobre " + entero(conDatos) + " areas con stock");
-}
-
-/* ---------- tablero ---------- */
-function pintarTablero(){
-  const t = $("#tablaTablero");
-  if (!estado.stock.length) {
-    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin datos cargados.</td></tr></tbody>';
-    $("#subtituloTablero").textContent = "Carga el libro de aging para ver el tablero.";
-    return;
-  }
-  const d = estado.corte;
-  $("#tituloTablero").textContent = "Monitoreo Aging";
-  $("#subtituloTablero").innerHTML =
-    "Corte al <b>" + fechaAR(d) + "</b> &middot; " + entero(estado.lineas.length) +
-    " lineas en " + entero(estado.ubicaciones.length) + " ubicaciones criticas";
-
-  let h = "<thead><tr>" +
-    "<th>Area</th><th>Responsables</th><th>Descripcion</th><th>Proceso</th><th>Target</th>" +
-    '<th colspan="2">Valorizado</th><th>Lineas</th><th>Indicador</th><th>UM</th>' +
-    "<th>ACTUAL<br>" + DIAS[d.getDay()] + "<br>" + fechaCorta(d) + "</th>" +
-    "</tr></thead><tbody>";
-
-  for (const r of estado.resumen) {
-    const cp = claseProceso(r.proceso);
-    const sem = r.target == null ? "nulo" : (r.lineas === 0 ? "ok" : (r.diasMax >= r.target ? "mal" : "ok"));
-    const etiq = sem === "mal" ? "FUERA" : (sem === "nulo" ? "S/T" : "OK");
-    const marca = r.enConfig ? "" : ' <span class="pastilla mal">sin configurar</span>';
-    h += '<tr class="clicable" data-area="' + esc(r.area) + '">' +
-      '<td class="area" rowspan="2">' + esc(r.area) + "</td>" +
-      '<td class="resp" rowspan="2">' + esc(r.responsable || "—") + marca + "</td>" +
-      '<td class="desc" rowspan="2">' + esc(r.descripcion || "—") + "</td>" +
-      '<td class="proceso ' + cp + '" rowspan="2">' + esc(r.proceso || "—") + "</td>" +
-      '<td class="target" rowspan="2">' + (r.target == null ? "—" : entero(r.target)) + "</td>" +
-      '<td class="rotulo-fila">Total</td>' +
-      '<td class="cifra">' + plata(r.valorizado) + "</td>" +
-      '<td class="cifra">' + entero(r.lineas) + "</td>" +
-      "<td>Lineas Totales</td><td>Lineas</td>" +
-      '<td class="cifra"><b>' + entero(r.lineas) + "</b></td></tr>" +
-      '<tr class="clicable fuera grupo-fin" data-area="' + esc(r.area) + '">' +
-      '<td class="rotulo-fila">Fuera Aging</td>' +
-      '<td class="cifra">' + plata(r.fueraValorizado) + "</td>" +
-      '<td class="cifra">' + entero(r.fueraLineas) + "</td>" +
-      "<td>Aging</td><td>Dias Max.</td>" +
-      '<td class="semaforo ' + sem + '">' + entero(r.diasMax) + "<small>" + etiq + "</small></td></tr>";
-  }
-  h += "</tbody>";
-  t.innerHTML = h;
-  t.querySelectorAll("tr.clicable").forEach((tr) => {
-    tr.addEventListener("click", () => {
-      irA("detalle");
-      $("#fArea").value = tr.dataset.area;
-      $("#fSoloFuera").checked = true;
-      pintarDetalle();
-    });
-  });
-}
-
-/* ---------- panorama ---------- */
-/* Las bandas son ordinales (cuanto se paso del target), asi que van en una sola
-   rampa de un hue, de claro a oscuro. Lo que esta dentro del target es contexto
-   y va en gris, para que la vista hable de lo que esta mal. */
 const BANDAS = [
-  { rot: "Dentro del target", color: "var(--banda-0)", corto: "dentro" },
-  { rot: "Hasta 2x el target", color: "var(--banda-1)", corto: "hasta 2x" },
-  { rot: "2 a 5x el target",   color: "var(--banda-2)", corto: "2 a 5x" },
-  { rot: "Mas de 5x el target",color: "var(--banda-3)", corto: "+5x" }
+  { rot: "Dentro del target",  col: "#9fb0bd", tinta: "#13202b", corto: "dentro" },
+  { rot: "Hasta 2x el target", col: "#e89189", tinta: "#3d100c", corto: "hasta 2x" },
+  { rot: "2 a 5x el target",   col: "#bf3630", tinta: "#ffffff", corto: "2 a 5x" },
+  { rot: "Mas de 5x",          col: "#85201b", tinta: "#ffffff", corto: "+5x" }
 ];
 function banda(l){
   if (l.aging == null || l.target == null || l.target <= 0) return null;
@@ -1530,190 +1277,598 @@ function banda(l){
   return r < 2 ? 1 : (r < 5 ? 2 : 3);
 }
 
-/* ---------- globo de ayuda ---------- */
+/* ============================================================
+   7. ESTADO DE LA INTERFAZ
+   ============================================================ */
+const ui = { vista: "mapa", ruta: [], alcance: "fuera", medida: "valorizado", sel: null };
+
+/* ---------- globo ---------- */
 function tip(e, html){
   const t = $("#tip");
   t.innerHTML = html;
   t.style.opacity = "1";
   const m = 16, w = t.offsetWidth, h = t.offsetHeight;
   let x = e.clientX + m, y = e.clientY + m;
-  if (x + w > window.innerWidth - 8)  x = e.clientX - w - m;
-  if (y + h > window.innerHeight - 8) y = e.clientY - h - m;
-  t.style.left = Math.max(8, x) + "px";
-  t.style.top  = Math.max(8, y) + "px";
+  if (x + w > window.innerWidth - 10) x = e.clientX - w - m;
+  if (y + h > window.innerHeight - 10) y = e.clientY - h - m;
+  t.style.left = Math.max(10, x) + "px";
+  t.style.top = Math.max(10, y) + "px";
 }
 function tipOff(){ $("#tip").style.opacity = "0"; }
 
-/* rectangulo con las esquinas de la punta redondeadas, apoyado en la base */
-function barraPath(x, y, w, h, redondaDer){
-  const r = Math.max(0, Math.min(redondaDer ? 4 : 0, w, h / 2));
-  if (!r) return "M" + x + "," + y + "h" + w + "v" + h + "h" + (-w) + "Z";
-  return "M" + x + "," + y + "h" + (w - r) +
-         "a" + r + "," + r + " 0 0 1 " + r + "," + r +
-         "v" + (h - 2 * r) +
-         "a" + r + "," + r + " 0 0 1 " + (-r) + "," + r +
-         "h" + (-(w - r)) + "Z";
+/* ============================================================
+   8. NAVEGACION
+   ============================================================ */
+const VISTAS = ["mapa","lineas","evolucion","datos","ubicaciones","maestro"];
+function irA(v){
+  ui.vista = v;
+  VISTAS.forEach((x) => { $("#v-" + x).hidden = x !== v; });
+  $$("#nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.v === v ? "true" : "false"));
+  document.body.classList.remove("rail-abierto");
+  pintarMigas();
+  if (v === "mapa") pintarMapa();
 }
-function svgTexto(clase, x, y, txt, anclaje){
-  return '<text class="' + clase + '" x="' + x + '" y="' + y + '"' +
-         (anclaje ? ' text-anchor="' + anclaje + '"' : "") + ">" + esc(txt) + "</text>";
-}
-
-function pintarPanorama(){
-  pintarHero();
-  pintarBandas();
-  pintarPlata();
-  pintarTendencia();
-}
-
-/* ---------- numero principal ---------- */
-function pintarHero(){
-  if (!estado.lineas.length) {
-    $("#heroCifra").textContent = "—";
-    $("#heroCifra").className = "cifra-gigante";
-    $("#heroBajada").textContent = "Carga la base del WMS para ver el panorama.";
-    $("#heroSec").innerHTML = "";
+function pintarMigas(){
+  const m = $("#migas");
+  if (ui.vista !== "mapa") {
+    const rot = { lineas:"Lineas", evolucion:"Evolucion", datos:"Datos",
+                  ubicaciones:"Ubicaciones criticas", maestro:"Maestro valorizado" }[ui.vista];
+    m.innerHTML = '<span class="hoy">' + rot + "</span>";
     return;
   }
-  const r = estado.resumen;
-  const val  = r.reduce((a, x) => a + x.valorizado, 0);
-  const fVal = r.reduce((a, x) => a + x.fueraValorizado, 0);
-  const lin  = r.reduce((a, x) => a + x.lineas, 0);
-  const fLin = r.reduce((a, x) => a + x.fueraLineas, 0);
-  const rojas = r.filter((x) => x.rojo);
-  const pct = val > 0 ? (fVal / val) * 100 : 0;
-
-  $("#heroCifra").textContent = plata(fVal);
-  $("#heroCifra").className = "cifra-gigante" + (fVal === 0 ? " bien" : "");
-  $("#heroBajada").innerHTML = fVal === 0
-    ? "No hay nada fuera de aging. Las " + entero(lin) + " lineas en ubicaciones criticas estan dentro de su target."
-    : "frenados fuera de aging al <b>" + fechaAR(estado.corte) + "</b>, en <b>" + entero(fLin) +
-      "</b> de " + entero(lin) + " lineas. Es el <b>" + fmtMoneda.format(pct) +
-      " %</b> de todo lo que hay en ubicaciones criticas.";
-
-  const peor = rojas.slice().sort((a, b) => b.fueraValorizado - a.fueraValorizado)[0];
-  const t = (v, rot) => '<div><div class="v">' + v + '</div><div class="r">' + rot + "</div></div>";
-  $("#heroSec").innerHTML =
-    t(plata(val), "Inmovilizado total") +
-    t(entero(rojas.length) + " de " + entero(r.filter((x) => x.lineas > 0).length), "Areas en rojo") +
-    (peor ? t(esc(peor.area), "La que mas pesa") : "") +
-    (peor && peor.responsable ? t(esc(peor.responsable.split(" ")[0]), "A quien reclamarle") : "");
+  let h = '<button data-nivel="0">Todo</button>';
+  ui.ruta.forEach((p, i) => {
+    h += '<span class="sep">/</span>';
+    h += i === ui.ruta.length - 1
+      ? '<span class="hoy">' + esc(p) + "</span>"
+      : '<button data-nivel="' + (i + 1) + '">' + esc(p) + "</button>";
+  });
+  if (!ui.ruta.length) h = '<span class="hoy">Todo</span>';
+  m.innerHTML = h;
+  m.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    ui.ruta = ui.ruta.slice(0, +b.dataset.nivel);
+    ui.sel = null;
+    pintarMapa();
+  }));
 }
 
-/* ---------- cuanto se pasa cada area de su target ---------- */
-let modoBandas = "lineas";
-function pintarBandas(){
-  const panel = $("#panelBandas"), svg = $("#gBandas");
-  const porArea = new Map();
-  for (const l of estado.lineas) {
-    const b = banda(l);
-    if (b == null) continue;
-    if (!porArea.has(l.area)) porArea.set(l.area,
-      { area: l.area, lineas: [0,0,0,0], valorizado: [0,0,0,0] });
-    const e = porArea.get(l.area);
-    e.lineas[b]++;
-    e.valorizado[b] += l.valorizado;
-  }
-  const datos = Array.from(porArea.values());
-  if (!datos.length) { panel.hidden = true; return; }
-  panel.hidden = false;
-
-  $("#leyendaBandas").innerHTML = BANDAS.map((b) =>
-    '<span><i style="background:' + b.color + '"></i>' + b.rot + "</span>").join("");
-
-  const campo = modoBandas === "lineas" ? "lineas" : "valorizado";
-  const fmt = modoBandas === "lineas" ? entero : plata;
-  const total = (d) => d[campo].reduce((a, x) => a + x, 0);
-  const fuera = (d) => d[campo][1] + d[campo][2] + d[campo][3];
-  datos.sort((a, b) => fuera(b) - fuera(a) || total(b) - total(a));
-
-  const W = 900, izq = 76, der = 118, alto = 28, gap = 12, top = 6, hueco = 2;
-  const H = top + datos.length * (alto + gap) + 6;
-  const ancho = W - izq - der;
-  const max = Math.max.apply(null, datos.map(total)) || 1;
-
-  let g = "";
-  datos.forEach((d, i) => {
-    const y = top + i * (alto + gap);
-    g += svgTexto("rot", izq - 10, y + alto / 2 + 4, d.area, "end");
-    let x = izq;
-    const ultima = d[campo].reduce((u, v, j) => (v > 0 ? j : u), -1);
-    d[campo].forEach((v, b) => {
-      if (v <= 0) return;
-      const w = Math.max(2, (v / max) * ancho - (b === ultima ? 0 : hueco));
-      g += '<path class="seg" d="' + barraPath(x, y, w, alto, b === ultima) + '"' +
-           ' fill="' + BANDAS[b].color + '" data-area="' + esc(d.area) + '" data-banda="' + b + '"' +
-           ' data-tip="' + esc("<b>" + d.area + " · " + BANDAS[b].rot + "</b>" +
-             entero(d.lineas[b]) + " lineas · " + plata(d.valorizado[b])) + '"></path>';
-      x += w + hueco;
+/* ============================================================
+   9. MAPA DE SUPERFICIE
+   ============================================================ */
+function lineasEnRuta(ruta){
+  return estado.lineas.filter((l) =>
+    (ruta.length < 1 || l.area === ruta[0]) &&
+    (ruta.length < 2 || normUbic(l.ubicacion) === normUbic(ruta[1])));
+}
+function nodosActuales(){
+  const todas = lineasEnRuta(ui.ruta);
+  const ls = ui.alcance === "todo" ? todas : todas.filter((l) => l.fuera);
+  const nivel = ui.ruta.length;
+  if (nivel >= 2) {
+    return ls.map((l) => {
+      const b = banda(l) == null ? 0 : banda(l);
+      const mz = [0,0,0,0], mv = [0,0,0,0];
+      mz[b] = 1; mv[b] = l.valorizado;
+      return { id: l.clave, nombre: (l.sku || "?").replace(/\.0+$/, ""),
+        sub: l.descripcion || "", hoja: true, linea: l,
+        lineas: 1, valorizado: l.valorizado, mezclaL: mz, mezclaV: mv,
+        score: b, max: b, fueraL: l.fuera ? 1 : 0, fueraV: l.fuera ? l.valorizado : 0,
+        diasMax: l.aging == null ? 0 : l.aging };
     });
-    g += svgTexto("val-fuerte", x + 8, y + alto / 2 + 4, fmt(total(d)));
-  });
-  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  svg.setAttribute("height", H);
-  svg.setAttribute("aria-label", "Lineas por area segun cuanto se pasan del target");
-  svg.innerHTML = g;
-  enganchar(svg, (el) => {
-    irA("detalle");
-    $("#fArea").value = el.dataset.area;
-    $("#fBanda").value = el.dataset.banda;
-    $("#fSoloFuera").checked = false;
-    pintarDetalle();
+  }
+  const claveDe = nivel === 0 ? (l) => l.area : (l) => l.ubicacion;
+  const m = new Map();
+  for (const l of ls) {
+    const k = claveDe(l);
+    if (!m.has(k)) m.set(k, { id: k, nombre: k, hoja: false, lineas: 0, valorizado: 0,
+      mezclaL: [0,0,0,0], mezclaV: [0,0,0,0], max: 0, fueraL: 0, fueraV: 0, diasMax: 0 });
+    const n = m.get(k);
+    const b = banda(l) == null ? 0 : banda(l);
+    n.lineas++; n.valorizado += l.valorizado;
+    n.mezclaL[b]++; n.mezclaV[b] += l.valorizado;
+    if (b > n.max) n.max = b;
+    if (l.fuera) { n.fueraL++; n.fueraV += l.valorizado; }
+    if (l.aging != null && l.aging > n.diasMax) n.diasMax = l.aging;
+  }
+  return Array.from(m.values()).map((n) => {
+    const peso = ui.medida === "lineas" ? n.mezclaL : n.mezclaV;
+    const tot = peso.reduce((a, x) => a + x, 0);
+    n.score = tot > 0 ? peso.reduce((a, x, i) => a + x * i, 0) / tot : 0;
+    return n;
   });
 }
+const tamanoDe = (n) => ui.medida === "lineas" ? n.lineas : n.valorizado;
+/* El score es continuo, asi que interpolamos sobre la rampa en vez de redondear:
+   dos areas con mezclas distintas no pueden quedar del mismo color. */
+function mezclarHex(a, b, t){
+  const comp = (x) => [1, 3, 5].map((i) => parseInt(x.substr(i, 2), 16));
+  const A = comp(a), B = comp(b);
+  return "#" + A.map((v, i) =>
+    Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+function colorDeScore(sc){
+  const c = Math.max(0, Math.min(3, sc)), i = Math.floor(c);
+  return i >= 3 ? BANDAS[3].col : mezclarHex(BANDAS[i].col, BANDAS[i + 1].col, c - i);
+}
+function tintaSobre(hex){
+  const L = [1, 3, 5].map((i) => parseInt(hex.substr(i, 2), 16) / 255)
+    .map((c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return (0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2]) > 0.40 ? "#13202b" : "#ffffff";
+}
+const colorDe = (n) => BANDAS[Math.min(3, Math.max(0, Math.round(n.score)))];
 
-/* ---------- donde esta la plata ---------- */
-function pintarPlata(){
-  const panel = $("#panelPlata"), svg = $("#gPlata");
-  const fuera = estado.lineas.filter((l) => l.fuera && l.valorizado > 0)
-    .sort((a, b) => b.valorizado - a.valorizado);
-  if (!fuera.length) { panel.hidden = true; return; }
-  panel.hidden = false;
-
-  const totalFuera = fuera.reduce((a, l) => a + l.valorizado, 0);
-  const top = fuera.slice(0, 15);
-  const W = 900, izq = 196, der = 150, alto = 22, gap = 8, arriba = 6;
-  const H = arriba + top.length * (alto + gap) + 6;
-  const ancho = W - izq - der;
-  const max = top[0].valorizado || 1;
-
-  let acum = 0, g = "";
-  top.forEach((l, i) => {
-    const y = arriba + i * (alto + gap);
-    acum += l.valorizado;
-    const w = Math.max(2, (l.valorizado / max) * ancho);
-    const rotulo = (l.sku || "?").replace(/\.0+$/, "") + "  " + l.ubicacion;
-    g += svgTexto("rot-chico", izq - 10, y + alto / 2 + 4,
-          rotulo.length > 34 ? rotulo.slice(0, 33) + "…" : rotulo, "end");
-    g += '<path class="seg" d="' + barraPath(izq, y, w, alto, true) + '" fill="var(--azul)"' +
-         ' data-sku="' + esc(l.sku) + '"' +
-         ' data-tip="' + esc("<b>" + (l.descripcion || l.sku) + "</b>" +
-           l.ubicacion + " · " + fmtCant.format(l.cantidad) + " " + (l.um || "u") + "<br>" +
-           plata(l.valorizado) + " · " + entero(l.aging) + " dias habiles, target " +
-           entero(l.target)) + '"></path>';
-    g += svgTexto("val", izq + w + 8, y + alto / 2 + 4,
-          plata(l.valorizado) + "  ·  " + fmtMoneda.format((acum / totalFuera) * 100) + " % acumulado");
-  });
-  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  svg.setAttribute("height", H);
-  svg.setAttribute("aria-label", "Lineas fuera de aging mas caras");
-  svg.innerHTML = g;
-  enganchar(svg, (el) => {
-    irA("detalle");
-    $("#btnLimpiar").click();
-    $("#fBuscar").value = el.dataset.sku;
-    pintarDetalle();
-  });
-
-  const pct = (acum / totalFuera) * 100;
-  $("#notaPlata").innerHTML = fuera.length <= 15
-    ? "Son todas las lineas fuera de aging: <b>" + plata(totalFuera) + "</b>."
-    : "Estas <b>" + top.length + "</b> lineas concentran el <b>" + fmtMoneda.format(pct) +
-      " %</b> de los " + plata(totalFuera) + " fuera de aging, repartidos en " +
-      entero(fuera.length) + " lineas en total.";
+/* reparto cuadriculado: filas sobre el lado corto, proporciones parejas */
+function repartir(items, x, y, w, h){
+  const out = [];
+  const list = items.filter((d) => d.valor > 0).sort((a, b) => b.valor - a.valor);
+  let total = list.reduce((a, d) => a + d.valor, 0);
+  if (!list.length || total <= 0 || w <= 0 || h <= 0) return out;
+  let i = 0;
+  while (i < list.length && w > 0.5 && h > 0.5) {
+    const corto = Math.min(w, h);
+    const escala = (w * h) / total;
+    let fila = [], suma = 0, peor = Infinity, j = i;
+    while (j < list.length) {
+      const s = suma + list[j].valor;
+      const areas = fila.concat([list[j]]).map((d) => d.valor * escala);
+      const p = peorAspecto(areas, s * escala, corto);
+      if (p > peor) break;
+      peor = p; suma = s; fila.push(list[j]); j++;
+    }
+    const grosor = (suma * escala) / corto;
+    let off = 0;
+    for (const d of fila) {
+      const largo = (d.valor * escala) / grosor;
+      out.push(w >= h ? { d, x: x, y: y + off, w: grosor, h: largo }
+                      : { d, x: x + off, y: y, w: largo, h: grosor });
+      off += largo;
+    }
+    if (w >= h) { x += grosor; w -= grosor; } else { y += grosor; h -= grosor; }
+    total -= suma;
+    i = j;
+  }
+  return out;
+}
+function peorAspecto(areas, sumaArea, corto){
+  const max = Math.max.apply(null, areas), min = Math.min.apply(null, areas);
+  if (!(sumaArea > 0) || !(min > 0)) return Infinity;
+  const s2 = sumaArea * sumaArea, c2 = corto * corto;
+  return Math.max((c2 * max) / s2, s2 / (c2 * min));
 }
 
-/* techo redondo para que los ticks no queden en numeros raros */
+/* el estado vacio reemplaza el contenido del contenedor, asi que el <svg> puede
+   no existir cuando volvemos: lo recreamos si hace falta */
+function lienzoSvg(cont){
+  let svg = cont.querySelector("svg");
+  if (!svg) {
+    cont.innerHTML = "";
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.id = "mapaSvg";
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Mapa de superficie del stock frenado");
+    cont.appendChild(svg);
+  }
+  return svg;
+}
+function pintarMapa(){
+  pintarMigas();
+  pintarLeyenda();
+  const cont = $("#mapa");
+  const W = Math.max(240, cont.clientWidth - 28);
+  const H = Math.max(200, cont.clientHeight - 28);
+
+  if (!estado.lineas.length) {
+    cont.innerHTML = '<div class="vacio"><div class="icono">◳</div>' +
+      "<h3>Todavia no hay datos</h3><p>Carga el <b>Base_Aging</b> del lunes en la solapa Datos " +
+      "y el mapa se arma solo.</p>" +
+      '<div class="acciones" style="justify-content:center"><button class="btn" id="irDatos">Ir a Datos</button></div></div>';
+    $("#irDatos").addEventListener("click", () => irA("datos"));
+    pintarCtx();
+    return;
+  }
+  const nodos = nodosActuales();
+  if (!nodos.length) {
+    cont.innerHTML = '<div class="vacio"><div class="icono">✓</div>' +
+      "<h3>Nada frenado por aca</h3><p>Todas las lineas de este nivel estan dentro de su target. " +
+      'Proba con <b>Todo el stock</b> para ver igual lo que hay.</p></div>';
+    pintarCtx();
+    return;
+  }
+  const svg = lienzoSvg(cont);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  /* Un nodo muy chico contra el total daria menos de un pixel y se perderia de vista.
+     Le ponemos un piso para que siempre se vea: la superficie queda exagerada, pero la
+     cifra que se lee adentro y en el globo es la real. Nada desaparece del mapa. */
+  const crudos = nodos.map((n) => ({ valor: Math.max(tamanoDe(n), 0.0001), n }));
+  const totalV = crudos.reduce((a, x) => a + x.valor, 0);
+  const piso = totalV * Math.min(0.05, Math.max(0.012, 9000 / Math.max(1, W * H)));
+  /* Las celdas muy chicas, repartidas junto con las grandes, terminan siendo tiras de
+     pocos pixeles de alto: el area sale bien pero la forma es ilegible. Les damos una
+     franja propia al pie, donde quedan rectangulos parejos y se pueden leer. */
+  const chicas = crudos.filter((x) => x.valor < piso);
+  const grandes = crudos.filter((x) => x.valor >= piso);
+  let piezas;
+  if (chicas.length && grandes.length) {
+    const hBanda = Math.max(78, Math.min(H * 0.22, chicas.length * 46));
+    piezas = repartir(grandes.map((x) => ({ n: x.n, valor: x.valor })), 0, 0, W, H - hBanda - 6)
+      .concat(repartir(chicas.map((x) => ({ n: x.n, valor: piso, chica: true })), 0, H - hBanda, W, hBanda));
+  } else {
+    piezas = repartir(crudos.map((x) =>
+      ({ n: x.n, valor: Math.max(x.valor, piso), chica: x.valor < piso })), 0, 0, W, H);
+  }
+
+  const hueco = 3;
+  let g = "";
+  for (const p of piezas) {
+    const n = p.d.n, relleno = colorDeScore(n.score), tinta = tintaSobre(relleno);
+    const x = p.x + hueco / 2, y = p.y + hueco / 2;
+    const w = Math.max(1, p.w - hueco), h = Math.max(1, p.h - hueco);
+    const rr = Math.min(8, w / 2, h / 2);
+    g += '<g class="celda-mapa" data-id="' + esc(n.id) + '" data-tip="' +
+         esc(globoNodo(n) + (p.d.chica ? '<br><span class="mut">celda agrandada para que se vea</span>' : "")) + '">' +
+         '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + rr +
+         '" fill="' + relleno + '"/>';
+    /* franja con la mezcla exacta de bandas: el relleno dice el promedio,
+       esto dice de que esta hecho */
+    if (!n.hoja && h > 74 && w > 86) {
+      const mez = ui.medida === "lineas" ? n.mezclaL : n.mezclaV;
+      const tot = mez.reduce((a, v) => a + v, 0) || 1;
+      const bw = w - 24, bx = x + 12, by = y + h - 19, bh = 7;
+      g += '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh +
+           '" rx="3.5" fill="' + tinta + '" opacity=".22"/>';
+      let ox = 0;
+      mez.forEach((v, bi) => {
+        if (v <= 0) return;
+        const seg = (v / tot) * bw;
+        g += '<rect x="' + (bx + ox) + '" y="' + by + '" width="' + Math.max(1.5, seg - 1.5) +
+             '" height="' + bh + '" rx="3.5" fill="' + BANDAS[bi].col + '"/>';
+        ox += seg;
+      });
+    }
+    if (w > 58 && h > 30) {
+      const t = tinta;
+      const nom = n.nombre.length > Math.floor(w / 7.4) ? n.nombre.slice(0, Math.max(3, Math.floor(w / 7.4) - 1)) + "…" : n.nombre;
+      g += '<text class="tit" x="' + (x + 11) + '" y="' + (y + 21) + '" fill="' + t + '">' + esc(nom) + "</text>";
+      if (h > 48) {
+        g += '<text class="cif" x="' + (x + 11) + '" y="' + (y + 38) + '" fill="' + t + '">' +
+             esc(ui.medida === "lineas" ? entero(n.lineas) + " lineas" : plata(n.valorizado)) + "</text>";
+      }
+      if (h > 68 && w > 112) {
+        g += '<text class="mini" x="' + (x + 11) + '" y="' + (y + 54) + '" fill="' + t + '">' +
+             esc(n.hoja ? entero(n.diasMax) + " dias habiles, target " + entero(n.linea.target)
+                        : entero(n.diasMax) + " dias max · " + entero(n.fueraL) + " frenadas") + "</text>";
+      }
+    }
+    g += "</g>";
+  }
+  svg.innerHTML = g;
+  svg.querySelectorAll(".celda-mapa").forEach((el) => {
+    el.addEventListener("mousemove", (e) => tip(e, el.dataset.tip));
+    el.addEventListener("mouseleave", tipOff);
+    el.addEventListener("click", () => {
+      tipOff();
+      const n = nodos.find((x) => String(x.id) === el.dataset.id);
+      if (!n) return;
+      if (n.hoja) { ui.sel = n; pintarCtx(); svg.querySelectorAll(".celda-mapa").forEach((o) => o.classList.remove("sel")); el.classList.add("sel"); }
+      else { ui.ruta = ui.ruta.concat([n.nombre]); ui.sel = null; pintarMapa(); }
+    });
+  });
+  pintarCtx();
+}
+function globoNodo(n){
+  const c = colorDe(n);
+  if (n.hoja) {
+    const l = n.linea;
+    return "<b>" + esc(l.descripcion || l.sku) + "</b>" +
+      '<span class="mut">' + esc(l.ubicacion) + " · " + fmtCant.format(l.cantidad) + " " + esc(l.um || "u") + "</span><br>" +
+      plata(l.valorizado) + " · " + entero(l.aging) + " dias habiles sobre un target de " + entero(l.target);
+  }
+  return "<b>" + esc(n.nombre) + "</b>" +
+    plata(n.valorizado) + " en " + entero(n.lineas) + " lineas<br>" +
+    '<span class="mut">' + entero(n.fueraL) + " frenadas · " + entero(n.diasMax) +
+    " dias max · " + esc(c.rot.toLowerCase()) + "</span>";
+}
+function pintarLeyenda(){
+  $("#leyenda").innerHTML = BANDAS.map((b) =>
+    '<span><i style="background:' + b.col + '"></i>' + b.rot + "</span>").join("") +
+    '<span style="color:var(--t3)" title="El tamano es proporcional, salvo en las celdas muy chicas, que se agrandan para que no desaparezcan. La cifra de adentro siempre es la real.">' +
+    "tamano = " + (ui.medida === "lineas" ? "lineas" : "plata") + "</span>";
+}
+
+/* ---------- panel de contexto ---------- */
+function pintarCtx(){
+  const c = $("#ctx");
+  if (!estado.lineas.length) {
+    c.innerHTML = '<div class="ctx-cab"><div class="eti">Sin datos</div><h2>—</h2></div>';
+    return;
+  }
+  if (ui.sel && ui.sel.hoja) return pintarCtxLinea(ui.sel.linea);
+
+  const ls = lineasEnRuta(ui.ruta);
+  const nivel = ui.ruta.length;
+  const eti = nivel === 0 ? "Todas las areas" : nivel === 1 ? "Area" : "Ubicacion";
+  const nom = nivel === 0 ? "Todo" : ui.ruta[ui.ruta.length - 1];
+  const r = nivel === 1 ? estado.resumen.find((x) => x.area === ui.ruta[0]) : null;
+
+  const val = ls.reduce((a, l) => a + l.valorizado, 0);
+  const fV  = ls.filter((l) => l.fuera).reduce((a, l) => a + l.valorizado, 0);
+  const fL  = ls.filter((l) => l.fuera).length;
+  const dMax = ls.reduce((a, l) => Math.max(a, l.aging == null ? 0 : l.aging), 0);
+  const mez = [0,0,0,0];
+  ls.forEach((l) => { const b = banda(l); if (b != null) mez[b] += l.valorizado; });
+  const totMez = mez.reduce((a, x) => a + x, 0) || 1;
+
+  let h = '<div class="ctx-cab"><div class="eti">' + esc(eti) + "</div><h2>" + esc(nom) + "</h2>";
+  if (r) h += '<div class="bajo">' + esc(r.responsable || "sin responsable") +
+    (r.proceso ? " · " + esc(r.proceso) : "") +
+    (r.target != null ? " · target " + entero(r.target) + " dias" : "") + "</div>";
+  else if (nivel === 0) h += '<div class="bajo">Corte al ' + esc(fechaAR(estado.corte)) + "</div>";
+  h += "</div>";
+
+  h += '<div class="ctx-cuerpo">';
+  h += par("Plata frenada", plata(fV), fV > 0);
+  h += par("Lineas frenadas", entero(fL) + " de " + entero(ls.length), fL > 0);
+  h += par("Dias maximos", entero(dMax));
+  h += par("Valorizado total", plata(val));
+  h += '<div class="barra-mezcla" title="Como se reparte la plata segun el atraso">' +
+    mez.map((v, i) => v > 0
+      ? '<i style="background:' + BANDAS[i].col + ';width:' + ((v / totMez) * 100).toFixed(2) + '%"></i>'
+      : "").join("") + "</div>";
+  h += '<div style="font-size:11.5px;color:var(--t2)">' +
+    mez.map((v, i) => v > 0 ? BANDAS[i].corto + " " + fmtMoneda.format((v / totMez) * 100) + " %" : "")
+      .filter(Boolean).join(" · ") + "</div>";
+
+  const hijos = nodosActuales().slice().sort((a, b) => tamanoDe(b) - tamanoDe(a)).slice(0, 12);
+  if (hijos.length) {
+    h += "<h3>" + (ui.ruta.length >= 2 ? "Lineas" : "Lo que mas pesa") + "</h3>";
+    h += '<div class="lista-lineas">' + hijos.map((n) =>
+      '<button class="ficha" data-id="' + esc(n.id) + '">' +
+      '<span class="pip" style="background:' + colorDe(n).col + '"></span>' +
+      '<span class="cuerpo"><span class="n1">' + esc(n.nombre) + "</span>" +
+      '<span class="n2">' + esc(n.hoja ? (n.sub || n.linea.ubicacion)
+        : entero(n.lineas) + " lineas · " + entero(n.diasMax) + " dias max") + "</span></span>" +
+      '<span class="plata">' + esc(ui.medida === "lineas" ? entero(n.lineas) : plata(n.valorizado)) + "</span>" +
+      "</button>").join("") + "</div>";
+  }
+  h += "</div>";
+  c.innerHTML = h;
+  c.querySelectorAll(".ficha").forEach((b) => b.addEventListener("click", () => {
+    const n = nodosActuales().find((x) => String(x.id) === b.dataset.id);
+    if (!n) return;
+    if (n.hoja) { ui.sel = n; pintarCtx(); }
+    else { ui.ruta = ui.ruta.concat([n.nombre]); ui.sel = null; pintarMapa(); }
+  }));
+}
+function par(k, v, mal){
+  return '<div class="par"><span class="k">' + k + '</span><span class="v' +
+    (mal ? " mal" : "") + '">' + v + "</span></div>";
+}
+function pintarCtxLinea(l){
+  const b = banda(l), c = BANDAS[b == null ? 0 : b];
+  let h = '<div class="ctx-cab"><div class="eti">Linea</div>' +
+    "<h2>" + esc((l.sku || "?").replace(/\.0+$/, "")) + "</h2>" +
+    '<div class="bajo">' + esc(l.descripcion || "sin descripcion") + "</div></div>";
+  h += '<div class="ctx-cuerpo">';
+  h += '<span class="chip ' + (l.fuera ? "mal" : "ok") + '">' + (l.fuera ? c.rot : "Dentro del target") + "</span>";
+  h += '<div style="height:12px"></div>';
+  h += par("Ubicacion", esc(l.ubicacion));
+  h += par("Cantidad", fmtCant.format(l.cantidad) + " " + esc(l.um || ""));
+  h += par("Precio unitario", l.costo == null ? "—" : fmtMoneda.format(l.costo));
+  h += par("Valorizado", plata(l.valorizado), l.fuera);
+  h += par("Dias habiles", l.aging == null ? "—" : entero(l.aging), l.fuera);
+  h += par("Target", l.target == null ? "—" : entero(l.target) + " dias");
+  if (l.lote) h += par("Lote", esc(l.lote));
+  if (l.tipoStock) h += par("Tipo de stock", esc(l.tipoStock));
+  h += "<h3>Fecha aging</h3>";
+  h += '<input type="date" class="fecha-ed' + (l.ajustada ? " tocada" : "") +
+       '" id="ctxFecha" value="' + fechaISO(l.fechaAging) + '" style="width:100%">';
+  h += '<p style="font-size:11.5px;color:var(--t2);margin:7px 0 0">' +
+    (l.ajustada ? "Ajustada a mano. En el archivo figura " +
+       (l.fechaArchivo ? fechaAR(l.fechaArchivo) : "vacia") + ". Borra el campo para volver a esa."
+     : "Es la del archivo. Si la cambias, el ajuste se guarda y se vuelve a aplicar cada semana.") +
+    "</p>";
+  if (l.sinCosto) h += '<div class="aviso malo" style="margin-top:14px">Este SKU no esta en el maestro, asi que se valoriza en $0.</div>';
+  else if (l.costoAmbiguo) h += '<div class="aviso alerta" style="margin-top:14px">El material esta repetido en el maestro con precios distintos. Se usa el primero.</div>';
+  h += '<div class="acciones"><button class="btn suave chico" id="ctxVolver">Volver al resumen</button></div>';
+  h += "</div>";
+  $("#ctx").innerHTML = h;
+  $("#ctxVolver").addEventListener("click", () => { ui.sel = null; pintarCtx();
+    $$("#mapaSvg .celda-mapa").forEach((o) => o.classList.remove("sel")); });
+  $("#ctxFecha").addEventListener("change", (e) => {
+    aplicarAjuste(l.clave, e.target.value, l);
+    const n = nodosActuales().find((x) => String(x.id) === l.clave);
+    ui.sel = n || null;
+    pintarMapa();
+  });
+}
+function aplicarAjuste(clave, valor, l){
+  if (!valor) delete estado.ajustes[clave];
+  else estado.ajustes[clave] = { fecha: valor, ubicacion: l ? l.ubicacion : "",
+    sku: l ? l.sku : "", creado: fechaISO(new Date()) };
+  guardar(LS.ajustes, estado.ajustes);
+  calcular();
+  pintarCabecera();
+  pintarLineas();
+  pintarAjustes();
+  pintarAvisos();
+}
+
+/* ============================================================
+   10. ORQUESTADOR
+   ============================================================ */
+function pintarTodo(){
+  if (estado.stock.length) calcular();
+  pintarCabecera();
+  pintarAvisos();
+  poblarFiltros();
+  if (ui.vista === "mapa") pintarMapa(); else pintarMigas();
+  pintarLineas();
+  pintarAjustes();
+  pintarEvolucion();
+  pintarAreas();
+  pintarUbicaciones();
+  pintarMaestro();
+  pintarFuentes();
+}
+function pintarCabecera(){
+  const hay = estado.lineas.length > 0;
+  $("#btnExportar").disabled = !hay;
+  $("#btnGuardarCorte").disabled = !hay;
+  const f = estado.fuentes.stock;
+  $("#estadoFuente").innerHTML = hay
+    ? "<b>" + entero(estado.lineas.length) + "</b> lineas en " +
+      entero(estado.ubicaciones.length) + " ubicaciones criticas<br>" +
+      entero(estado.maestroCrudo.length) + " SKU en el maestro"
+    : (f ? "Archivo leido, sin lineas criticas" : "Sin datos cargados");
+}
+
+/* ---------- avisos ---------- */
+function pintarAvisos(){
+  const d = estado.diag, c = [];
+  if (!estado.stock.length) {
+    c.push(av("info", "Para empezar, carga la base del WMS aca abajo."));
+  } else {
+    if (!estado.maestro.size) c.push(av("malo", "No hay maestro de precios: <b>todo el valorizado da $0</b>."));
+    else if (d.lineasSinCosto) c.push(av("malo", "<b>" + entero(d.lineasSinCosto) +
+      " lineas sin precio en el maestro</b> (" + entero(d.skusSinCosto.length) +
+      " SKU distintos). Cuentan como $0, asi que el total esta subestimado.",
+      "Ver", () => { irA("maestro"); $("#fSoloSinCosto").checked = true; $("#fSoloUsados").checked = true; pintarMaestro(); }));
+    if (d.lineasCostoAmbiguo) {
+      const peor = (d.skusAmbiguosEnUso || []).map((k) => estado.maestroAmbiguos[k]).filter(Boolean)
+        .sort((a, b) => (b.max - b.min) - (a.max - a.min))[0];
+      c.push(av("alerta", "<b>" + entero(d.lineasCostoAmbiguo) + " lineas con precio dudoso</b>: " +
+        "su material esta repetido en el maestro con precios distintos" +
+        (peor ? " (el peor va de " + plata(peor.min) + " a " + plata(peor.max) + ")" : "") + ".",
+        "Ver", () => { irA("maestro"); $("#fSoloAmbiguos").checked = true; pintarMaestro(); }));
+    }
+    if (d.lineasSinFecha) c.push(av("alerta", "<b>" + entero(d.lineasSinFecha) +
+      " lineas sin Fecha Aging</b>. No se les puede calcular antiguedad.",
+      "Ver", () => { irA("lineas"); $("#fSoloProblemas").checked = true; pintarLineas(); }));
+    if (d.ajustesHuerfanos && d.ajustesHuerfanos.length) c.push(av("alerta", "<b>" +
+      entero(d.ajustesHuerfanos.length) + " ajustes de fecha</b> no coinciden con ninguna linea de esta base.",
+      "Ver", () => irA("lineas")));
+    if (d.areasSinConfig.length) c.push(av("alerta", "<b>Area sin configurar: " +
+      d.areasSinConfig.map(esc).join(", ") + "</b>. Tiene stock critico pero no tiene responsable.",
+      "Configurar", () => irA("ubicaciones")));
+    if (!c.length) c.push(av("ok", "Sin inconsistencias: todas las lineas tienen fecha, precio y area configurada."));
+  }
+  const cont = $("#avisos");
+  cont.innerHTML = "";
+  c.forEach((n) => cont.appendChild(n));
+  const graves = c.filter((n) => !n.classList.contains("ok") && !n.classList.contains("info")).length;
+  const pico = $("#picoDatos"), bot = $("#btnAvisos");
+  pico.hidden = graves === 0; pico.textContent = graves;
+  bot.hidden = graves === 0;
+  bot.textContent = graves + (graves === 1 ? " aviso" : " avisos");
+}
+function av(tipo, html, txt, fn){
+  const d = document.createElement("div");
+  d.className = "aviso " + tipo;
+  d.innerHTML = "<div>" + html + "</div>";
+  if (txt) {
+    const b = document.createElement("button");
+    b.className = "btn suave chico"; b.type = "button"; b.textContent = txt;
+    b.addEventListener("click", fn);
+    d.appendChild(b);
+  }
+  return d;
+}
+
+/* ---------- filtros ---------- */
+function poblarFiltros(){
+  const pon = (id, vals, todos) => {
+    const e = $(id), v = e.value;
+    e.innerHTML = '<option value="">' + todos + "</option>" +
+      vals.map((x) => '<option value="' + esc(x) + '">' + esc(x) + "</option>").join("");
+    if (vals.indexOf(v) > -1) e.value = v;
+  };
+  pon("#fArea", Array.from(new Set(estado.resumen.map((r) => r.area))), "Todas");
+  pon("#fResp", Array.from(new Set(estado.resumen.map((r) => r.responsable).filter(Boolean))), "Todos");
+  pon("#fUbicArea", Array.from(new Set(estado.ubicaciones.map((u) => String(u.area || "").trim()).filter(Boolean))).sort(), "Todas");
+}
+function lineasFiltradas(){
+  const a = $("#fArea").value, r = $("#fResp").value, bn = $("#fBanda").value;
+  const q = norm($("#fBuscar").value), soloP = $("#fSoloProblemas").checked;
+  const resp = new Map(estado.resumen.map((x) => [x.area, x]));
+  return estado.lineas.filter((l) => {
+    if (a && l.area !== a) return false;
+    if (r && (resp.get(l.area) || {}).responsable !== r) return false;
+    if (bn !== "" && String(banda(l)) !== bn) return false;
+    if (soloP && !(l.sinCosto || l.sinFecha || l.sinTarget || l.costoAmbiguo)) return false;
+    if (q && !(norm(l.sku).includes(q) || norm(l.descripcion).includes(q) || norm(l.ubicacion).includes(q))) return false;
+    return true;
+  }).sort((x, y) => (y.aging == null ? -1 : y.aging) - (x.aging == null ? -1 : x.aging));
+}
+
+/* ---------- tabla de lineas ---------- */
+const TOPE = 500;
+function pintarLineas(){
+  const t = $("#tablaLineas");
+  if (!estado.lineas.length) {
+    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin datos</h3>' +
+      "<p>Carga la base del WMS en Datos.</p></div></td></tr></tbody>";
+    $("#pieLineas").textContent = "";
+    return;
+  }
+  const f = lineasFiltradas(), vis = f.slice(0, TOPE);
+  let h = "<thead><tr><th>Area</th><th>Ubicacion</th><th>SKU</th><th>Descripcion</th>" +
+    '<th class="cifra">Cant.</th><th class="cifra">Valorizado</th><th>Fecha aging</th>' +
+    '<th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
+  for (const l of vis) {
+    const b = banda(l);
+    const chip = l.aging == null ? '<span class="chip neutro">sin fecha</span>'
+      : l.fuera ? '<span class="chip mal">' + BANDAS[b].corto + "</span>"
+      : '<span class="chip ok">dentro</span>';
+    const extra = l.sinCosto ? ' <span class="chip neutro">sin precio</span>'
+      : (l.costoAmbiguo ? ' <span class="chip avisa">precio dudoso</span>' : "");
+    h += "<tr>" +
+      "<td><b>" + esc(l.area) + "</b></td>" +
+      '<td class="mono">' + esc(l.ubicacion) + "</td>" +
+      '<td class="mono">' + esc((l.sku || "").replace(/\.0+$/, "")) + "</td>" +
+      "<td>" + esc(l.descripcion) + "</td>" +
+      '<td class="cifra">' + fmtCant.format(l.cantidad) + "</td>" +
+      '<td class="cifra">' + (l.sinCosto ? "—" : fmtMoneda.format(l.valorizado)) + "</td>" +
+      '<td><input type="date" class="fecha-ed' + (l.ajustada ? " tocada" : "") +
+        '" data-clave="' + esc(l.clave) + '" value="' + fechaISO(l.fechaAging) + '"></td>' +
+      '<td class="cifra"><b>' + (l.aging == null ? "—" : entero(l.aging)) + "</b></td>" +
+      '<td class="cifra">' + (l.target == null ? "—" : entero(l.target)) + "</td>" +
+      "<td>" + chip + extra + "</td></tr>";
+  }
+  t.innerHTML = h + "</tbody>";
+  const tot = f.reduce((a, l) => a + l.valorizado, 0);
+  $("#pieLineas").innerHTML = "Mostrando <b>" + entero(vis.length) + "</b> de <b>" +
+    entero(f.length) + "</b> lineas · valorizado filtrado <b>" + plata(tot) + "</b>" +
+    (f.length > vis.length ? " · exporta para verlas todas" : "");
+}
+
+/* ---------- ajustes de fecha ---------- */
+function pintarAjustes(){
+  const claves = Object.keys(estado.ajustes);
+  const card = $("#tarjetaAjustes");
+  if (!claves.length) { card.hidden = true; return; }
+  card.hidden = false;
+  const cuenta = {};
+  estado.lineas.forEach((l) => { if (l.ajustada) cuenta[l.clave] = (cuenta[l.clave] || 0) + 1; });
+  let h = "<thead><tr><th>Ubicacion</th><th>SKU</th><th>Fecha aplicada</th><th>En el archivo</th>" +
+    '<th class="cifra">Lineas</th><th>Ajustado el</th><th></th></tr></thead><tbody>';
+  for (const k of claves) {
+    const a = estado.ajustes[k], l = estado.lineas.find((x) => x.clave === k), n = cuenta[k] || 0;
+    const p = k.split("|");
+    h += "<tr>" +
+      '<td class="mono">' + esc(a.ubicacion || p[0]) + "</td>" +
+      '<td class="mono">' + esc((a.sku || p[1] || "").replace(/\.0+$/, "")) + "</td>" +
+      "<td><b>" + esc(fechaAR(fecha(a.fecha))) + "</b></td>" +
+      "<td>" + (l ? esc(l.fechaArchivo ? fechaAR(l.fechaArchivo) : "(vacia)") : "—") + "</td>" +
+      '<td class="cifra">' + (n === 0 ? '<span class="chip mal">no coincide</span>'
+        : n === 1 ? '<span class="chip ok">1</span>'
+        : '<span class="chip neutro" title="Hay lineas identicas: el ajuste se aplica a todas">' + n + " gemelas</span>") + "</td>" +
+      "<td>" + esc(a.creado ? fechaAR(fecha(a.creado)) : "—") + "</td>" +
+      '<td><button class="btn riesgo chico" data-delaj="' + esc(k) + '" type="button">Quitar</button></td></tr>';
+  }
+  $("#tablaAjustes").innerHTML = h + "</tbody>";
+}
+
+/* ---------- evolucion ---------- */
 function escalaLinda(max){
   if (!(max > 0)) return { techo: 1, paso: 0.25 };
   const exp = Math.pow(10, Math.floor(Math.log10(max)));
@@ -1721,180 +1876,73 @@ function escalaLinda(max){
   const paso = (n <= 1 ? 0.25 : n <= 2 ? 0.5 : n <= 5 ? 1 : 2) * exp;
   return { techo: Math.ceil(max / paso) * paso, paso };
 }
-
-/* ---------- tendencia ---------- */
-function pintarTendencia(){
-  const panel = $("#panelTendencia"), svg = $("#gTendencia");
+function pintarEvolucion(){
   const hist = leer(LS.hist, []);
+  const svg = $("#gTendencia");
   if (hist.length < 2) {
-    panel.hidden = !estado.lineas.length;
-    svg.innerHTML = "";
-    $("#ayudaTendencia").innerHTML = hist.length === 1
+    svg.innerHTML = ""; svg.setAttribute("height", 0);
+    $("#subEvolucion").innerHTML = hist.length === 1
       ? "Hay un solo corte guardado. Guarda el del proximo lunes y aca vas a ver si mejora o empeora."
       : "Todavia no guardaste ningun corte. Toca <b>Guardar corte</b> arriba a la derecha y cada semana se suma un punto.";
+  } else {
+    $("#subEvolucion").textContent = "Cada punto es un corte guardado. Pasa el mouse para ver el detalle.";
+    const pts = hist.map((c) => ({ fecha: new Date(c.fecha + "T00:00:00"),
+      v: c.areas.reduce((a, x) => a + (x.fueraValorizado || 0), 0),
+      lin: c.areas.reduce((a, x) => a + (x.fueraLineas || 0), 0) }));
+    const W = 920, H = 270, izq = 96, der = 30, arr = 20, aba = 36;
+    const au = H - arr - aba, an = W - izq - der;
+    const e0 = escalaLinda(Math.max.apply(null, pts.map((p) => p.v))), max = e0.techo;
+    const X = (i) => izq + (pts.length === 1 ? an / 2 : (i / (pts.length - 1)) * an);
+    const Y = (v) => arr + au - (v / max) * au;
+    let g = "";
+    for (let v = 0; v <= max + 1e-9; v += e0.paso) {
+      g += '<line class="grilla" x1="' + izq + '" y1="' + Y(v) + '" x2="' + (W - der) + '" y2="' + Y(v) + '"/>';
+      g += '<text class="eti" x="' + (izq - 10) + '" y="' + (Y(v) + 4) + '" text-anchor="end">$ ' + fmtEntero.format(v) + "</text>";
+    }
+    g += '<path class="serie" d="' + pts.map((p, i) => (i ? "L" : "M") + X(i) + "," + Y(p.v)).join(" ") + '"/>';
+    pts.forEach((p, i) => {
+      g += '<circle class="punto" cx="' + X(i) + '" cy="' + Y(p.v) + '" r="5.5" data-tip="' +
+        esc("<b>" + fechaAR(p.fecha) + "</b>" + plata(p.v) + " en " + entero(p.lin) + " lineas") + '"/>';
+      g += '<text class="eti" x="' + X(i) + '" y="' + (H - 12) + '" text-anchor="middle">' + esc(fechaCorta(p.fecha)) + "</text>";
+    });
+    const u = pts[pts.length - 1], a = pts[pts.length - 2], dif = u.v - a.v;
+    g += '<text class="' + (dif > 0 ? "d-mal" : "d-bien") + '" x="' + (X(pts.length - 1) - 12) +
+      '" y="' + (Y(u.v) - 16) + '" text-anchor="end">' +
+      esc((dif > 0 ? "▲ subio " : dif < 0 ? "▼ bajo " : "igual que ") + plata(Math.abs(dif)) + " vs el corte anterior") + "</text>";
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("height", H);
+    svg.innerHTML = g;
+    svg.querySelectorAll("[data-tip]").forEach((el) => {
+      el.addEventListener("mousemove", (e) => tip(e, el.dataset.tip));
+      el.addEventListener("mouseleave", tipOff);
+    });
+  }
+  pintarHistorico(hist);
+}
+function pintarHistorico(hist){
+  const t = $("#tablaHist");
+  if (!hist.length) {
+    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin cortes guardados</h3>' +
+      "<p>Cada lunes, despues de cargar la base, toca Guardar corte.</p></div></td></tr></tbody>";
     return;
   }
-  panel.hidden = false;
-  $("#ayudaTendencia").textContent = "Valorizado fuera de aging en cada corte guardado.";
-
-  const pts = hist.map((c) => ({
-    fecha: new Date(c.fecha + "T00:00:00"),
-    v: c.areas.reduce((a, x) => a + (x.fueraValorizado || 0), 0),
-    lin: c.areas.reduce((a, x) => a + (x.fueraLineas || 0), 0)
-  }));
-  const W = 900, izq = 86, der = 34, arriba = 18, abajo = 34;
-  const H = 260, altoUtil = H - arriba - abajo, anchoUtil = W - izq - der;
-  const esc0 = escalaLinda(Math.max.apply(null, pts.map((p) => p.v)));
-  const max = esc0.techo;
-  const x = (i) => izq + (pts.length === 1 ? anchoUtil / 2 : (i / (pts.length - 1)) * anchoUtil);
-  const y = (v) => arriba + altoUtil - (v / max) * altoUtil;
-
-  let g = "";
-  for (let v = 0; v <= max + 1e-9; v += esc0.paso) {
-    const yy = y(v);
-    g += '<line class="grilla" x1="' + izq + '" y1="' + yy + '" x2="' + (W - der) + '" y2="' + yy + '"/>';
-    g += svgTexto("val", izq - 10, yy + 4, "$ " + fmtEntero.format(v), "end");
+  const met = $("#hMetrica").value;
+  const esPlata = met === "valorizado" || met === "fueraValorizado";
+  const areas = [];
+  hist.forEach((c) => c.areas.forEach((a) => { if (areas.indexOf(a.area) < 0) areas.push(a.area); }));
+  areas.sort();
+  let h = "<thead><tr><th>Area</th>" + hist.map((c) =>
+    '<th class="cifra">' + esc(fechaCorta(new Date(c.fecha + "T00:00:00"))) + "</th>").join("") + "</tr></thead><tbody>";
+  for (const a of areas) {
+    h += "<tr><td><b>" + esc(a) + "</b></td>";
+    for (const c of hist) {
+      const r = c.areas.find((x) => x.area === a), v = r ? r[met] : null;
+      h += '<td class="cifra">' + (v == null ? "—" : (esPlata ? fmtMoneda.format(v) : entero(v))) + "</td>";
+    }
+    h += "</tr>";
   }
-  g += '<path class="linea-serie" d="' + pts.map((p, i) => (i ? "L" : "M") + x(i) + "," + y(p.v)).join(" ") + '"/>';
-  pts.forEach((p, i) => {
-    g += '<circle class="punto seg" cx="' + x(i) + '" cy="' + y(p.v) + '" r="5"' +
-         ' data-tip="' + esc("<b>" + fechaAR(p.fecha) + "</b>" + plata(p.v) + " en " +
-           entero(p.lin) + " lineas") + '"></circle>';
-    g += svgTexto("rot-chico", x(i), H - 12, fechaCorta(p.fecha), "middle");
-  });
-  const ult = pts[pts.length - 1], ant = pts[pts.length - 2];
-  const dif = ult.v - ant.v;
-  g += svgTexto(dif > 0 ? "delta-mal" : "delta-bien",
-        x(pts.length - 1) - 10, y(ult.v) - 15,
-        (dif > 0 ? "▲ subio " : dif < 0 ? "▼ bajo " : "igual que ") +
-        plata(Math.abs(dif)) + " vs el corte anterior", "end");
-  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  svg.setAttribute("height", H);
-  svg.setAttribute("aria-label", "Valorizado fuera de aging por corte");
-  svg.innerHTML = g;
-  enganchar(svg, null);
-}
-
-/* globos y clics para cualquier grafico */
-function enganchar(svg, alTocar){
-  svg.querySelectorAll("[data-tip]").forEach((el) => {
-    el.addEventListener("mousemove", (e) => tip(e, el.dataset.tip));
-    el.addEventListener("mouseleave", tipOff);
-    if (alTocar) el.addEventListener("click", () => { tipOff(); alTocar(el); });
-  });
-}
-
-/* ---------- detalle ---------- */
-function poblarFiltros(){
-  const sel = (id, vals, actual) => {
-    const e = $(id), v = actual != null ? actual : e.value;
-    e.innerHTML = '<option value="">' + (id === "#fArea" ? "Todas" : "Todos") + "</option>" +
-      vals.map((x) => '<option value="' + esc(x) + '">' + esc(x) + "</option>").join("");
-    if (vals.indexOf(v) > -1) e.value = v;
-  };
-  sel("#fArea",    Array.from(new Set(estado.resumen.map((r) => r.area))));
-  sel("#fResp",    Array.from(new Set(estado.resumen.map((r) => r.responsable).filter(Boolean))));
-  sel("#fProceso", Array.from(new Set(estado.resumen.map((r) => r.proceso).filter(Boolean))));
-  const areas = Array.from(new Set(estado.ubicaciones.map((u) => String(u.area || "").trim()).filter(Boolean))).sort();
-  const e = $("#fUbicArea"), v = e.value;
-  e.innerHTML = '<option value="">Todas</option>' + areas.map((x) => '<option value="' + esc(x) + '">' + esc(x) + "</option>").join("");
-  if (areas.indexOf(v) > -1) e.value = v;
-}
-
-function lineasFiltradas(){
-  const a = $("#fArea").value, r = $("#fResp").value, p = $("#fProceso").value;
-  const q = norm($("#fBuscar").value);
-  const bnd = $("#fBanda").value;
-  const soloF = $("#fSoloFuera").checked, soloP = $("#fSoloProblemas").checked;
-  const resp = new Map(estado.resumen.map((x) => [x.area, x]));
-  return estado.lineas.filter((l) => {
-    if (a && l.area !== a) return false;
-    const rr = resp.get(l.area) || {};
-    if (r && rr.responsable !== r) return false;
-    if (p && rr.proceso !== p) return false;
-    if (bnd !== "" && String(banda(l)) !== bnd) return false;
-    if (soloF && !l.fuera) return false;
-    if (soloP && !(l.sinCosto || l.sinFecha || l.sinTarget)) return false;
-    if (q && !(norm(l.sku).includes(q) || norm(l.descripcion).includes(q) || norm(l.ubicacion).includes(q))) return false;
-    return true;
-  }).sort((x, y) => (y.aging == null ? -1 : y.aging) - (x.aging == null ? -1 : x.aging));
-}
-
-const TOPE_DETALLE = 600;
-function pintarDetalle(){
-  const t = $("#tablaDetalle");
-  if (!estado.lineas.length) {
-    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin datos cargados.</td></tr></tbody>';
-    $("#pieDetalle").textContent = "";
-    return;
-  }
-  const f = lineasFiltradas();
-  const vis = f.slice(0, TOPE_DETALLE);
-  let h = "<thead><tr><th>Area</th><th>Ubicacion</th><th>SKU</th><th>Descripcion</th>" +
-    '<th class="cifra">Cant.</th><th class="cifra">Costo</th><th class="cifra">Valorizado</th>' +
-    '<th>Fecha Aging</th><th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
-  for (const l of vis) {
-    const p = l.fuera ? '<span class="pastilla mal">FUERA</span>'
-            : (l.aging == null ? '<span class="pastilla neutro">sin fecha</span>'
-            : '<span class="pastilla ok">OK</span>');
-    const av = l.sinCosto
-      ? ' <span class="pastilla neutro" title="SKU sin costo en el maestro">sin costo</span>'
-      : (l.costoAmbiguo ? ' <span class="pastilla neutro" title="El material esta repetido en el maestro con precios distintos">precio dudoso</span>' : "");
-    h += "<tr>" +
-      "<td><b>" + esc(l.area) + "</b></td>" +
-      '<td class="mono">' + esc(l.ubicacion) + "</td>" +
-      '<td class="mono">' + esc(l.sku) + "</td>" +
-      "<td>" + esc(l.descripcion) + "</td>" +
-      '<td class="cifra">' + fmtCant.format(l.cantidad) + "</td>" +
-      '<td class="cifra">' + (l.costo == null ? "—" : fmtMoneda.format(l.costo)) + "</td>" +
-      '<td class="cifra">' + (l.sinCosto ? "—" : fmtMoneda.format(l.valorizado)) + "</td>" +
-      '<td><input type="date" class="fecha-aging' + (l.ajustada ? " ajustada" : "") +
-        '" data-clave="' + esc(l.clave) + '" value="' + fechaISO(l.fechaAging) + '" title="' +
-        (l.ajustada ? "Ajustada a mano. En el archivo figura " + (l.fechaArchivo ? fechaAR(l.fechaArchivo) : "vacia") +
-                      ". Borra el campo para volver a esa."
-                    : "Fecha del archivo. Si la cambias, el ajuste se guarda y se vuelve a aplicar cada semana.") +
-        '"></td>' +
-      '<td class="cifra"><b>' + (l.aging == null ? "—" : entero(l.aging)) + "</b></td>" +
-      '<td class="cifra">' + (l.target == null ? "—" : entero(l.target)) + "</td>" +
-      "<td>" + p + av + "</td></tr>";
-  }
-  h += "</tbody>";
-  t.innerHTML = h;
-  const tot = f.reduce((a, l) => a + l.valorizado, 0);
-  $("#pieDetalle").innerHTML =
-    "Mostrando <b>" + entero(vis.length) + "</b> de <b>" + entero(f.length) + "</b> lineas &middot; " +
-    "valorizado filtrado <b>" + plata(tot) + "</b>" +
-    (f.length > vis.length ? " &middot; exporta a CSV para ver todas" : "");
-}
-
-/* ---------- fechas ajustadas ---------- */
-function pintarAjustes(){
-  const claves = Object.keys(estado.ajustes);
-  const panel = $("#panelAjustes"), t = $("#tablaAjustes");
-  if (!claves.length) { panel.hidden = true; return; }
-  panel.hidden = false;
-
-  const cuenta = {};
-  estado.lineas.forEach((l) => { if (l.ajustada) cuenta[l.clave] = (cuenta[l.clave] || 0) + 1; });
-
-  let h = "<thead><tr><th>Ubicacion</th><th>SKU</th><th>Fecha aplicada</th>" +
-    '<th>En el archivo</th><th class="cifra">Lineas</th><th>Ajustado el</th><th></th></tr></thead><tbody>';
-  for (const k of claves) {
-    const a = estado.ajustes[k];
-    const l = estado.lineas.find((x) => x.clave === k);
-    const n = cuenta[k] || 0;
-    const partes = k.split("|");
-    h += "<tr>" +
-      '<td class="mono">' + esc(a.ubicacion || partes[0]) + "</td>" +
-      '<td class="mono">' + esc(a.sku || partes[1]) + "</td>" +
-      "<td><b>" + esc(fechaAR(fecha(a.fecha))) + "</b></td>" +
-      "<td>" + (l ? esc(l.fechaArchivo ? fechaAR(l.fechaArchivo) : "(vacia)") : "—") + "</td>" +
-      '<td class="cifra">' + (n === 0 ? '<span class="pastilla mal">no coincide</span>'
-        : n === 1 ? '<span class="pastilla ok">1</span>'
-        : '<span class="pastilla neutro" title="Hay varias lineas identicas: el ajuste se aplica a todas">' + n + " gemelas</span>") + "</td>" +
-      "<td>" + esc(a.creado ? fechaAR(fecha(a.creado)) : "—") + "</td>" +
-      '<td><button class="btn peligro chico" data-delAj="' + esc(k) + '" type="button">Quitar</button></td></tr>';
-  }
+  h += '<tr><td class="cifra" style="color:var(--t3)">quitar</td>' + hist.map((c, i) =>
+    '<td class="cifra"><button class="btn riesgo chico" data-delcorte="' + i + '" type="button">✕</button></td>').join("") + "</tr>";
   t.innerHTML = h + "</tbody>";
 }
 
@@ -1902,180 +1950,123 @@ function pintarAjustes(){
 function pintarAreas(){
   const t = $("#tablaAreas");
   if (!estado.areas.length) {
-    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin areas cargadas. Carga el libro o agregalas abajo.</td></tr></tbody>';
+    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin areas</h3><p>Agregalas abajo o restaura las originales.</p></div></td></tr></tbody>';
     return;
   }
   const conStock = new Map(estado.resumen.map((r) => [r.area, r]));
   let h = "<thead><tr><th>Area</th><th>Responsable</th><th>Proceso</th>" +
-    '<th class="cifra">Target</th><th>Descripcion</th><th class="cifra">Ubicaciones</th><th></th></tr></thead><tbody>';
+    '<th class="cifra">Target</th><th class="cifra">Ubicaciones</th><th></th></tr></thead><tbody>';
   estado.areas.forEach((a, i) => {
     const n = estado.ubicaciones.filter((u) => String(u.area).trim() === String(a.area).trim()).length;
     const r = conStock.get(String(a.area).trim());
-    h += "<tr>" +
-      "<td><b>" + esc(a.area) + "</b>" + (r && r.lineas ? ' <span class="pastilla neutro">' + entero(r.lineas) + " lineas</span>" : "") + "</td>" +
-      '<td><input type="text" data-ar="' + i + '" data-campo="responsable" value="' + esc(a.responsable) + '" size="18"></td>' +
+    h += "<tr><td><b>" + esc(a.area) + "</b>" +
+      (r && r.lineas ? ' <span class="chip neutro">' + entero(r.lineas) + "</span>" : "") + "</td>" +
+      '<td><input type="text" data-ar="' + i + '" data-campo="responsable" value="' + esc(a.responsable) + '" size="17"></td>' +
       '<td><select data-ar="' + i + '" data-campo="proceso">' +
         ["INBOUND","OUTBOND","Gestion de Stock"].map((p) =>
-          '<option' + (norm(p) === norm(a.proceso) ? " selected" : "") + ">" + p + "</option>").join("") +
+          "<option" + (norm(p) === norm(a.proceso) ? " selected" : "") + ">" + p + "</option>").join("") +
         (["inbound","outbond","gestion de stock"].indexOf(norm(a.proceso)) < 0 && a.proceso
-          ? '<option selected>' + esc(a.proceso) + "</option>" : "") +
-      "</select></td>" +
-      '<td class="cifra"><input type="number" min="0" data-ar="' + i + '" data-campo="target" value="' + (a.target == null ? "" : a.target) + '" size="4" style="width:64px"></td>' +
-      '<td><textarea data-ar="' + i + '" data-campo="descripcion" rows="2" placeholder="(vacio: lista las ubicaciones)">' + esc(a.descripcion) + "</textarea></td>" +
+          ? "<option selected>" + esc(a.proceso) + "</option>" : "") + "</select></td>" +
+      '<td class="cifra"><input type="number" min="0" data-ar="' + i + '" data-campo="target" value="' +
+        (a.target == null ? "" : a.target) + '" style="width:72px"></td>' +
       '<td class="cifra">' + entero(n) + "</td>" +
-      '<td><button class="btn peligro chico" data-delAr="' + i + '" type="button">Eliminar</button></td></tr>';
+      '<td><button class="btn riesgo chico" data-delar="' + i + '" type="button">Eliminar</button></td></tr>';
   });
   t.innerHTML = h + "</tbody>";
 }
 
 /* ---------- ubicaciones ---------- */
-function ubicFiltradas(){
-  const a = $("#fUbicArea").value, q = norm($("#fUbicBuscar").value);
-  return estado.ubicaciones
-    .map((u, i) => ({ u, i }))
-    .filter(({ u }) => {
-      if (a && String(u.area).trim() !== a) return false;
-      if (q && !norm(u.ubicacion).includes(q)) return false;
-      return true;
-    });
-}
 function pintarUbicaciones(){
   const t = $("#tablaUbic");
   if (!estado.ubicaciones.length) {
-    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin ubicaciones criticas. Carga el libro o agregalas abajo.</td></tr></tbody>';
+    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin ubicaciones criticas</h3>' +
+      "<p>Sin ubicaciones no se calcula nada. Restaura las originales o agregalas abajo.</p></div></td></tr></tbody>";
     $("#pieUbic").textContent = "";
     return;
   }
-  const f = ubicFiltradas();
+  const a = $("#fUbicArea").value, q = norm($("#fUbicBuscar").value);
+  const f = estado.ubicaciones.map((u, i) => ({ u, i })).filter(({ u }) =>
+    (!a || String(u.area).trim() === a) && (!q || norm(u.ubicacion).includes(q)));
   const conStock = new Map();
   estado.lineas.forEach((l) => conStock.set(normUbic(l.ubicacion), (conStock.get(normUbic(l.ubicacion)) || 0) + 1));
-  let h = "<thead><tr><th>Ubicacion</th><th>Area</th><th class=\"cifra\">Target</th>" +
+  let h = '<thead><tr><th>Ubicacion</th><th>Area</th><th class="cifra">Target</th>' +
     '<th class="cifra">Lineas hoy</th><th></th></tr></thead><tbody>';
-  f.slice(0, 500).forEach(({ u, i }) => {
+  f.slice(0, 400).forEach(({ u, i }) => {
     const n = conStock.get(normUbic(u.ubicacion)) || 0;
-    h += "<tr>" +
-      '<td class="mono">' + esc(u.ubicacion) + "</td>" +
-      '<td><input type="text" data-ub="' + i + '" data-campo="area" value="' + esc(u.area) + '" size="7" style="width:76px"></td>' +
-      '<td class="cifra"><input type="number" min="0" data-ub="' + i + '" data-campo="target" value="' + (u.target == null ? "" : u.target) + '" style="width:64px"></td>' +
+    h += '<tr><td class="mono">' + esc(u.ubicacion) + "</td>" +
+      '<td><input type="text" data-ub="' + i + '" data-campo="area" value="' + esc(u.area) + '" style="width:80px"></td>' +
+      '<td class="cifra"><input type="number" min="0" data-ub="' + i + '" data-campo="target" value="' +
+        (u.target == null ? "" : u.target) + '" style="width:72px"></td>' +
       '<td class="cifra">' + (n ? "<b>" + entero(n) + "</b>" : "—") + "</td>" +
-      '<td><button class="btn peligro chico" data-delUb="' + i + '" type="button">Eliminar</button></td></tr>';
+      '<td><button class="btn riesgo chico" data-delub="' + i + '" type="button">Eliminar</button></td></tr>';
   });
   t.innerHTML = h + "</tbody>";
-  $("#pieUbic").innerHTML = "Mostrando <b>" + entero(Math.min(f.length, 500)) + "</b> de <b>" +
-    entero(estado.ubicaciones.length) + "</b> ubicaciones criticas";
+  $("#pieUbic").innerHTML = "Mostrando <b>" + entero(Math.min(f.length, 400)) + "</b> de <b>" +
+    entero(estado.ubicaciones.length) + "</b>";
 }
 
 /* ---------- maestro ---------- */
 function pintarMaestro(){
   const t = $("#tablaMaestro");
   if (!estado.maestroCrudo.length) {
-    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin maestro cargado. Cargalo en la solapa Datos.</td></tr></tbody>';
+    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin maestro</h3>' +
+      "<p>Carga el Base Item Valorizados en Datos.</p></div></td></tr></tbody>";
     $("#pieMaestro").textContent = "";
     return;
   }
   const q = norm($("#fSku").value);
-  const soloUsados = $("#fSoloUsados").checked;
-  const soloFaltan = $("#fSoloSinCosto").checked;
-  const soloAmbiguos = $("#fSoloAmbiguos").checked;
-  const usados = new Set();
-  estado.lineas.forEach((l) => { if (l.sku) usados.add(String(l.sku).trim().toUpperCase()); });
-  const faltan = new Set(estado.diag.skusSinCosto ? estado.diag.skusSinCosto.map((s) => s.toUpperCase()) : []);
-
-  let filas;
-  if (soloFaltan) {
-    filas = Array.from(faltan).map((s) => [s, null]);
-  } else {
-    filas = estado.maestroCrudo.filter(([sku]) => {
-      const k = String(sku).trim().toUpperCase();
-      if (soloUsados && !usados.has(k)) return false;
-      if (soloAmbiguos && !estado.maestroAmbiguos[k]) return false;
-      if (q && !norm(sku).includes(q)) return false;
-      return true;
-    });
-  }
-  if (q && soloFaltan) filas = filas.filter(([sku]) => norm(sku).includes(q));
-
-  let h = '<thead><tr><th>SKU</th><th class="cifra">Costo unitario</th><th>Estado</th><th></th></tr></thead><tbody>';
-  filas.slice(0, 400).forEach(([sku, costo]) => {
-    const usado = usados.has(String(sku).trim().toUpperCase());
-    h += "<tr>" +
-      '<td class="mono"><b>' + esc(sku) + "</b></td>" +
-      '<td class="cifra"><input type="text" data-sku="' + esc(sku) + '" value="' +
-        (costo == null ? "" : fmtMoneda.format(costo)) + '" style="width:120px;text-align:right" placeholder="sin costo"></td>' +
-      "<td>" + (costo == null ? '<span class="pastilla mal">falta</span>' :
-                (usado ? '<span class="pastilla ok">en uso</span>' : '<span class="pastilla neutro">sin stock</span>')) +
-        (function(){
-          const a = estado.maestroAmbiguos[String(sku).trim().toUpperCase()];
-          return a ? ' <span class="pastilla mal" title="En el maestro tiene ' + a.n +
-            " precios distintos, de " + plata(a.min) + " a " + plata(a.max) +
-            ". Se usa " + plata(a.usado) + ', el primero que aparece.">repetido</span>' : "";
-        })() + "</td>" +
-      '<td><button class="btn peligro chico" data-delSku="' + esc(sku) + '" type="button">Eliminar</button></td></tr>';
+  const sU = $("#fSoloUsados").checked, sF = $("#fSoloSinCosto").checked, sA = $("#fSoloAmbiguos").checked;
+  const usados = new Set(); estado.lineas.forEach((l) => { if (l.sku) usados.add(String(l.sku).trim().toUpperCase()); });
+  const faltan = new Set((estado.diag.skusSinCosto || []).map((s) => s.toUpperCase()));
+  let filas = sF ? Array.from(faltan).map((s) => [s, null]) : estado.maestroCrudo.filter(([sku]) => {
+    const k = String(sku).trim().toUpperCase();
+    if (sU && !usados.has(k)) return false;
+    if (sA && !estado.maestroAmbiguos[k]) return false;
+    return true;
   });
-  t.innerHTML = h + "</tbody>";
-  if (!filas.length) t.innerHTML = '<tbody><tr><td class="vacio-tabla">Nada que mostrar con ese filtro.</td></tr></tbody>';
-  $("#pieMaestro").innerHTML = "Mostrando <b>" + entero(Math.min(filas.length, 400)) + "</b> de <b>" +
-    entero(filas.length) + "</b> &middot; maestro completo: <b>" + entero(estado.maestroCrudo.length) + "</b> SKU" +
-    (estado.diag.skusSinCosto && estado.diag.skusSinCosto.length
-      ? ' &middot; <span style="color:var(--rojo)"><b>' + entero(estado.diag.skusSinCosto.length) + "</b> SKU del stock sin costo</span>" : "");
-}
-
-/* ---------- historico ---------- */
-function pintarHistorico(){
-  const hist = leer(LS.hist, []);
-  const t = $("#tablaHist");
-  if (!hist.length) {
-    t.innerHTML = '<tbody><tr><td class="vacio-tabla">Sin cortes guardados. Calcula un corte y toca <b>Guardar corte</b>.</td></tr></tbody>';
-    return;
-  }
-  const metrica = $("#hMetrica").value;
-  const esPlata = metrica === "valorizado" || metrica === "fueraValorizado";
-  const areas = [];
-  hist.forEach((c) => c.areas.forEach((a) => { if (areas.indexOf(a.area) < 0) areas.push(a.area); }));
-  areas.sort();
-
-  let h = "<thead><tr><th>Area</th>" +
-    hist.map((c) => "<th>" + esc(fechaCorta(new Date(c.fecha + "T00:00:00"))) + "</th>").join("") +
-    "<th></th></tr></thead><tbody>";
-  for (const a of areas) {
-    h += "<tr><td><b>" + esc(a) + "</b></td>";
-    for (const c of hist) {
-      const r = c.areas.find((x) => x.area === a);
-      const v = r ? r[metrica] : null;
-      h += '<td class="cifra">' + (v == null ? "—" : (esPlata ? fmtMoneda.format(v) : entero(v))) + "</td>";
-    }
-    h += "<td></td></tr>";
-  }
-  h += "<tr><td></td>" + hist.map((c, i) =>
-    '<td class="cifra"><button class="btn peligro chico" data-delCorte="' + i + '" type="button">Borrar</button></td>').join("") +
-    "<td></td></tr></tbody>";
-  t.innerHTML = h;
+  if (q) filas = filas.filter(([sku]) => norm(sku).includes(q));
+  let h = '<thead><tr><th>SKU</th><th class="cifra">Precio unitario</th><th>Estado</th><th></th></tr></thead><tbody>';
+  filas.slice(0, 300).forEach(([sku, costo]) => {
+    const k = String(sku).trim().toUpperCase(), amb = estado.maestroAmbiguos[k];
+    h += '<tr><td class="mono"><b>' + esc(String(sku).replace(/\.0+$/, "")) + "</b></td>" +
+      '<td class="cifra"><input type="text" data-sku="' + esc(sku) + '" value="' +
+        (costo == null ? "" : fmtMoneda.format(costo)) + '" style="width:118px;text-align:right" placeholder="sin precio"></td>' +
+      "<td>" + (costo == null ? '<span class="chip mal">falta</span>'
+        : usados.has(k) ? '<span class="chip ok">en uso</span>' : '<span class="chip neutro">sin stock</span>') +
+        (amb ? ' <span class="chip avisa" title="Tiene ' + amb.n + " precios distintos, de " +
+          plata(amb.min) + " a " + plata(amb.max) + ". Se usa " + plata(amb.usado) +
+          '">repetido</span>' : "") + "</td>" +
+      '<td><button class="btn riesgo chico" data-delsku="' + esc(sku) + '" type="button">Eliminar</button></td></tr>';
+  });
+  t.innerHTML = filas.length ? h + "</tbody>"
+    : '<tbody><tr><td><div class="vacio"><h3>Nada con ese filtro</h3></div></td></tr></tbody>';
+  $("#pieMaestro").innerHTML = "Mostrando <b>" + entero(Math.min(filas.length, 300)) + "</b> de <b>" +
+    entero(filas.length) + "</b> · maestro completo <b>" + entero(estado.maestroCrudo.length) + "</b> SKU" +
+    ((estado.diag.skusSinCosto || []).length ? ' · <span style="color:var(--mal)"><b>' +
+      entero(estado.diag.skusSinCosto.length) + "</b> del stock sin precio</span>" : "");
 }
 
 /* ---------- fuentes ---------- */
 function pintarFuentes(){
   const f = estado.fuentes;
-  const fila = (nom, ok, detalle) =>
-    "<tr><td><b>" + nom + "</b></td><td>" +
-    (ok ? '<span class="pastilla ok">cargado</span>' : '<span class="pastilla mal">falta</span>') +
-    "</td><td>" + detalle + "</td></tr>";
   const cuando = (x) => x && x.cuando ? new Date(x.cuando).toLocaleString("es-AR") : "—";
-  $("#tablaFuentes").innerHTML =
-    "<thead><tr><th>Fuente</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>" +
-    fila("Hoja Stock", !!f.stock, f.stock
-      ? entero(f.stock.filas) + " filas, " + entero(f.stock.sinFecha) + " sin Fecha Aging &middot; " + cuando(f.stock)
-      : "Carga el libro de aging") +
-    fila("Ubicaciones criticas", estado.ubicaciones.length > 0,
-      entero(estado.ubicaciones.length) + " ubicaciones" + (f.ubicaciones ? " &middot; " + cuando(f.ubicaciones) : " (guardadas en este navegador)")) +
-    fila("Areas", estado.areas.length > 0,
-      entero(estado.areas.length) + " areas" + (f.areas ? " &middot; " + cuando(f.areas) : " (guardadas en este navegador)")) +
-    fila("Maestro valorizado", estado.maestroCrudo.length > 0,
-      entero(estado.maestroCrudo.length) + " SKU" + (f.maestro ? " &middot; " + cuando(f.maestro) : " (guardado en este navegador)")) +
+  const fila = (n, ok, d) => "<tr><td><b>" + n + "</b></td><td>" +
+    (ok ? '<span class="chip ok">cargado</span>' : '<span class="chip mal">falta</span>') +
+    "</td><td>" + d + "</td></tr>";
+  $("#tablaFuentes").innerHTML = "<thead><tr><th>Fuente</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>" +
+    fila("Base del WMS", !!f.stock, f.stock ? entero(f.stock.filas) + " filas, " +
+      entero(f.stock.sinFecha) + " sin Fecha Aging · " + cuando(f.stock) : "Arrastrala arriba") +
+    fila("Ubicaciones criticas", estado.ubicaciones.length > 0, entero(estado.ubicaciones.length) +
+      " ubicaciones" + (f.ubicaciones ? " · " + cuando(f.ubicaciones) : " (guardadas en este navegador)")) +
+    fila("Areas", estado.areas.length > 0, entero(estado.areas.length) + " areas" +
+      (f.areas ? " · " + cuando(f.areas) : " (guardadas en este navegador)")) +
+    fila("Maestro valorizado", estado.maestroCrudo.length > 0, entero(estado.maestroCrudo.length) +
+      " SKU" + (f.maestro ? " · " + cuando(f.maestro) : " (guardado en este navegador)")) +
     "</tbody>";
 }
 
 /* ============================================================
-   7. EXPORTACION
+   11. EXPORTACION
    ============================================================ */
 function bajarCSV(nombre, filas){
   const csv = filas.map((f) => f.map((c) => {
@@ -2091,78 +2082,70 @@ function bajarCSV(nombre, filas){
 }
 const dec = (n) => String(n == null ? "" : n).replace(".", ",");
 
-function exportarTablero(){
-  const f = [["Monitoreo Aging - corte " + fechaAR(estado.corte)], []];
-  f.push(["Area","Responsables","Descripcion","Proceso","Target","Concepto","Valorizado","Lineas","Indicador","UM","Actual"]);
-  for (const r of estado.resumen) {
-    const d = (r.descripcion || "").replace(/\n/g, " / ");
-    f.push([r.area, r.responsable, d, r.proceso, r.target, "Total", dec(r.valorizado.toFixed(2)), r.lineas, "Lineas Totales", "Lineas", r.lineas]);
-    f.push(["", "", "", "", "", "Fuera Aging", dec(r.fueraValorizado.toFixed(2)), r.fueraLineas, "Aging", "Dias Max.", r.diasMax]);
-  }
-  bajarCSV("aging_tablero_" + fechaISO(estado.corte) + ".csv", f);
+function exportarResumen(){
+  const f = [["Aging - corte " + fechaAR(estado.corte)], [],
+    ["Area","Responsable","Proceso","Target","Lineas","Valorizado","Lineas frenadas","Plata frenada","Dias max"]];
+  estado.resumen.forEach((r) => f.push([r.area, r.responsable, r.proceso, r.target, r.lineas,
+    dec(r.valorizado.toFixed(2)), r.fueraLineas, dec(r.fueraValorizado.toFixed(2)), r.diasMax]));
+  bajarCSV("aging_resumen_" + fechaISO(estado.corte) + ".csv", f);
 }
-function exportarDetalle(){
-  const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Costo","Valorizado","Fecha Aging","Fecha del archivo","Ajustada","Dias","Target","Fuera de Aging","Observacion"]];
+function exportarLineas(){
+  const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Precio","Valorizado",
+    "Fecha aging","Fecha del archivo","Ajustada","Dias","Target","Frenada","Atraso","Observacion"]];
   for (const l of lineasFiltradas()) {
-    const obs = [l.sinCosto ? "sin costo" : "", l.sinFecha ? "sin fecha aging" : "", l.sinTarget ? "sin target" : ""].filter(Boolean).join(" / ");
+    const b = banda(l);
     f.push([l.area, l.ubicacion, l.sku, l.descripcion, l.lote, dec(l.cantidad), l.um,
-      l.costo == null ? "" : dec(l.costo.toFixed(4)),
-      l.sinCosto ? "" : dec(l.valorizado.toFixed(2)),
+      l.costo == null ? "" : dec(l.costo.toFixed(4)), l.sinCosto ? "" : dec(l.valorizado.toFixed(2)),
       fechaAR(l.fechaAging), fechaAR(l.fechaArchivo), l.ajustada ? "X" : "",
-      l.aging == null ? "" : l.aging, l.target == null ? "" : l.target,
-      l.fuera ? "X" : "", obs]);
+      l.aging == null ? "" : l.aging, l.target == null ? "" : l.target, l.fuera ? "X" : "",
+      b == null ? "" : BANDAS[b].rot,
+      [l.sinCosto ? "sin precio" : "", l.costoAmbiguo ? "precio dudoso" : "",
+       l.sinFecha ? "sin fecha" : "", l.sinTarget ? "sin target" : ""].filter(Boolean).join(" / ")]);
   }
-  bajarCSV("aging_detalle_" + fechaISO(estado.corte) + ".csv", f);
+  bajarCSV("aging_lineas_" + fechaISO(estado.corte) + ".csv", f);
+}
+function exportarHistorico(){
+  const hist = leer(LS.hist, []);
+  const met = ["lineas","valorizado","fueraLineas","fueraValorizado","diasMax"];
+  const f = [["Area","Corte","Lineas","Valorizado","Lineas frenadas","Plata frenada","Dias max"]];
+  hist.forEach((c) => c.areas.forEach((a) => f.push([a.area, c.fecha].concat(met.map((m) => dec(a[m]))))));
+  bajarCSV("aging_historico.csv", f);
 }
 
 /* ============================================================
-   8. EVENTOS
+   12. CARGA DE ARCHIVOS
    ============================================================ */
-function irA(vista){
-  $$(".solapa").forEach((b) => {
-    const act = b.dataset.vista === vista;
-    b.setAttribute("aria-selected", act ? "true" : "false");
-    $("#v-" + b.dataset.vista).hidden = !act;
-  });
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-$$(".solapa").forEach((b) => b.addEventListener("click", () => irA(b.dataset.vista)));
-
-/* --- carga de archivos --- */
 function estadoZona(idZona, idEst, clase, texto){
   $(idZona).className = "zona" + (clase === "listo" ? " listo" : "");
   const e = $(idEst);
   e.className = "estado" + (clase === "error" ? " error" : clase === "listo" ? "" : " vacio");
   e.innerHTML = texto;
 }
-
 async function cargarLibro(file){
   estadoZona("#zonaLibro", "#estLibro", "", "Leyendo " + esc(file.name) + "...");
   try {
     const res = await leerArchivo(file);
-    let msg = [];
+    const msg = [];
     if (res.tipo === "excel") {
       const hStock = hojaDeStock(res);
-      const hDep   = hojaPorNombre(res, ["Depositos Virtuales","Depositos","Depósitos"]);
-      const hResp  = hojaPorNombre(res, ["Resp. Alm","Resp Alm","Responsables"]);
-      if (hDep)  { const n = ingestarDepositos(hDep);  if (n) msg.push(n + " ubicaciones criticas"); }
-      if (hResp) { const n = ingestarAreas(hResp);     if (n) msg.push(n + " areas"); }
-      if (!hStock) throw new Error(
-        "Ninguna hoja tiene las columnas Ubicacion, Producto y Ctd. Hojas encontradas: " +
-        res.nombres.join(", "));
+      const hDep = hojaPorNombre(res, ["Depositos Virtuales","Depositos","Depósitos"]);
+      const hResp = hojaPorNombre(res, ["Resp. Alm","Resp Alm","Responsables"]);
+      if (hDep) { const n = ingestarDepositos(hDep); if (n) msg.push(n + " ubicaciones criticas"); }
+      if (hResp) { const n = ingestarAreas(hResp); if (n) msg.push(n + " areas"); }
+      if (!hStock) throw new Error("Ninguna hoja tiene las columnas Ubicacion, Producto y Ctd. Hojas: " + res.nombres.join(", "));
       msg.unshift(ingestarStock(hStock) + " filas de stock");
       if (!hDep && !hResp) msg.push("config: se mantiene la guardada");
     } else {
       msg.push(ingestarStock(res.filas) + " filas de stock");
     }
-    estadoZona("#zonaLibro", "#estLibro", "listo", esc(file.name) + "<br>" + msg.join(" &middot; "));
+    estadoZona("#zonaLibro", "#estLibro", "listo", esc(file.name) + "<br>" + msg.join(" · "));
+    ui.ruta = []; ui.sel = null;
     pintarTodo();
-    irA("panorama");
+    irA("mapa");
   } catch (e) {
     estadoZona("#zonaLibro", "#estLibro", "error", esc(e.message));
   }
 }
-
 async function cargarMaestro(file){
   estadoZona("#zonaMaestro", "#estMaestro", "", "Leyendo " + esc(file.name) + "...");
   try {
@@ -2173,51 +2156,41 @@ async function cargarMaestro(file){
       const sel = $("#mHoja");
       sel.innerHTML = res.nombres.map((n) => '<option value="' + esc(n) + '">' + esc(n) + "</option>").join("");
       sel.value = mapeo.hoja && res.nombres.indexOf(mapeo.hoja) > -1 ? mapeo.hoja : res.nombres[0];
-    } else {
-      $("#mHoja").innerHTML = '<option value="">(archivo plano)</option>';
-    }
+    } else $("#mHoja").innerHTML = '<option value="">(archivo plano)</option>';
     $("#mapeoMaestro").hidden = false;
-    poblarColumnasMaestro(mapeo.iSku, mapeo.iCosto);
+    poblarColumnas(mapeo.iSku, mapeo.iCosto);
     aplicarMaestro(file.name);
   } catch (e) {
     estadoZona("#zonaMaestro", "#estMaestro", "error", esc(e.message));
   }
 }
-
-function filasMaestroActuales(){
-  const res = estado.libroHojas;
-  if (!res) return [];
-  if (res.tipo === "excel") return res.hojas[$("#mHoja").value] || [];
-  return res.filas || [];
+function filasMaestro(){
+  const r = estado.libroHojas;
+  if (!r) return [];
+  return r.tipo === "excel" ? (r.hojas[$("#mHoja").value] || []) : (r.filas || []);
 }
-function poblarColumnasMaestro(iSku, iCosto){
-  const filas = filasMaestroActuales();
-  const head = filas[0] || [];
+function poblarColumnas(iSku, iCosto){
+  const head = filasMaestro()[0] || [];
   const ancho = Math.max(head.length, 10);
   const letra = (i) => { let s = "", n = i; do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0); return s; };
   const ops = [];
   for (let i = 0; i < ancho; i++) {
-    const m = head[i] == null ? "" : String(head[i]).slice(0, 20);
+    const m = head[i] == null ? "" : String(head[i]).slice(0, 22);
     ops.push('<option value="' + i + '">' + letra(i) + (m ? " — " + esc(m) : "") + "</option>");
   }
-  $("#mSku").innerHTML = ops.join("");
-  $("#mCosto").innerHTML = ops.join("");
-  $("#mSku").value   = Math.min(iSku, ancho - 1);
+  $("#mSku").innerHTML = ops.join(""); $("#mCosto").innerHTML = ops.join("");
+  $("#mSku").value = Math.min(iSku, ancho - 1);
   $("#mCosto").value = Math.min(iCosto, ancho - 1);
 }
-function aplicarMaestro(nombreArchivo){
+function aplicarMaestro(nombre){
   try {
-    const filas = filasMaestroActuales();
-    const iSku = +$("#mSku").value, iCosto = +$("#mCosto").value;
+    const filas = filasMaestro(), iSku = +$("#mSku").value, iCosto = +$("#mCosto").value;
     const previos = estado.maestroCrudo.slice();
     const n = ingestarMaestro(filas, iSku, iCosto);
-    /* Si el archivo nuevo es mucho mas chico que el guardado, probablemente sea
-       parcial o este mal mapeado: antes de perder precios, preguntamos. */
+    guardar(LS.mapeo, { hoja: $("#mHoja").value || null, iSku, iCosto });
     if (previos.length > 100 && n < previos.length * 0.5) {
-      const fusionar = !confirm(
-        "El archivo trae " + entero(n) + " SKU y el maestro guardado tiene " + entero(previos.length) + ".\n\n" +
-        "Aceptar: reemplazar igual, quedan solo los " + entero(n) + ".\n" +
-        "Cancelar: fusionar, manteniendo los que no vengan en el archivo nuevo.");
+      const fusionar = !confirm("El archivo trae " + entero(n) + " SKU y el maestro guardado tiene " +
+        entero(previos.length) + ".\n\nAceptar: reemplazar igual.\nCancelar: fusionar, manteniendo los que no vengan.");
       if (fusionar) {
         const nuevos = new Map(estado.maestroCrudo.map(([k, v]) => [String(k).trim().toUpperCase(), [k, v]]));
         for (const [k, v] of previos) {
@@ -2227,195 +2200,92 @@ function aplicarMaestro(nombreArchivo){
         indexarMaestro(Array.from(nuevos.values()));
       }
     }
-    guardar(LS.mapeo, { hoja: $("#mHoja").value || null, iSku, iCosto });
-    const muestra = estado.maestroCrudo.slice(0, 3).map(([s, c]) => esc(s) + " = " + fmtMoneda.format(c)).join(" &middot; ");
-    $("#vistaMaestro").innerHTML = "Primeros registros leidos: " + muestra;
+    $("#vistaMaestro").innerHTML = "Primeros registros: " + estado.maestroCrudo.slice(0, 3)
+      .map(([s, c]) => esc(String(s)) + " = " + fmtMoneda.format(c)).join(" · ");
     estadoZona("#zonaMaestro", "#estMaestro", "listo",
-      esc(nombreArchivo || "maestro") + "<br>" + entero(n) + " SKU valorizados");
+      esc(nombre || "maestro") + "<br>" + entero(estado.maestroCrudo.length) + " SKU valorizados");
     pintarTodo();
   } catch (e) {
     estadoZona("#zonaMaestro", "#estMaestro", "error", esc(e.message));
   }
 }
 
-$$("[data-abre]").forEach((b) => b.addEventListener("click", () => $("#" + b.dataset.abre).click()));
-$("#inLibro").addEventListener("change", (e) => { if (e.target.files[0]) cargarLibro(e.target.files[0]); e.target.value = ""; });
-$("#inMaestro").addEventListener("change", (e) => { if (e.target.files[0]) cargarMaestro(e.target.files[0]); e.target.value = ""; });
-[["#zonaLibro", cargarLibro], ["#zonaMaestro", cargarMaestro]].forEach(([sel, fn]) => {
-  const z = $(sel);
-  ["dragenter","dragover"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add("encima"); }));
-  ["dragleave","drop"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.remove("encima"); }));
-  z.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) fn(f); });
-});
-$("#mHoja").addEventListener("change", () => poblarColumnasMaestro(+$("#mSku").value, +$("#mCosto").value));
-$("#btnAplicarMaestro").addEventListener("click", () => aplicarMaestro());
-$("#btnPegar").addEventListener("click", () => {
-  const txt = $("#pegado").value.trim();
-  if (!txt) return;
-  try { ingestarStock(parseDelimitado(txt, "\t")); pintarTodo(); irA("panorama"); }
-  catch (e) { alert(e.message); }
+/* ============================================================
+   13. EVENTOS
+   ============================================================ */
+$$("#nav button").forEach((b) => b.addEventListener("click", () => irA(b.dataset.v)));
+$("#btnRail").addEventListener("click", () => document.body.classList.toggle("rail-abierto"));
+$("#btnAvisos").addEventListener("click", () => irA("datos"));
+
+$$("#mandoAlcance button").forEach((b) => b.addEventListener("click", () => {
+  ui.alcance = b.dataset.alcance;
+  $$("#mandoAlcance button").forEach((o) => o.setAttribute("aria-pressed", o === b ? "true" : "false"));
+  ui.sel = null; pintarMapa();
+}));
+$$("#mandoMedida button").forEach((b) => b.addEventListener("click", () => {
+  ui.medida = b.dataset.medida;
+  $$("#mandoMedida button").forEach((o) => o.setAttribute("aria-pressed", o === b ? "true" : "false"));
+  pintarMapa();
+}));
+let redib;
+window.addEventListener("resize", () => {
+  clearTimeout(redib);
+  redib = setTimeout(() => { if (ui.vista === "mapa") pintarMapa(); }, 160);
 });
 
-/* --- fecha de corte --- */
 $("#fCorte").addEventListener("change", (e) => {
   const d = fecha(e.target.value);
   if (d) { estado.corte = d; pintarTodo(); }
 });
-$("#btnHoy").addEventListener("click", () => {
-  const d = new Date(); d.setHours(0, 0, 0, 0);
-  estado.corte = d; $("#fCorte").value = fechaISO(d); pintarTodo();
+$("#btnExportar").addEventListener("click", () => {
+  if (ui.vista === "lineas") exportarLineas();
+  else if (ui.vista === "evolucion") exportarHistorico();
+  else exportarResumen();
+});
+$("#btnGuardarCorte").addEventListener("click", () => {
+  const hist = leer(LS.hist, []), iso = fechaISO(estado.corte);
+  const corte = { fecha: iso, areas: estado.resumen.map((r) => ({ area: r.area, lineas: r.lineas,
+    valorizado: +r.valorizado.toFixed(2), fueraLineas: r.fueraLineas,
+    fueraValorizado: +r.fueraValorizado.toFixed(2), diasMax: r.diasMax })) };
+  const i = hist.findIndex((c) => c.fecha === iso);
+  if (i > -1) { if (!confirm("Ya hay un corte del " + fechaAR(estado.corte) + ". Lo reemplazo?")) return; hist[i] = corte; }
+  else hist.push(corte);
+  hist.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (!guardar(LS.hist, hist)) { alert("No se pudo guardar: el almacenamiento esta lleno."); return; }
+  pintarEvolucion();
+  irA("evolucion");
 });
 
-/* --- ABM delegado --- */
-$("#tablaAreas").addEventListener("input", (e) => {
-  const i = e.target.dataset.ar;
-  if (i == null) return;
-  const c = e.target.dataset.campo;
-  estado.areas[i][c] = c === "target" ? (e.target.value === "" ? null : num(e.target.value)) : e.target.value;
-  guardar(LS.areas, estado.areas);
-  calcular(); pintarTablero(); pintarKpis(); pintarPanorama(); pintarAvisos();
+/* --- lineas --- */
+["#fArea","#fResp","#fBanda","#fBuscar","#fSoloProblemas"].forEach((s) =>
+  $(s).addEventListener("input", pintarLineas));
+$("#btnLimpiar").addEventListener("click", () => {
+  ["#fArea","#fResp","#fBanda"].forEach((s) => $(s).value = "");
+  $("#fBuscar").value = ""; $("#fSoloProblemas").checked = false;
+  pintarLineas();
 });
-$("#tablaAreas").addEventListener("click", (e) => {
-  const i = e.target.dataset.delar;
-  if (i == null) return;
-  if (!confirm("Eliminar el area " + estado.areas[i].area + " del reporte?\n\nLas ubicaciones siguen cargadas: el area va a aparecer como 'sin configurar'.")) return;
-  estado.areas.splice(i, 1);
-  guardar(LS.areas, estado.areas);
-  pintarTodo();
-});
-$("#btnAddArea").addEventListener("click", () => {
-  const a = $("#nArea").value.trim();
-  if (!a) { $("#errArea").textContent = "Pone el codigo de area."; return; }
-  if (estado.areas.some((x) => String(x.area).trim() === a)) { $("#errArea").textContent = "Esa area ya existe."; return; }
-  estado.areas.push({
-    area: a, responsable: $("#nResp").value.trim(), proceso: $("#nProceso").value,
-    target: num($("#nTargetA").value), descripcion: $("#nDescA").value.trim()
-  });
-  guardar(LS.areas, estado.areas);
-  $("#nArea").value = $("#nResp").value = $("#nDescA").value = "";
-  $("#errArea").textContent = "";
-  pintarTodo();
-});
-
-$("#tablaUbic").addEventListener("input", (e) => {
-  const i = e.target.dataset.ub;
-  if (i == null) return;
-  const c = e.target.dataset.campo;
-  estado.ubicaciones[i][c] = c === "target" ? num(e.target.value) : e.target.value.trim();
-  guardar(LS.ubic, estado.ubicaciones);
-  calcular(); pintarTablero(); pintarKpis(); pintarPanorama(); pintarAvisos();
-});
-$("#tablaUbic").addEventListener("click", (e) => {
-  const i = e.target.dataset.delub;
-  if (i == null) return;
-  if (!confirm("Eliminar la ubicacion " + estado.ubicaciones[i].ubicacion + "?\n\nSu stock deja de contar en el aging.")) return;
-  estado.ubicaciones.splice(i, 1);
-  guardar(LS.ubic, estado.ubicaciones);
-  pintarTodo();
-});
-$("#btnAddUbic").addEventListener("click", () => {
-  const u = $("#nUbic").value.trim(), a = $("#nUbicArea").value.trim();
-  if (!u) { $("#errUbic").textContent = "Pone el nombre de la ubicacion."; return; }
-  if (!a) { $("#errUbic").textContent = "Pone el area a la que pertenece."; return; }
-  if (estado.ubicaciones.some((x) => normUbic(x.ubicacion) === normUbic(u))) { $("#errUbic").textContent = "Esa ubicacion ya esta cargada."; return; }
-  estado.ubicaciones.push({ ubicacion: u, area: a, target: num($("#nTargetU").value) });
-  guardar(LS.ubic, estado.ubicaciones);
-  $("#nUbic").value = "";
-  $("#errUbic").textContent = "";
-  pintarTodo();
-});
-$("#btnBorrarUbic").addEventListener("click", () => {
-  if (!confirm("Vaciar la lista completa de ubicaciones criticas?\n\nSin ubicaciones no se calcula nada.")) return;
-  estado.ubicaciones = []; guardar(LS.ubic, []); pintarTodo();
-});
-["#fUbicArea","#fUbicBuscar"].forEach((s) => $(s).addEventListener("input", pintarUbicaciones));
-$("#btnCsvUbic").addEventListener("click", () => {
-  const f = [["Ubicacion","Area","Target"]];
-  estado.ubicaciones.forEach((u) => f.push([u.ubicacion, u.area, u.target]));
-  bajarCSV("ubicaciones_criticas.csv", f);
-});
-
-/* --- maestro --- */
-$("#tablaMaestro").addEventListener("change", (e) => {
-  const sku = e.target.dataset.sku;
-  if (sku == null) return;
-  const v = e.target.value.trim();
-  const pares = estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase());
-  if (v !== "") pares.push([sku, num(v)]);
-  delete estado.maestroAmbiguos[sku.toUpperCase()];
-  indexarMaestro(pares);
-  pintarTodo();
-});
-$("#tablaMaestro").addEventListener("click", (e) => {
-  const sku = e.target.dataset.delsku;
-  if (sku == null) return;
-  indexarMaestro(estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase()));
-  pintarTodo();
-});
-$("#btnAddSku").addEventListener("click", () => {
-  const s = $("#nSku").value.trim(), c = $("#nCosto").value.trim();
-  if (!s) { $("#errSku").textContent = "Pone el SKU."; return; }
-  if (!c) { $("#errSku").textContent = "Pone el costo unitario."; return; }
-  const pares = estado.maestroCrudo.filter(([x]) => String(x).trim().toUpperCase() !== s.toUpperCase());
-  pares.push([s, num(c)]);
-  delete estado.maestroAmbiguos[s.toUpperCase()];
-  indexarMaestro(pares);
-  $("#nSku").value = $("#nCosto").value = "";
-  $("#errSku").textContent = "";
-  pintarTodo();
-});
-$("#btnBorrarMaestro").addEventListener("click", () => {
-  if (!confirm("Vaciar el maestro de costos?\n\nTodo el valorizado va a dar $0 hasta que cargues uno nuevo.")) return;
-  indexarMaestro([]); pintarTodo();
-});
-["#fSku","#fSoloUsados","#fSoloSinCosto","#fSoloAmbiguos"].forEach((s) => $(s).addEventListener("input", pintarMaestro));
-$("#btnCsvMaestro").addEventListener("click", () => {
-  const f = [["SKU","Costo"]];
-  estado.maestroCrudo.forEach(([s, c]) => f.push([s, dec(c)]));
-  bajarCSV("maestro_valorizado.csv", f);
-});
-
-/* --- selector del grafico de bandas --- */
-$$("#panelBandas .selector button").forEach((b) => b.addEventListener("click", () => {
-  modoBandas = b.dataset.modo;
-  $$("#panelBandas .selector button").forEach((o) =>
-    o.setAttribute("aria-pressed", o === b ? "true" : "false"));
-  pintarBandas();
-}));
-
-/* --- ajustes de fecha --- */
-$("#tablaDetalle").addEventListener("change", (e) => {
+$("#tablaLineas").addEventListener("change", (e) => {
   const clave = e.target.dataset.clave;
   if (clave == null) return;
-  const v = e.target.value;
-  const l = estado.lineas.find((x) => x.clave === clave);
-  if (!v) delete estado.ajustes[clave];
-  else estado.ajustes[clave] = {
-    fecha: v,
-    ubicacion: l ? l.ubicacion : "",
-    sku: l ? l.sku : "",
-    creado: fechaISO(new Date())
-  };
-  guardar(LS.ajustes, estado.ajustes);
-  pintarTodo();
+  aplicarAjuste(clave, e.target.value, estado.lineas.find((x) => x.clave === clave));
+  if (ui.vista === "mapa") pintarMapa();
 });
 $("#tablaAjustes").addEventListener("click", (e) => {
   const k = e.target.dataset.delaj;
   if (k == null) return;
-  delete estado.ajustes[k];
-  guardar(LS.ajustes, estado.ajustes);
-  pintarTodo();
+  delete estado.ajustes[k]; guardar(LS.ajustes, estado.ajustes);
+  calcular(); pintarTodo();
 });
 $("#btnBorrarAjustes").addEventListener("click", () => {
-  if (!confirm("Borrar las " + Object.keys(estado.ajustes).length + " fechas ajustadas?\n\nTodas vuelven a la fecha del archivo.")) return;
-  estado.ajustes = {}; guardar(LS.ajustes, {}); pintarTodo();
+  if (!confirm("Borrar las " + Object.keys(estado.ajustes).length + " fechas ajustadas?")) return;
+  estado.ajustes = {}; guardar(LS.ajustes, {}); calcular(); pintarTodo();
 });
 $("#btnLimpiarHuerfanos").addEventListener("click", () => {
   const h = estado.diag.ajustesHuerfanos || [];
   if (!h.length) { alert("Todos los ajustes coinciden con alguna linea."); return; }
-  if (!confirm("Borrar " + h.length + " ajustes que no coinciden con ninguna linea de esta base?")) return;
+  if (!confirm("Borrar " + h.length + " ajustes que no coinciden con ninguna linea?")) return;
   h.forEach((k) => delete estado.ajustes[k]);
-  guardar(LS.ajustes, estado.ajustes); pintarTodo();
+  guardar(LS.ajustes, estado.ajustes); calcular(); pintarTodo();
 });
 $("#btnCsvAjustes").addEventListener("click", () => {
   const f = [["Ubicacion","SKU","Fecha aplicada","Ajustado el","Clave"]];
@@ -2426,96 +2296,172 @@ $("#btnCsvAjustes").addEventListener("click", () => {
   bajarCSV("aging_fechas_ajustadas.csv", f);
 });
 
-/* --- detalle --- */
-["#fArea","#fResp","#fProceso","#fBanda","#fBuscar","#fSoloFuera","#fSoloProblemas"]
-  .forEach((s) => $(s).addEventListener("input", pintarDetalle));
-$("#btnLimpiar").addEventListener("click", () => {
-  ["#fArea","#fResp","#fProceso","#fBanda"].forEach((s) => $(s).value = "");
-  $("#fBuscar").value = "";
-  $("#fSoloFuera").checked = $("#fSoloProblemas").checked = false;
-  pintarDetalle();
+/* --- evolucion --- */
+$("#hMetrica").addEventListener("change", () => pintarHistorico(leer(LS.hist, [])));
+$("#btnCsvHist").addEventListener("click", exportarHistorico);
+$("#btnBorrarHist").addEventListener("click", () => {
+  if (!confirm("Vaciar todo el historico de cortes?")) return;
+  guardar(LS.hist, []); pintarEvolucion();
 });
-$("#btnCsvDetalle").addEventListener("click", exportarDetalle);
-$("#btnCsvTablero").addEventListener("click", exportarTablero);
-$("#btnImprimir").addEventListener("click", () => window.print());
-
-/* --- historico --- */
-$("#btnGuardarCorte").addEventListener("click", () => {
-  const hist = leer(LS.hist, []);
-  const iso = fechaISO(estado.corte);
-  const corte = {
-    fecha: iso,
-    areas: estado.resumen.map((r) => ({
-      area: r.area, lineas: r.lineas, valorizado: +r.valorizado.toFixed(2),
-      fueraLineas: r.fueraLineas, fueraValorizado: +r.fueraValorizado.toFixed(2), diasMax: r.diasMax
-    }))
-  };
-  const i = hist.findIndex((c) => c.fecha === iso);
-  if (i > -1) {
-    if (!confirm("Ya hay un corte guardado del " + fechaAR(estado.corte) + ". Lo reemplazo?")) return;
-    hist[i] = corte;
-  } else hist.push(corte);
-  hist.sort((a, b) => a.fecha.localeCompare(b.fecha));
-  if (!guardar(LS.hist, hist)) { alert("No se pudo guardar: el almacenamiento del navegador esta lleno."); return; }
-  pintarHistorico();
-  pintarTendencia();
-  irA(hist.length > 1 ? "panorama" : "historico");
-});
-$("#hMetrica").addEventListener("change", pintarHistorico);
 $("#tablaHist").addEventListener("click", (e) => {
   const i = e.target.dataset.delcorte;
   if (i == null) return;
   const hist = leer(LS.hist, []);
   if (!confirm("Borrar el corte del " + fechaCorta(new Date(hist[i].fecha + "T00:00:00")) + "?")) return;
-  hist.splice(i, 1); guardar(LS.hist, hist); pintarHistorico();
-});
-$("#btnBorrarHist").addEventListener("click", () => {
-  if (!confirm("Vaciar todo el historico de cortes?")) return;
-  guardar(LS.hist, []); pintarHistorico();
-});
-$("#btnCsvHist").addEventListener("click", () => {
-  const hist = leer(LS.hist, []);
-  const met = ["lineas","valorizado","fueraLineas","fueraValorizado","diasMax"];
-  const f = [["Area","Corte","Lineas","Valorizado","Lineas fuera","Valorizado fuera","Dias max"]];
-  hist.forEach((c) => c.areas.forEach((a) =>
-    f.push([a.area, c.fecha].concat(met.map((m) => dec(a[m]))))));
-  bajarCSV("aging_historico.csv", f);
+  hist.splice(i, 1); guardar(LS.hist, hist); pintarEvolucion();
 });
 
+/* --- datos --- */
+$$("[data-abre]").forEach((b) => b.addEventListener("click", () => $("#" + b.dataset.abre).click()));
+$("#inLibro").addEventListener("change", (e) => { if (e.target.files[0]) cargarLibro(e.target.files[0]); e.target.value = ""; });
+$("#inMaestro").addEventListener("change", (e) => { if (e.target.files[0]) cargarMaestro(e.target.files[0]); e.target.value = ""; });
+[["#zonaLibro", cargarLibro], ["#zonaMaestro", cargarMaestro]].forEach(([sel, fn]) => {
+  const z = $(sel);
+  ["dragenter","dragover"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add("encima"); }));
+  ["dragleave","drop"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.remove("encima"); }));
+  z.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) fn(f); });
+});
+$("#mHoja").addEventListener("change", () => poblarColumnas(+$("#mSku").value, +$("#mCosto").value));
+$("#btnAplicarMaestro").addEventListener("click", () => aplicarMaestro());
+$("#btnPegar").addEventListener("click", () => {
+  const t = $("#pegado").value.trim();
+  if (!t) return;
+  try { ingestarStock(parseDelimitado(t, "\t")); ui.ruta = []; pintarTodo(); irA("mapa"); }
+  catch (e) { alert(e.message); }
+});
+
+/* --- areas y ubicaciones --- */
+$("#tablaAreas").addEventListener("input", (e) => {
+  const i = e.target.dataset.ar;
+  if (i == null) return;
+  const c = e.target.dataset.campo;
+  estado.areas[i][c] = c === "target" ? (e.target.value === "" ? null : num(e.target.value)) : e.target.value;
+  guardar(LS.areas, estado.areas);
+  calcular(); pintarCabecera(); pintarAvisos(); if (ui.vista === "mapa") pintarMapa();
+});
+$("#tablaAreas").addEventListener("click", (e) => {
+  const i = e.target.dataset.delar;
+  if (i == null) return;
+  if (!confirm("Eliminar el area " + estado.areas[i].area + "?")) return;
+  estado.areas.splice(i, 1); guardar(LS.areas, estado.areas); pintarTodo();
+});
+$("#btnAddArea").addEventListener("click", () => {
+  const a = $("#nArea").value.trim();
+  if (!a) { $("#errArea").textContent = "Pone el codigo de area."; return; }
+  if (estado.areas.some((x) => String(x.area).trim() === a)) { $("#errArea").textContent = "Esa area ya existe."; return; }
+  estado.areas.push({ area: a, responsable: $("#nResp").value.trim(), proceso: $("#nProceso").value,
+    target: num($("#nTargetA").value), descripcion: "" });
+  guardar(LS.areas, estado.areas);
+  $("#nArea").value = $("#nResp").value = ""; $("#errArea").textContent = "";
+  pintarTodo();
+});
+$("#tablaUbic").addEventListener("input", (e) => {
+  const i = e.target.dataset.ub;
+  if (i == null) return;
+  const c = e.target.dataset.campo;
+  estado.ubicaciones[i][c] = c === "target" ? num(e.target.value) : e.target.value.trim();
+  guardar(LS.ubic, estado.ubicaciones);
+  calcular(); pintarCabecera(); pintarAvisos(); if (ui.vista === "mapa") pintarMapa();
+});
+$("#tablaUbic").addEventListener("click", (e) => {
+  const i = e.target.dataset.delub;
+  if (i == null) return;
+  if (!confirm("Eliminar " + estado.ubicaciones[i].ubicacion + "?\n\nSu stock deja de contar.")) return;
+  estado.ubicaciones.splice(i, 1); guardar(LS.ubic, estado.ubicaciones); pintarTodo();
+});
+$("#btnAddUbic").addEventListener("click", () => {
+  const u = $("#nUbic").value.trim(), a = $("#nUbicArea").value.trim();
+  if (!u) { $("#errUbic").textContent = "Pone el nombre de la ubicacion."; return; }
+  if (!a) { $("#errUbic").textContent = "Pone el area."; return; }
+  if (estado.ubicaciones.some((x) => normUbic(x.ubicacion) === normUbic(u))) { $("#errUbic").textContent = "Ya esta cargada."; return; }
+  estado.ubicaciones.push({ ubicacion: u, area: a, target: num($("#nTargetU").value) });
+  guardar(LS.ubic, estado.ubicaciones);
+  $("#nUbic").value = ""; $("#errUbic").textContent = "";
+  pintarTodo();
+});
+["#fUbicArea","#fUbicBuscar"].forEach((s) => $(s).addEventListener("input", pintarUbicaciones));
+$("#btnCsvUbic").addEventListener("click", () => {
+  const f = [["Ubicacion","Area","Target"]];
+  estado.ubicaciones.forEach((u) => f.push([u.ubicacion, u.area, u.target]));
+  bajarCSV("ubicaciones_criticas.csv", f);
+});
+$("#btnBorrarUbic").addEventListener("click", () => {
+  if (!confirm("Vaciar la lista de ubicaciones criticas?\n\nSin ubicaciones no se calcula nada.")) return;
+  estado.ubicaciones = []; guardar(LS.ubic, []); pintarTodo();
+});
 function sembrarConfig(){
   estado.ubicaciones = CONFIG_INICIAL.ubicaciones.map(([u, a, t]) => ({ ubicacion: u, area: a, target: t }));
-  estado.areas       = CONFIG_INICIAL.areas.map(([a, r, p, t, d]) =>
+  estado.areas = CONFIG_INICIAL.areas.map(([a, r, p, t, d]) =>
     ({ area: a, responsable: r, proceso: p, target: t, descripcion: d }));
   guardar(LS.ubic, estado.ubicaciones);
   guardar(LS.areas, estado.areas);
 }
 $("#btnRestaurar").addEventListener("click", () => {
   if (!confirm("Restaurar las " + CONFIG_INICIAL.ubicaciones.length + " ubicaciones y " +
-               CONFIG_INICIAL.areas.length + " areas originales?\n\nSe pierden los cambios que hayas hecho.")) return;
-  sembrarConfig();
+    CONFIG_INICIAL.areas.length + " areas originales?\n\nSe pierden los cambios que hayas hecho.")) return;
+  sembrarConfig(); pintarTodo();
+});
+
+/* --- maestro --- */
+["#fSku","#fSoloUsados","#fSoloSinCosto","#fSoloAmbiguos"].forEach((s) =>
+  $(s).addEventListener("input", pintarMaestro));
+$("#tablaMaestro").addEventListener("change", (e) => {
+  const sku = e.target.dataset.sku;
+  if (sku == null) return;
+  const v = e.target.value.trim();
+  const pares = estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase());
+  if (v !== "") pares.push([sku, num(v)]);
+  delete estado.maestroAmbiguos[sku.toUpperCase()];
+  indexarMaestro(pares); pintarTodo();
+});
+$("#tablaMaestro").addEventListener("click", (e) => {
+  const sku = e.target.dataset.delsku;
+  if (sku == null) return;
+  indexarMaestro(estado.maestroCrudo.filter(([s]) => String(s).trim().toUpperCase() !== sku.toUpperCase()));
   pintarTodo();
+});
+$("#btnAddSku").addEventListener("click", () => {
+  const s = $("#nSku").value.trim(), c = $("#nCosto").value.trim();
+  if (!s) { $("#errSku").textContent = "Pone el SKU."; return; }
+  if (!c) { $("#errSku").textContent = "Pone el precio."; return; }
+  const pares = estado.maestroCrudo.filter(([x]) => String(x).trim().toUpperCase() !== s.toUpperCase());
+  pares.push([s, num(c)]);
+  delete estado.maestroAmbiguos[s.toUpperCase()];
+  indexarMaestro(pares);
+  $("#nSku").value = $("#nCosto").value = ""; $("#errSku").textContent = "";
+  pintarTodo();
+});
+$("#btnCsvMaestro").addEventListener("click", () => {
+  const f = [["SKU","Precio"]];
+  estado.maestroCrudo.forEach(([s, c]) => f.push([s, dec(c)]));
+  bajarCSV("maestro_valorizado.csv", f);
+});
+$("#btnBorrarMaestro").addEventListener("click", () => {
+  if (!confirm("Vaciar el maestro?\n\nTodo el valorizado va a dar $0.")) return;
+  indexarMaestro([]); pintarTodo();
 });
 
 /* ============================================================
-   9. ARRANQUE
+   14. ARRANQUE
    ============================================================ */
 (function init(){
   estado.ubicaciones = leer(LS.ubic, []);
-  estado.areas       = leer(LS.areas, []);
+  estado.areas = leer(LS.areas, []);
+  estado.ajustes = leer(LS.ajustes, {});
+  estado.maestroAmbiguos = leer(LS.ambiguos, {});
   if (!estado.ubicaciones.length && !estado.areas.length && !leer(LS.sembrado, false)) {
     sembrarConfig();
     guardar(LS.sembrado, true);
   }
-  estado.ajustes    = leer(LS.ajustes, {});
-  estado.maestroAmbiguos = leer(LS.ambiguos, {});
   const m = leer(LS.maestro, []);
   if (m.length) indexarMaestro(m);
   $("#fCorte").value = fechaISO(estado.corte);
-  if (estado.ubicaciones.length) estadoZona("#zonaLibro", "#estLibro", "", "Config guardada: " + estado.ubicaciones.length + " ubicaciones. Falta el stock del dia.");
-  if (m.length) estadoZona("#zonaMaestro", "#estMaestro", "listo", "Guardado en este navegador<br>" + entero(m.length) + " SKU valorizados");
+  if (m.length) estadoZona("#zonaMaestro", "#estMaestro", "listo",
+    "Guardado en este navegador<br>" + entero(m.length) + " SKU valorizados");
   pintarTodo();
-  irA(estado.stock.length ? "panorama" : "datos");
+  irA(estado.lineas.length ? "mapa" : "datos");
 })();
+
 </script>
 </body>
 </html>
