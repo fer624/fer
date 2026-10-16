@@ -189,8 +189,8 @@ label.campo{display:block;font-size:11.5px;color:var(--t2);font-weight:600;margi
 .cinta .n.ok{color:var(--ok)}
 .cinta .r{font-size:11.5px;color:var(--t2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* ---------- mapa ---------- */
-.zona-mapa{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--fondo)}
+/* ---------- panorama: barras agrupadas ---------- */
+.zona-tabla{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
 .mandos{
   display:flex;align-items:center;gap:12px;padding:12px 18px;flex-wrap:wrap;
   border-bottom:1px solid var(--borde);background:var(--panel);
@@ -198,20 +198,63 @@ label.campo{display:block;font-size:11.5px;color:var(--t2);font-weight:600;margi
 .leyenda{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--t2);margin-left:auto}
 .leyenda span{display:flex;align-items:center;gap:5px}
 .leyenda i{width:10px;height:10px;border-radius:3px;flex:none}
-#mapa{flex:1;min-height:0;position:relative;padding:14px}
-#mapaSvg{width:100%;height:100%;display:block}
-.celda-mapa{cursor:pointer}
-.celda-mapa rect{transition:filter .13s, stroke .13s}
-.celda-mapa:hover rect{filter:brightness(1.07)}
-.celda-mapa.sel rect{stroke:var(--t1);stroke-width:2.5}
-.celda-mapa text{pointer-events:none;font-family:var(--fuente)}
-.celda-mapa .tit{font-size:13px;font-weight:650;letter-spacing:-.01em}
-.celda-mapa .cif{font-size:11.5px;font-variant-numeric:tabular-nums;opacity:.9}
-.celda-mapa .mini{font-size:10.5px;opacity:.8}
-@keyframes entrar{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
-#mapaSvg > g{animation:entrar .22s ease-out;transform-origin:center}
+#grupos{flex:1;overflow-y:auto;padding:16px 20px 40px;min-height:0}
 
-/* ---------- panel de contexto ---------- */
+.regla{
+  display:grid;grid-template-columns:var(--cols);align-items:center;gap:0 14px;
+  position:sticky;top:0;z-index:3;background:var(--fondo);
+  padding:4px 0 7px;margin-bottom:6px;
+}
+.regla .ticks{position:relative;height:15px}
+.regla .ticks span{
+  position:absolute;top:0;font-size:10.5px;color:var(--t3);
+  font-variant-numeric:tabular-nums;transform:translateX(-50%);white-space:nowrap;
+}
+.regla .ticks span:first-child{transform:none}
+.regla .ticks span:last-child{transform:translateX(-100%)}
+.regla .rot{font-size:10.5px;color:var(--t3);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+
+:root{--cols:216px 1fr 104px 132px}
+.bloque{
+  background:var(--panel);border:1px solid var(--borde);border-radius:var(--r-g);
+  box-shadow:var(--sombra);margin-bottom:14px;overflow:hidden;break-inside:avoid;
+}
+.bloque .cab{
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding:12px 16px;border-bottom:1px solid var(--borde);background:var(--panel-2);
+}
+.bloque .cab .cod{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.bloque .cab .meta{font-size:12px;color:var(--t2)}
+.bloque .cab .der{margin-left:auto;text-align:right;display:flex;align-items:baseline;gap:12px}
+.bloque .cab .plata{font-size:15px;font-weight:680;font-variant-numeric:tabular-nums;color:var(--mal)}
+.bloque .cab .plata.ok{color:var(--ok)}
+.bloque .cuerpo{padding:8px 16px 12px}
+
+.fila{
+  display:grid;grid-template-columns:var(--cols);align-items:center;gap:0 14px;
+  width:100%;border:0;background:transparent;text-align:left;
+  padding:4px 6px;border-radius:8px;cursor:pointer;transition:background .12s;
+  font:inherit;color:inherit;
+}
+.fila:hover{background:var(--panel-2)}
+.fila.sel{background:var(--ac-suave);box-shadow:inset 0 0 0 1px var(--ac-borde)}
+.fila .nom{
+  font-size:12.5px;font-family:var(--mono);color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.fila .pista{height:14px;position:relative}
+.fila .barra{display:flex;height:14px;gap:2px;min-width:3px}
+.fila .barra i{display:block;height:100%}
+.fila .barra i:last-child{border-radius:0 4px 4px 0}
+.fila .barra i:first-child{border-radius:0}
+.fila .cif{font-size:12.5px;font-weight:620;text-align:right;font-variant-numeric:tabular-nums}
+.fila .aux{font-size:11.5px;color:var(--t2);font-variant-numeric:tabular-nums}
+.fila .aux b{color:var(--t1)}
+
+/* encabezado que solo sale al imprimir */
+.solo-papel{display:none}
+
+/* ---------- panel de contexto ---------- *//* ---------- panel de contexto ---------- */
 .ctx{
   width:var(--ctx);flex:none;border-left:1px solid var(--borde);
   background:var(--panel);display:flex;flex-direction:column;overflow:hidden;
@@ -325,6 +368,29 @@ input.fecha-ed{
 input.fecha-ed:hover{border-color:var(--borde-fuerte);background:var(--panel)}
 input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#6b4a00;font-weight:650}
 
+@media print{
+  @page{size:A4 landscape;margin:12mm}
+  :root{--cols:200px 1fr 96px 120px}
+  html,body{height:auto;overflow:visible;background:#fff;font-size:10.5px}
+  body{display:block}
+  .rail,.barra-ctx,.mandos .grupo-btn,.ctx,#tip,.acciones,.filtros{display:none !important}
+  .obra{height:auto;overflow:visible;display:block}
+  .lienzo,.lienzo.pleno{height:auto;overflow:visible;display:block;padding:0}
+  .zona-tabla{display:block;overflow:visible}
+  .mandos{border:0;padding:0 0 8px;background:none}
+  .leyenda{margin-left:0;font-size:9.5px}
+  #grupos{overflow:visible;padding:0;height:auto}
+  .regla{position:static;background:none}
+  .bloque{box-shadow:none;border-color:#ccc;margin-bottom:9px;break-inside:avoid;page-break-inside:avoid}
+  .bloque .cab{background:#f4f5f7}
+  .fila{padding:2px 4px}
+  .fila .barra i,.bloque .cab,.leyenda i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .solo-papel{display:block;margin-bottom:12px;border-bottom:2px solid #222;padding-bottom:8px}
+  .solo-papel h1{font-size:17px;margin:0}
+  .solo-papel .linea{display:flex;gap:18px;font-size:11px;color:#444;margin-top:5px;flex-wrap:wrap}
+  .solo-papel .linea b{color:#000}
+}
+
 @media (max-width:1180px){
   :root{--ctx:290px}
 }
@@ -354,9 +420,9 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
   </div>
 
   <nav class="nav" id="nav">
-    <button data-v="mapa" aria-current="true">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8v8H3zM13 3h8v4h-8zM13 11h8v10h-8zM3 15h8v6H3z"/></svg>
-      Mapa
+    <button data-v="panorama" aria-current="true">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h13M4 11h8M4 16h16M4 21h6"/></svg>
+      Panorama
     </button>
     <button data-v="lineas">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
@@ -398,14 +464,15 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
     <div class="migas" id="migas"></div>
     <div class="derecha">
       <button class="btn suave chico" id="btnAvisos" hidden></button>
+      <button class="btn suave" id="btnReporte" disabled>Reporte PDF</button>
       <button class="btn suave" id="btnExportar" disabled>Exportar</button>
       <button class="btn" id="btnGuardarCorte" disabled>Guardar corte</button>
     </div>
   </header>
 
-  <!-- ============ MAPA ============ -->
-  <div class="lienzo pleno" id="v-mapa">
-    <div class="zona-mapa">
+  <!-- ============ PANORAMA ============ -->
+  <div class="lienzo pleno" id="v-panorama">
+    <div class="zona-tabla">
       <div class="mandos">
         <div class="grupo-btn" id="mandoAlcance" role="group" aria-label="Que mostrar">
           <button type="button" data-alcance="fuera" aria-pressed="true">Solo lo frenado</button>
@@ -417,7 +484,9 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
         </div>
         <div class="leyenda" id="leyenda"></div>
       </div>
-      <div id="mapa"><svg id="mapaSvg" role="img" aria-label="Mapa de superficie del stock frenado"></svg></div>
+      <div id="grupos">
+        <div class="solo-papel" id="cabPapel"></div>
+      </div>
     </div>
     <aside class="ctx" id="ctx"></aside>
   </div>
@@ -1280,7 +1349,7 @@ function banda(l){
 /* ============================================================
    7. ESTADO DE LA INTERFAZ
    ============================================================ */
-const ui = { vista: "mapa", ruta: [], alcance: "fuera", medida: "valorizado", sel: null };
+const ui = { vista: "panorama", alcance: "fuera", medida: "valorizado", sel: null };
 
 /* ---------- globo ---------- */
 function tip(e, html){
@@ -1299,344 +1368,254 @@ function tipOff(){ $("#tip").style.opacity = "0"; }
 /* ============================================================
    8. NAVEGACION
    ============================================================ */
-const VISTAS = ["mapa","lineas","evolucion","datos","ubicaciones","maestro"];
+const VISTAS = ["panorama","lineas","evolucion","datos","ubicaciones","maestro"];
 function irA(v){
   ui.vista = v;
   VISTAS.forEach((x) => { $("#v-" + x).hidden = x !== v; });
   $$("#nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.v === v ? "true" : "false"));
   document.body.classList.remove("rail-abierto");
   pintarMigas();
-  if (v === "mapa") pintarMapa();
+  if (v === "panorama") pintarPanorama();
 }
 function pintarMigas(){
   const m = $("#migas");
-  if (ui.vista !== "mapa") {
-    const rot = { lineas:"Lineas", evolucion:"Evolucion", datos:"Datos",
-                  ubicaciones:"Ubicaciones criticas", maestro:"Maestro valorizado" }[ui.vista];
-    m.innerHTML = '<span class="hoy">' + rot + "</span>";
-    return;
+  const rot = { panorama:"Panorama", lineas:"Lineas", evolucion:"Evolucion", datos:"Datos",
+                ubicaciones:"Ubicaciones criticas", maestro:"Maestro valorizado" }[ui.vista];
+  let h = '<span class="hoy">' + rot + "</span>";
+  if (ui.vista === "panorama" && ui.sel) {
+    const s = ui.sel;
+    const nom = s.clase === "linea" ? "Linea" : s.clase === "area" ? s.area : s.ubic;
+    h += '<span class="sep">/</span><button id="migaLimpia">' + esc(nom) + " ✕</button>";
   }
-  let h = '<button data-nivel="0">Todo</button>';
-  ui.ruta.forEach((p, i) => {
-    h += '<span class="sep">/</span>';
-    h += i === ui.ruta.length - 1
-      ? '<span class="hoy">' + esc(p) + "</span>"
-      : '<button data-nivel="' + (i + 1) + '">' + esc(p) + "</button>";
-  });
-  if (!ui.ruta.length) h = '<span class="hoy">Todo</span>';
   m.innerHTML = h;
-  m.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-    ui.ruta = ui.ruta.slice(0, +b.dataset.nivel);
-    ui.sel = null;
-    pintarMapa();
-  }));
+  const b = $("#migaLimpia");
+  if (b) b.addEventListener("click", () => { ui.sel = null; marcarSel(); pintarCtx(); pintarMigas(); });
 }
 
 /* ============================================================
-   9. MAPA DE SUPERFICIE
+   9. PANORAMA — barras agrupadas por area y ubicacion
+   Es una tabla con barras, no un grafico suelto: con decenas de
+   ubicaciones cada fila necesita su cifra, y asi se imprime entero.
    ============================================================ */
-function lineasEnRuta(ruta){
-  return estado.lineas.filter((l) =>
-    (ruta.length < 1 || l.area === ruta[0]) &&
-    (ruta.length < 2 || normUbic(l.ubicacion) === normUbic(ruta[1])));
-}
-function nodosActuales(){
-  const todas = lineasEnRuta(ui.ruta);
-  const ls = ui.alcance === "todo" ? todas : todas.filter((l) => l.fuera);
-  const nivel = ui.ruta.length;
-  if (nivel >= 2) {
-    return ls.map((l) => {
-      const b = banda(l) == null ? 0 : banda(l);
-      const mz = [0,0,0,0], mv = [0,0,0,0];
-      mz[b] = 1; mv[b] = l.valorizado;
-      return { id: l.clave, nombre: (l.sku || "?").replace(/\.0+$/, ""),
-        sub: l.descripcion || "", hoja: true, linea: l,
-        lineas: 1, valorizado: l.valorizado, mezclaL: mz, mezclaV: mv,
-        score: b, max: b, fueraL: l.fuera ? 1 : 0, fueraV: l.fuera ? l.valorizado : 0,
-        diasMax: l.aging == null ? 0 : l.aging };
-    });
-  }
-  const claveDe = nivel === 0 ? (l) => l.area : (l) => l.ubicacion;
-  const m = new Map();
-  for (const l of ls) {
-    const k = claveDe(l);
-    if (!m.has(k)) m.set(k, { id: k, nombre: k, hoja: false, lineas: 0, valorizado: 0,
-      mezclaL: [0,0,0,0], mezclaV: [0,0,0,0], max: 0, fueraL: 0, fueraV: 0, diasMax: 0 });
-    const n = m.get(k);
+function datosPanorama(){
+  const soloFuera = ui.alcance === "fuera";
+  const porArea = new Map();
+  for (const l of estado.lineas) {
+    if (soloFuera && !l.fuera) continue;
+    if (!porArea.has(l.area)) porArea.set(l.area, { area: l.area, ubic: new Map(),
+      lineas: 0, valorizado: 0, fueraL: 0, fueraV: 0, diasMax: 0, mezclaL: [0,0,0,0], mezclaV: [0,0,0,0] });
+    const A = porArea.get(l.area);
+    if (!A.ubic.has(l.ubicacion)) A.ubic.set(l.ubicacion, { nombre: l.ubicacion,
+      lineas: 0, valorizado: 0, fueraL: 0, fueraV: 0, diasMax: 0, mezclaL: [0,0,0,0], mezclaV: [0,0,0,0] });
+    const U = A.ubic.get(l.ubicacion);
     const b = banda(l) == null ? 0 : banda(l);
-    n.lineas++; n.valorizado += l.valorizado;
-    n.mezclaL[b]++; n.mezclaV[b] += l.valorizado;
-    if (b > n.max) n.max = b;
-    if (l.fuera) { n.fueraL++; n.fueraV += l.valorizado; }
-    if (l.aging != null && l.aging > n.diasMax) n.diasMax = l.aging;
-  }
-  return Array.from(m.values()).map((n) => {
-    const peso = ui.medida === "lineas" ? n.mezclaL : n.mezclaV;
-    const tot = peso.reduce((a, x) => a + x, 0);
-    n.score = tot > 0 ? peso.reduce((a, x, i) => a + x * i, 0) / tot : 0;
-    return n;
-  });
-}
-const tamanoDe = (n) => ui.medida === "lineas" ? n.lineas : n.valorizado;
-/* El score es continuo, asi que interpolamos sobre la rampa en vez de redondear:
-   dos areas con mezclas distintas no pueden quedar del mismo color. */
-function mezclarHex(a, b, t){
-  const comp = (x) => [1, 3, 5].map((i) => parseInt(x.substr(i, 2), 16));
-  const A = comp(a), B = comp(b);
-  return "#" + A.map((v, i) =>
-    Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
-}
-function colorDeScore(sc){
-  const c = Math.max(0, Math.min(3, sc)), i = Math.floor(c);
-  return i >= 3 ? BANDAS[3].col : mezclarHex(BANDAS[i].col, BANDAS[i + 1].col, c - i);
-}
-function tintaSobre(hex){
-  const L = [1, 3, 5].map((i) => parseInt(hex.substr(i, 2), 16) / 255)
-    .map((c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-  return (0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2]) > 0.40 ? "#13202b" : "#ffffff";
-}
-const colorDe = (n) => BANDAS[Math.min(3, Math.max(0, Math.round(n.score)))];
-
-/* reparto cuadriculado: filas sobre el lado corto, proporciones parejas */
-function repartir(items, x, y, w, h){
-  const out = [];
-  const list = items.filter((d) => d.valor > 0).sort((a, b) => b.valor - a.valor);
-  let total = list.reduce((a, d) => a + d.valor, 0);
-  if (!list.length || total <= 0 || w <= 0 || h <= 0) return out;
-  let i = 0;
-  while (i < list.length && w > 0.5 && h > 0.5) {
-    const corto = Math.min(w, h);
-    const escala = (w * h) / total;
-    let fila = [], suma = 0, peor = Infinity, j = i;
-    while (j < list.length) {
-      const s = suma + list[j].valor;
-      const areas = fila.concat([list[j]]).map((d) => d.valor * escala);
-      const p = peorAspecto(areas, s * escala, corto);
-      if (p > peor) break;
-      peor = p; suma = s; fila.push(list[j]); j++;
+    for (const o of [A, U]) {
+      o.lineas++; o.valorizado += l.valorizado;
+      o.mezclaL[b]++; o.mezclaV[b] += l.valorizado;
+      if (l.fuera) { o.fueraL++; o.fueraV += l.valorizado; }
+      if (l.aging != null && l.aging > o.diasMax) o.diasMax = l.aging;
     }
-    const grosor = (suma * escala) / corto;
-    let off = 0;
-    for (const d of fila) {
-      const largo = (d.valor * escala) / grosor;
-      out.push(w >= h ? { d, x: x, y: y + off, w: grosor, h: largo }
-                      : { d, x: x + off, y: y, w: largo, h: grosor });
-      off += largo;
-    }
-    if (w >= h) { x += grosor; w -= grosor; } else { y += grosor; h -= grosor; }
-    total -= suma;
-    i = j;
   }
-  return out;
-}
-function peorAspecto(areas, sumaArea, corto){
-  const max = Math.max.apply(null, areas), min = Math.min.apply(null, areas);
-  if (!(sumaArea > 0) || !(min > 0)) return Infinity;
-  const s2 = sumaArea * sumaArea, c2 = corto * corto;
-  return Math.max((c2 * max) / s2, s2 / (c2 * min));
+  const cfg = new Map(estado.resumen.map((r) => [r.area, r]));
+  const tam = (o) => ui.medida === "lineas" ? o.lineas : o.valorizado;
+  return Array.from(porArea.values()).map((A) => {
+    const r = cfg.get(A.area) || {};
+    A.responsable = r.responsable || ""; A.proceso = r.proceso || ""; A.target = r.target;
+    A.totalLineas = r.lineas != null ? r.lineas : A.lineas;
+    A.ubicaciones = Array.from(A.ubic.values()).sort((x, y) => tam(y) - tam(x) || y.diasMax - x.diasMax);
+    return A;
+  }).sort((x, y) => tam(y) - tam(x) || y.diasMax - x.diasMax);
 }
 
-/* el estado vacio reemplaza el contenido del contenedor, asi que el <svg> puede
-   no existir cuando volvemos: lo recreamos si hace falta */
-function lienzoSvg(cont){
-  let svg = cont.querySelector("svg");
-  if (!svg) {
-    cont.innerHTML = "";
-    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.id = "mapaSvg";
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Mapa de superficie del stock frenado");
-    cont.appendChild(svg);
-  }
-  return svg;
-}
-function pintarMapa(){
-  pintarMigas();
+function pintarPanorama(){
   pintarLeyenda();
-  const cont = $("#mapa");
-  const W = Math.max(240, cont.clientWidth - 28);
-  const H = Math.max(200, cont.clientHeight - 28);
-
+  const cont = $("#grupos");
+  const papel = '<div class="solo-papel" id="cabPapel">' + cabeceraPapel() + "</div>";
   if (!estado.lineas.length) {
-    cont.innerHTML = '<div class="vacio"><div class="icono">◳</div>' +
-      "<h3>Todavia no hay datos</h3><p>Carga el <b>Base_Aging</b> del lunes en la solapa Datos " +
-      "y el mapa se arma solo.</p>" +
+    cont.innerHTML = papel + '<div class="vacio"><div class="icono">◱</div>' +
+      "<h3>Todavia no hay datos</h3><p>Carga el <b>Base_Aging</b> del lunes en Datos " +
+      "y el panorama se arma solo.</p>" +
       '<div class="acciones" style="justify-content:center"><button class="btn" id="irDatos">Ir a Datos</button></div></div>';
     $("#irDatos").addEventListener("click", () => irA("datos"));
     pintarCtx();
     return;
   }
-  const nodos = nodosActuales();
-  if (!nodos.length) {
-    cont.innerHTML = '<div class="vacio"><div class="icono">✓</div>' +
-      "<h3>Nada frenado por aca</h3><p>Todas las lineas de este nivel estan dentro de su target. " +
+  const datos = datosPanorama();
+  if (!datos.length) {
+    cont.innerHTML = papel + '<div class="vacio"><div class="icono">✓</div>' +
+      "<h3>Nada frenado</h3><p>Todas las lineas estan dentro de su target. " +
       'Proba con <b>Todo el stock</b> para ver igual lo que hay.</p></div>';
     pintarCtx();
     return;
   }
-  const svg = lienzoSvg(cont);
-  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  /* Un nodo muy chico contra el total daria menos de un pixel y se perderia de vista.
-     Le ponemos un piso para que siempre se vea: la superficie queda exagerada, pero la
-     cifra que se lee adentro y en el globo es la real. Nada desaparece del mapa. */
-  const crudos = nodos.map((n) => ({ valor: Math.max(tamanoDe(n), 0.0001), n }));
-  const totalV = crudos.reduce((a, x) => a + x.valor, 0);
-  const piso = totalV * Math.min(0.05, Math.max(0.012, 9000 / Math.max(1, W * H)));
-  /* Las celdas muy chicas, repartidas junto con las grandes, terminan siendo tiras de
-     pocos pixeles de alto: el area sale bien pero la forma es ilegible. Les damos una
-     franja propia al pie, donde quedan rectangulos parejos y se pueden leer. */
-  const chicas = crudos.filter((x) => x.valor < piso);
-  const grandes = crudos.filter((x) => x.valor >= piso);
-  let piezas;
-  if (chicas.length && grandes.length) {
-    const hBanda = Math.max(78, Math.min(H * 0.22, chicas.length * 46));
-    piezas = repartir(grandes.map((x) => ({ n: x.n, valor: x.valor })), 0, 0, W, H - hBanda - 6)
-      .concat(repartir(chicas.map((x) => ({ n: x.n, valor: piso, chica: true })), 0, H - hBanda, W, hBanda));
-  } else {
-    piezas = repartir(crudos.map((x) =>
-      ({ n: x.n, valor: Math.max(x.valor, piso), chica: x.valor < piso })), 0, 0, W, H);
-  }
+  const tam = (o) => ui.medida === "lineas" ? o.lineas : o.valorizado;
+  const esPlata = ui.medida !== "lineas";
+  const fmt = esPlata ? plata : entero;
+  let max = 0;
+  datos.forEach((A) => A.ubicaciones.forEach((U) => { if (tam(U) > max) max = tam(U); }));
+  const esc0 = escalaLinda(max), techo = esc0.techo || 1;
 
-  const hueco = 3;
-  let g = "";
-  for (const p of piezas) {
-    const n = p.d.n, relleno = colorDeScore(n.score), tinta = tintaSobre(relleno);
-    const x = p.x + hueco / 2, y = p.y + hueco / 2;
-    const w = Math.max(1, p.w - hueco), h = Math.max(1, p.h - hueco);
-    const rr = Math.min(8, w / 2, h / 2);
-    g += '<g class="celda-mapa" data-id="' + esc(n.id) + '" data-tip="' +
-         esc(globoNodo(n) + (p.d.chica ? '<br><span class="mut">celda agrandada para que se vea</span>' : "")) + '">' +
-         '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + rr +
-         '" fill="' + relleno + '"/>';
-    /* franja con la mezcla exacta de bandas: el relleno dice el promedio,
-       esto dice de que esta hecho */
-    if (!n.hoja && h > 74 && w > 86) {
-      const mez = ui.medida === "lineas" ? n.mezclaL : n.mezclaV;
-      const tot = mez.reduce((a, v) => a + v, 0) || 1;
-      const bw = w - 24, bx = x + 12, by = y + h - 19, bh = 7;
-      g += '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh +
-           '" rx="3.5" fill="' + tinta + '" opacity=".22"/>';
-      let ox = 0;
-      mez.forEach((v, bi) => {
-        if (v <= 0) return;
-        const seg = (v / tot) * bw;
-        g += '<rect x="' + (bx + ox) + '" y="' + by + '" width="' + Math.max(1.5, seg - 1.5) +
-             '" height="' + bh + '" rx="3.5" fill="' + BANDAS[bi].col + '"/>';
-        ox += seg;
-      });
-    }
-    if (w > 58 && h > 30) {
-      const t = tinta;
-      const nom = n.nombre.length > Math.floor(w / 7.4) ? n.nombre.slice(0, Math.max(3, Math.floor(w / 7.4) - 1)) + "…" : n.nombre;
-      g += '<text class="tit" x="' + (x + 11) + '" y="' + (y + 21) + '" fill="' + t + '">' + esc(nom) + "</text>";
-      if (h > 48) {
-        g += '<text class="cif" x="' + (x + 11) + '" y="' + (y + 38) + '" fill="' + t + '">' +
-             esc(ui.medida === "lineas" ? entero(n.lineas) + " lineas" : plata(n.valorizado)) + "</text>";
-      }
-      if (h > 68 && w > 112) {
-        g += '<text class="mini" x="' + (x + 11) + '" y="' + (y + 54) + '" fill="' + t + '">' +
-             esc(n.hoja ? entero(n.diasMax) + " dias habiles, target " + entero(n.linea.target)
-                        : entero(n.diasMax) + " dias max · " + entero(n.fueraL) + " frenadas") + "</text>";
-      }
-    }
-    g += "</g>";
+  /* regla: la escala arriba, pegada, para no repetir el eje en cada grupo */
+  let h = papel;
+  h += '<div class="regla"><div class="rot">Ubicacion</div><div class="ticks">';
+  for (let k = 0; k <= 4; k++) {
+    const v = (techo / 4) * k;
+    h += '<span style="left:' + (k * 25) + '%">' +
+      (esPlata ? "$ " + fmtEntero.format(v) : entero(v)) + "</span>";
   }
-  svg.innerHTML = g;
-  svg.querySelectorAll(".celda-mapa").forEach((el) => {
+  h += '</div><div class="rot" style="text-align:right">' + (esPlata ? "Plata" : "Lineas") +
+       '</div><div class="rot">Detalle</div></div>';
+
+  for (const A of datos) {
+    const sinFrenar = A.fueraV === 0 && A.fueraL === 0;
+    h += '<section class="bloque"><header class="cab" data-area="' + esc(A.area) + '">' +
+      '<span class="cod">' + esc(A.area) + "</span>" +
+      '<span class="meta">' + esc([A.responsable || "sin responsable", A.proceso,
+        A.target != null ? "target " + entero(A.target) + " dias" : ""].filter(Boolean).join(" · ")) + "</span>" +
+      '<span class="der"><span class="plata' + (sinFrenar ? " ok" : "") + '">' +
+        (esPlata ? plata(A.fueraV) : entero(A.fueraL) + " lineas") + "</span>" +
+      '<span class="meta">' + entero(A.fueraL) + " de " + entero(A.totalLineas) +
+        " lineas · " + entero(A.diasMax) + ' dias max</span></span></header><div class="cuerpo">';
+    for (const U of A.ubicaciones) {
+      const mez = esPlata ? U.mezclaV : U.mezclaL;
+      const totU = mez.reduce((a, v) => a + v, 0) || 1;
+      const anchoBarra = Math.max(0.6, (tam(U) / techo) * 100);
+      const segs = mez.map((v, i) => v > 0
+        ? '<i style="width:' + ((v / totU) * 100).toFixed(3) + '%;background:' + BANDAS[i].col + '"></i>'
+        : "").join("");
+      h += '<button class="fila" data-area="' + esc(A.area) + '" data-ubic="' + esc(U.nombre) + '" data-tip="' +
+        esc(globoUbic(A, U)) + '">' +
+        '<span class="nom" title="' + esc(U.nombre) + '">' + esc(U.nombre) + "</span>" +
+        '<span class="pista"><span class="barra" style="width:' + anchoBarra.toFixed(3) + '%">' + segs + "</span></span>" +
+        '<span class="cif">' + esc(fmt(tam(U))) + "</span>" +
+        '<span class="aux"><b>' + entero(U.diasMax) + "</b> dias max · " + entero(U.lineas) + " lin</span>" +
+        "</button>";
+    }
+    h += "</div></section>";
+  }
+  cont.innerHTML = h;
+  cont.querySelectorAll(".fila").forEach((el) => {
     el.addEventListener("mousemove", (e) => tip(e, el.dataset.tip));
     el.addEventListener("mouseleave", tipOff);
     el.addEventListener("click", () => {
       tipOff();
-      const n = nodos.find((x) => String(x.id) === el.dataset.id);
-      if (!n) return;
-      if (n.hoja) { ui.sel = n; pintarCtx(); svg.querySelectorAll(".celda-mapa").forEach((o) => o.classList.remove("sel")); el.classList.add("sel"); }
-      else { ui.ruta = ui.ruta.concat([n.nombre]); ui.sel = null; pintarMapa(); }
+      ui.sel = { clase: "ubic", area: el.dataset.area, ubic: el.dataset.ubic };
+      marcarSel(); pintarCtx(); pintarMigas();
     });
   });
+  cont.querySelectorAll(".cab").forEach((el) => el.addEventListener("click", () => {
+    ui.sel = { clase: "area", area: el.dataset.area };
+    marcarSel(); pintarCtx(); pintarMigas();
+  }));
+  marcarSel();
   pintarCtx();
 }
-function globoNodo(n){
-  const c = colorDe(n);
-  if (n.hoja) {
-    const l = n.linea;
-    return "<b>" + esc(l.descripcion || l.sku) + "</b>" +
-      '<span class="mut">' + esc(l.ubicacion) + " · " + fmtCant.format(l.cantidad) + " " + esc(l.um || "u") + "</span><br>" +
-      plata(l.valorizado) + " · " + entero(l.aging) + " dias habiles sobre un target de " + entero(l.target);
-  }
-  return "<b>" + esc(n.nombre) + "</b>" +
-    plata(n.valorizado) + " en " + entero(n.lineas) + " lineas<br>" +
-    '<span class="mut">' + entero(n.fueraL) + " frenadas · " + entero(n.diasMax) +
-    " dias max · " + esc(c.rot.toLowerCase()) + "</span>";
+function marcarSel(){
+  $$("#grupos .fila").forEach((el) => el.classList.toggle("sel",
+    !!ui.sel && ui.sel.clase === "ubic" && el.dataset.ubic === ui.sel.ubic));
+}
+function globoUbic(A, U){
+  const mez = ui.medida === "lineas" ? U.mezclaL : U.mezclaV;
+  const tot = mez.reduce((a, v) => a + v, 0) || 1;
+  return "<b>" + esc(U.nombre) + "</b>" +
+    plata(U.valorizado) + " en " + entero(U.lineas) + " lineas · " + entero(U.diasMax) + " dias max<br>" +
+    '<span class="mut">' + mez.map((v, i) => v > 0
+      ? BANDAS[i].corto + " " + fmtMoneda.format((v / tot) * 100) + " %" : "").filter(Boolean).join(" · ") +
+    "</span>";
 }
 function pintarLeyenda(){
   $("#leyenda").innerHTML = BANDAS.map((b) =>
-    '<span><i style="background:' + b.col + '"></i>' + b.rot + "</span>").join("") +
-    '<span style="color:var(--t3)" title="El tamano es proporcional, salvo en las celdas muy chicas, que se agrandan para que no desaparezcan. La cifra de adentro siempre es la real.">' +
-    "tamano = " + (ui.medida === "lineas" ? "lineas" : "plata") + "</span>";
+    '<span><i style="background:' + b.col + '"></i>' + b.rot + "</span>").join("");
+}
+function cabeceraPapel(){
+  if (!estado.lineas.length) return "";
+  const r = estado.resumen;
+  const val = r.reduce((a, x) => a + x.valorizado, 0);
+  const fV = r.reduce((a, x) => a + x.fueraValorizado, 0);
+  const fL = r.reduce((a, x) => a + x.fueraLineas, 0);
+  const lin = r.reduce((a, x) => a + x.lineas, 0);
+  return "<h1>Aging de ubicaciones criticas</h1>" +
+    '<div class="linea"><span>Corte al <b>' + fechaAR(estado.corte) + "</b></span>" +
+    "<span>Plata frenada <b>" + plata(fV) + "</b></span>" +
+    "<span>Lineas frenadas <b>" + entero(fL) + " de " + entero(lin) + "</b></span>" +
+    "<span>Inmovilizado total <b>" + plata(val) + "</b></span>" +
+    "<span>Areas en rojo <b>" + entero(r.filter((x) => x.rojo).length) + "</b></span>" +
+    "<span>" + (ui.alcance === "fuera" ? "Solo lo frenado" : "Todo el stock") + "</span></div>";
 }
 
 /* ---------- panel de contexto ---------- */
+function lineasDe(sel){
+  if (!sel) return estado.lineas;
+  if (sel.clase === "area") return estado.lineas.filter((l) => l.area === sel.area);
+  if (sel.clase === "ubic") return estado.lineas.filter((l) => l.ubicacion === sel.ubic);
+  return estado.lineas;
+}
 function pintarCtx(){
   const c = $("#ctx");
   if (!estado.lineas.length) {
     c.innerHTML = '<div class="ctx-cab"><div class="eti">Sin datos</div><h2>—</h2></div>';
     return;
   }
-  if (ui.sel && ui.sel.hoja) return pintarCtxLinea(ui.sel.linea);
+  if (ui.sel && ui.sel.clase === "linea") {
+    const l = estado.lineas.find((x) => x.clave === ui.sel.clave);
+    if (l) return pintarCtxLinea(l);
+    ui.sel = null;
+  }
+  const sel = ui.sel;
+  const ls = lineasDe(sel).filter((l) => ui.alcance === "todo" || l.fuera || !sel);
+  const todas = lineasDe(sel);
+  const eti = !sel ? "Todas las areas" : sel.clase === "area" ? "Area" : "Ubicacion";
+  const nom = !sel ? "Todo" : sel.clase === "area" ? sel.area : sel.ubic;
+  const r = sel && sel.clase === "area" ? estado.resumen.find((x) => x.area === sel.area) : null;
 
-  const ls = lineasEnRuta(ui.ruta);
-  const nivel = ui.ruta.length;
-  const eti = nivel === 0 ? "Todas las areas" : nivel === 1 ? "Area" : "Ubicacion";
-  const nom = nivel === 0 ? "Todo" : ui.ruta[ui.ruta.length - 1];
-  const r = nivel === 1 ? estado.resumen.find((x) => x.area === ui.ruta[0]) : null;
-
-  const val = ls.reduce((a, l) => a + l.valorizado, 0);
-  const fV  = ls.filter((l) => l.fuera).reduce((a, l) => a + l.valorizado, 0);
-  const fL  = ls.filter((l) => l.fuera).length;
-  const dMax = ls.reduce((a, l) => Math.max(a, l.aging == null ? 0 : l.aging), 0);
+  const val = todas.reduce((a, l) => a + l.valorizado, 0);
+  const fV = todas.filter((l) => l.fuera).reduce((a, l) => a + l.valorizado, 0);
+  const fL = todas.filter((l) => l.fuera).length;
+  const dMax = todas.reduce((a, l) => Math.max(a, l.aging == null ? 0 : l.aging), 0);
   const mez = [0,0,0,0];
-  ls.forEach((l) => { const b = banda(l); if (b != null) mez[b] += l.valorizado; });
+  todas.forEach((l) => { const b = banda(l); if (b != null) mez[b] += l.valorizado; });
   const totMez = mez.reduce((a, x) => a + x, 0) || 1;
 
   let h = '<div class="ctx-cab"><div class="eti">' + esc(eti) + "</div><h2>" + esc(nom) + "</h2>";
-  if (r) h += '<div class="bajo">' + esc(r.responsable || "sin responsable") +
-    (r.proceso ? " · " + esc(r.proceso) : "") +
-    (r.target != null ? " · target " + entero(r.target) + " dias" : "") + "</div>";
-  else if (nivel === 0) h += '<div class="bajo">Corte al ' + esc(fechaAR(estado.corte)) + "</div>";
+  if (r) h += '<div class="bajo">' + esc([r.responsable || "sin responsable", r.proceso,
+    r.target != null ? "target " + entero(r.target) + " dias" : ""].filter(Boolean).join(" · ")) + "</div>";
+  else if (!sel) h += '<div class="bajo">Corte al ' + esc(fechaAR(estado.corte)) + "</div>";
+  else h += '<div class="bajo">' + esc(sel.area || "") + "</div>";
   h += "</div>";
 
   h += '<div class="ctx-cuerpo">';
+  if (sel) h += '<div class="acciones" style="margin:0 0 14px"><button class="btn suave chico" id="ctxTodo">Ver el total</button></div>';
   h += par("Plata frenada", plata(fV), fV > 0);
-  h += par("Lineas frenadas", entero(fL) + " de " + entero(ls.length), fL > 0);
+  h += par("Lineas frenadas", entero(fL) + " de " + entero(todas.length), fL > 0);
   h += par("Dias maximos", entero(dMax));
   h += par("Valorizado total", plata(val));
   h += '<div class="barra-mezcla" title="Como se reparte la plata segun el atraso">' +
     mez.map((v, i) => v > 0
-      ? '<i style="background:' + BANDAS[i].col + ';width:' + ((v / totMez) * 100).toFixed(2) + '%"></i>'
-      : "").join("") + "</div>";
-  h += '<div style="font-size:11.5px;color:var(--t2)">' +
-    mez.map((v, i) => v > 0 ? BANDAS[i].corto + " " + fmtMoneda.format((v / totMez) * 100) + " %" : "")
-      .filter(Boolean).join(" · ") + "</div>";
+      ? '<i style="background:' + BANDAS[i].col + ';width:' + ((v / totMez) * 100).toFixed(2) + '%"></i>' : "").join("") +
+    "</div>";
+  h += '<div style="font-size:11.5px;color:var(--t2)">' + mez.map((v, i) => v > 0
+    ? BANDAS[i].corto + " " + fmtMoneda.format((v / totMez) * 100) + " %" : "").filter(Boolean).join(" · ") + "</div>";
 
-  const hijos = nodosActuales().slice().sort((a, b) => tamanoDe(b) - tamanoDe(a)).slice(0, 12);
-  if (hijos.length) {
-    h += "<h3>" + (ui.ruta.length >= 2 ? "Lineas" : "Lo que mas pesa") + "</h3>";
-    h += '<div class="lista-lineas">' + hijos.map((n) =>
-      '<button class="ficha" data-id="' + esc(n.id) + '">' +
-      '<span class="pip" style="background:' + colorDe(n).col + '"></span>' +
-      '<span class="cuerpo"><span class="n1">' + esc(n.nombre) + "</span>" +
-      '<span class="n2">' + esc(n.hoja ? (n.sub || n.linea.ubicacion)
-        : entero(n.lineas) + " lineas · " + entero(n.diasMax) + " dias max") + "</span></span>" +
-      '<span class="plata">' + esc(ui.medida === "lineas" ? entero(n.lineas) : plata(n.valorizado)) + "</span>" +
-      "</button>").join("") + "</div>";
+  const top = todas.filter((l) => ui.alcance === "todo" ? true : l.fuera)
+    .sort((a, b) => b.valorizado - a.valorizado).slice(0, 12);
+  if (top.length) {
+    h += "<h3>Lineas que mas pesan</h3>";
+    h += '<div class="lista-lineas">' + top.map((l) => {
+      const b = banda(l);
+      return '<button class="ficha" data-clave="' + esc(l.clave) + '">' +
+        '<span class="pip" style="background:' + BANDAS[b == null ? 0 : b].col + '"></span>' +
+        '<span class="cuerpo"><span class="n1">' + esc(l.sku || "?") + "</span>" +
+        '<span class="n2">' + esc(l.descripcion || l.ubicacion) + "</span></span>" +
+        '<span class="plata">' + plata(l.valorizado) + "</span></button>";
+    }).join("") + "</div>";
   }
   h += "</div>";
   c.innerHTML = h;
+  const bt = $("#ctxTodo");
+  if (bt) bt.addEventListener("click", () => { ui.sel = null; marcarSel(); pintarCtx(); pintarMigas(); });
   c.querySelectorAll(".ficha").forEach((b) => b.addEventListener("click", () => {
-    const n = nodosActuales().find((x) => String(x.id) === b.dataset.id);
-    if (!n) return;
-    if (n.hoja) { ui.sel = n; pintarCtx(); }
-    else { ui.ruta = ui.ruta.concat([n.nombre]); ui.sel = null; pintarMapa(); }
+    ui.sel = { clase: "linea", clave: b.dataset.clave, volver: sel };
+    pintarCtx(); pintarMigas();
   }));
 }
 function par(k, v, mal){
@@ -1646,7 +1625,7 @@ function par(k, v, mal){
 function pintarCtxLinea(l){
   const b = banda(l), c = BANDAS[b == null ? 0 : b];
   let h = '<div class="ctx-cab"><div class="eti">Linea</div>' +
-    "<h2>" + esc((l.sku || "?").replace(/\.0+$/, "")) + "</h2>" +
+    "<h2>" + esc(l.sku || "?") + "</h2>" +
     '<div class="bajo">' + esc(l.descripcion || "sin descripcion") + "</div></div>";
   h += '<div class="ctx-cuerpo">';
   h += '<span class="chip ' + (l.fuera ? "mal" : "ok") + '">' + (l.fuera ? c.rot : "Dentro del target") + "</span>";
@@ -1661,24 +1640,25 @@ function pintarCtxLinea(l){
   if (l.tipoStock) h += par("Tipo de stock", esc(l.tipoStock));
   h += "<h3>Fecha aging</h3>";
   h += '<input type="date" class="fecha-ed' + (l.ajustada ? " tocada" : "") +
-       '" id="ctxFecha" value="' + fechaISO(l.fechaAging) + '" style="width:100%">';
+    '" id="ctxFecha" value="' + fechaISO(l.fechaAging) + '" style="width:100%">';
   h += '<p style="font-size:11.5px;color:var(--t2);margin:7px 0 0">' +
     (l.ajustada ? "Ajustada a mano. En el archivo figura " +
-       (l.fechaArchivo ? fechaAR(l.fechaArchivo) : "vacia") + ". Borra el campo para volver a esa."
-     : "Es la del archivo. Si la cambias, el ajuste se guarda y se vuelve a aplicar cada semana.") +
-    "</p>";
+      (l.fechaArchivo ? fechaAR(l.fechaArchivo) : "vacia") + ". Borra el campo para volver a esa."
+     : "Es la del archivo. Si la cambias, el ajuste se guarda y se vuelve a aplicar cada semana.") + "</p>";
   if (l.sinCosto) h += '<div class="aviso malo" style="margin-top:14px">Este SKU no esta en el maestro, asi que se valoriza en $0.</div>';
   else if (l.costoAmbiguo) h += '<div class="aviso alerta" style="margin-top:14px">El material esta repetido en el maestro con precios distintos. Se usa el primero.</div>';
-  h += '<div class="acciones"><button class="btn suave chico" id="ctxVolver">Volver al resumen</button></div>';
-  h += "</div>";
+  h += '<div class="acciones"><button class="btn suave chico" id="ctxVolver">Volver</button></div></div>';
   $("#ctx").innerHTML = h;
-  $("#ctxVolver").addEventListener("click", () => { ui.sel = null; pintarCtx();
-    $$("#mapaSvg .celda-mapa").forEach((o) => o.classList.remove("sel")); });
+  $("#ctxVolver").addEventListener("click", () => {
+    ui.sel = (ui.sel && ui.sel.volver) || null;
+    marcarSel(); pintarCtx(); pintarMigas();
+  });
   $("#ctxFecha").addEventListener("change", (e) => {
+    const volver = ui.sel && ui.sel.volver;
     aplicarAjuste(l.clave, e.target.value, l);
-    const n = nodosActuales().find((x) => String(x.id) === l.clave);
-    ui.sel = n || null;
-    pintarMapa();
+    pintarPanorama();
+    ui.sel = { clase: "linea", clave: l.clave, volver: volver };
+    pintarCtx();
   });
 }
 function aplicarAjuste(clave, valor, l){
@@ -1701,7 +1681,7 @@ function pintarTodo(){
   pintarCabecera();
   pintarAvisos();
   poblarFiltros();
-  if (ui.vista === "mapa") pintarMapa(); else pintarMigas();
+  pintarPanorama(); pintarMigas();
   pintarLineas();
   pintarAjustes();
   pintarEvolucion();
@@ -1713,6 +1693,7 @@ function pintarTodo(){
 function pintarCabecera(){
   const hay = estado.lineas.length > 0;
   $("#btnExportar").disabled = !hay;
+  $("#btnReporte").disabled = !hay;
   $("#btnGuardarCorte").disabled = !hay;
   const f = estado.fuentes.stock;
   $("#estadoFuente").innerHTML = hay
@@ -1812,8 +1793,8 @@ function pintarLineas(){
   }
   const f = lineasFiltradas(), vis = f.slice(0, TOPE);
   let h = "<thead><tr><th>Area</th><th>Ubicacion</th><th>SKU</th><th>Descripcion</th>" +
-    '<th class="cifra">Cant.</th><th class="cifra">Valorizado</th><th>Fecha aging</th>' +
-    '<th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
+    '<th class="cifra">Cant.</th><th class="cifra">Precio unit.</th><th class="cifra">Valorizado</th>' +
+    '<th>Fecha aging</th><th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
   for (const l of vis) {
     const b = banda(l);
     const chip = l.aging == null ? '<span class="chip neutro">sin fecha</span>'
@@ -1824,9 +1805,10 @@ function pintarLineas(){
     h += "<tr>" +
       "<td><b>" + esc(l.area) + "</b></td>" +
       '<td class="mono">' + esc(l.ubicacion) + "</td>" +
-      '<td class="mono">' + esc((l.sku || "").replace(/\.0+$/, "")) + "</td>" +
+      '<td class="mono">' + esc(l.sku || "") + "</td>" +
       "<td>" + esc(l.descripcion) + "</td>" +
       '<td class="cifra">' + fmtCant.format(l.cantidad) + "</td>" +
+      '<td class="cifra">' + (l.costo == null ? "—" : fmtMoneda.format(l.costo)) + "</td>" +
       '<td class="cifra">' + (l.sinCosto ? "—" : fmtMoneda.format(l.valorizado)) + "</td>" +
       '<td><input type="date" class="fecha-ed' + (l.ajustada ? " tocada" : "") +
         '" data-clave="' + esc(l.clave) + '" value="' + fechaISO(l.fechaAging) + '"></td>' +
@@ -1856,7 +1838,7 @@ function pintarAjustes(){
     const p = k.split("|");
     h += "<tr>" +
       '<td class="mono">' + esc(a.ubicacion || p[0]) + "</td>" +
-      '<td class="mono">' + esc((a.sku || p[1] || "").replace(/\.0+$/, "")) + "</td>" +
+      '<td class="mono">' + esc(a.sku || p[1] || "") + "</td>" +
       "<td><b>" + esc(fechaAR(fecha(a.fecha))) + "</b></td>" +
       "<td>" + (l ? esc(l.fechaArchivo ? fechaAR(l.fechaArchivo) : "(vacia)") : "—") + "</td>" +
       '<td class="cifra">' + (n === 0 ? '<span class="chip mal">no coincide</span>'
@@ -2028,7 +2010,7 @@ function pintarMaestro(){
   let h = '<thead><tr><th>SKU</th><th class="cifra">Precio unitario</th><th>Estado</th><th></th></tr></thead><tbody>';
   filas.slice(0, 300).forEach(([sku, costo]) => {
     const k = String(sku).trim().toUpperCase(), amb = estado.maestroAmbiguos[k];
-    h += '<tr><td class="mono"><b>' + esc(String(sku).replace(/\.0+$/, "")) + "</b></td>" +
+    h += '<tr><td class="mono"><b>' + esc(String(sku)) + "</b></td>" +
       '<td class="cifra"><input type="text" data-sku="' + esc(sku) + '" value="' +
         (costo == null ? "" : fmtMoneda.format(costo)) + '" style="width:118px;text-align:right" placeholder="sin precio"></td>' +
       "<td>" + (costo == null ? '<span class="chip mal">falta</span>'
@@ -2139,9 +2121,9 @@ async function cargarLibro(file){
       msg.push(ingestarStock(res.filas) + " filas de stock");
     }
     estadoZona("#zonaLibro", "#estLibro", "listo", esc(file.name) + "<br>" + msg.join(" · "));
-    ui.ruta = []; ui.sel = null;
+    ui.sel = null;
     pintarTodo();
-    irA("mapa");
+    irA("panorama");
   } catch (e) {
     estadoZona("#zonaLibro", "#estLibro", "error", esc(e.message));
   }
@@ -2216,21 +2198,22 @@ function aplicarMaestro(nombre){
 $$("#nav button").forEach((b) => b.addEventListener("click", () => irA(b.dataset.v)));
 $("#btnRail").addEventListener("click", () => document.body.classList.toggle("rail-abierto"));
 $("#btnAvisos").addEventListener("click", () => irA("datos"));
+$("#btnReporte").addEventListener("click", () => { irA("panorama"); setTimeout(() => window.print(), 120); });
 
 $$("#mandoAlcance button").forEach((b) => b.addEventListener("click", () => {
   ui.alcance = b.dataset.alcance;
   $$("#mandoAlcance button").forEach((o) => o.setAttribute("aria-pressed", o === b ? "true" : "false"));
-  ui.sel = null; pintarMapa();
+  ui.sel = null; pintarPanorama();
 }));
 $$("#mandoMedida button").forEach((b) => b.addEventListener("click", () => {
   ui.medida = b.dataset.medida;
   $$("#mandoMedida button").forEach((o) => o.setAttribute("aria-pressed", o === b ? "true" : "false"));
-  pintarMapa();
+  pintarPanorama();
 }));
 let redib;
 window.addEventListener("resize", () => {
   clearTimeout(redib);
-  redib = setTimeout(() => { if (ui.vista === "mapa") pintarMapa(); }, 160);
+  redib = setTimeout(() => { if (ui.vista === "panorama") pintarPanorama(); }, 160);
 });
 
 $("#fCorte").addEventListener("change", (e) => {
@@ -2268,7 +2251,7 @@ $("#tablaLineas").addEventListener("change", (e) => {
   const clave = e.target.dataset.clave;
   if (clave == null) return;
   aplicarAjuste(clave, e.target.value, estado.lineas.find((x) => x.clave === clave));
-  if (ui.vista === "mapa") pintarMapa();
+  if (ui.vista === "panorama") pintarPanorama();
 });
 $("#tablaAjustes").addEventListener("click", (e) => {
   const k = e.target.dataset.delaj;
@@ -2326,7 +2309,7 @@ $("#btnAplicarMaestro").addEventListener("click", () => aplicarMaestro());
 $("#btnPegar").addEventListener("click", () => {
   const t = $("#pegado").value.trim();
   if (!t) return;
-  try { ingestarStock(parseDelimitado(t, "\t")); ui.ruta = []; pintarTodo(); irA("mapa"); }
+  try { ingestarStock(parseDelimitado(t, "\t")); ui.sel = null; pintarTodo(); irA("panorama"); }
   catch (e) { alert(e.message); }
 });
 
@@ -2337,7 +2320,7 @@ $("#tablaAreas").addEventListener("input", (e) => {
   const c = e.target.dataset.campo;
   estado.areas[i][c] = c === "target" ? (e.target.value === "" ? null : num(e.target.value)) : e.target.value;
   guardar(LS.areas, estado.areas);
-  calcular(); pintarCabecera(); pintarAvisos(); if (ui.vista === "mapa") pintarMapa();
+  calcular(); pintarCabecera(); pintarAvisos(); if (ui.vista === "panorama") pintarPanorama();
 });
 $("#tablaAreas").addEventListener("click", (e) => {
   const i = e.target.dataset.delar;
@@ -2361,7 +2344,7 @@ $("#tablaUbic").addEventListener("input", (e) => {
   const c = e.target.dataset.campo;
   estado.ubicaciones[i][c] = c === "target" ? num(e.target.value) : e.target.value.trim();
   guardar(LS.ubic, estado.ubicaciones);
-  calcular(); pintarCabecera(); pintarAvisos(); if (ui.vista === "mapa") pintarMapa();
+  calcular(); pintarCabecera(); pintarAvisos(); if (ui.vista === "panorama") pintarPanorama();
 });
 $("#tablaUbic").addEventListener("click", (e) => {
   const i = e.target.dataset.delub;

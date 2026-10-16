@@ -24,13 +24,18 @@ en vez de calcular con otra cosa.
 
 ### Las pantallas
 
-**Mapa** — la principal. Un treemap donde cada rectangulo es un area: el **tamano** es la
-plata frenada y el **color**, cuanto se paso del target. Un clic entra a sus ubicaciones,
-otro a las lineas, y se vuelve por las migas de arriba. El panel de la derecha describe
-siempre donde estas parado, con la mezcla de atrasos y lo que mas pesa. Dos interruptores:
-ver solo lo frenado o todo el stock, y medir por plata o por lineas.
+**Panorama** — la principal. Un bloque por area, y dentro **una barra por ubicacion**,
+ordenadas de mayor a menor. Todas las barras comparten la misma escala, asi se comparan
+entre areas distintas; cada barra va partida por banda de atraso, para ver de que esta
+hecha la ubicacion y no solo cuanto pesa. Es una tabla con barras y no un grafico suelto:
+con decenas de ubicaciones cada fila necesita su cifra al lado, y asi **se imprime entera**.
 
-**Lineas** — la tabla completa, con filtros. Aca se edita la `Fecha Aging` de cada linea.
+Un clic en una ubicacion la selecciona y el panel de la derecha muestra su detalle y sus
+lineas mas caras; un clic en una linea abre su ficha, con la Fecha Aging editable ahi mismo.
+Dos interruptores: ver solo lo frenado o todo el stock, y medir por plata o por lineas.
+
+**Lineas** — la tabla completa, con filtros: SKU, descripcion, cantidad, precio unitario,
+valorizado, dias y target. Aca tambien se edita la `Fecha Aging` de cada linea.
 
 **Evolucion** — la plata frenada corte a corte, con el delta contra el anterior.
 
@@ -44,7 +49,7 @@ ver solo lo frenado o todo el stock, y medir por plata o por lineas.
 2. **Datos** → arrastrar `Base Item Valorizados.xlsx`: queda guardado en el navegador (unos
    470 KB con los 22.398 materiales). Espera el `Material` en la columna A y el
    `Precio interno periodico` en la H. Los precios estan en USD.
-3. **Mapa** → mirar y navegar.
+3. **Panorama** → mirar, y **Reporte PDF** para imprimirlo o guardarlo.
 4. **Guardar corte** → agrega un punto a la evolucion.
 
 Las 199 ubicaciones criticas y las 9 areas vienen cargadas de fabrica, asi que no hace falta
@@ -68,8 +73,14 @@ porque los targets van de 2 a 90 dias: 22 dias en 8030 (target 2) es mucho peor 
 
 Las tres bandas de atraso son una rampa de un solo hue de claro a oscuro, por ser una escala
 ordenada y no categorias sueltas. Validada sobre blanco: lightness monotona, saltos visibles
-y el extremo claro por encima de 2:1. El relleno de cada celda interpola sobre esa rampa
-segun el promedio ponderado del nodo, y la franja de adentro muestra la mezcla exacta.
+y el extremo claro por encima de 2:1.
+
+### El reporte PDF
+
+El boton **Reporte PDF** imprime el Panorama tal como esta en pantalla, con lo que tengas
+elegido en los interruptores. Sale apaisado, con un encabezado propio (corte, plata frenada,
+lineas, areas en rojo), sin el menu ni el panel lateral, y cada bloque de area entero en una
+sola hoja.
 
 **Las celdas muy chicas** se agrandan hasta un minimo y, cuando hay varias, se les reserva una
 franja al pie: repartidas junto con las grandes quedarian en tiras de pocos pixeles y
