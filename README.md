@@ -192,6 +192,13 @@ En el .xlsx cada columna va tipada:
 
 Ademas sale con filtro automatico y los anchos de columna puestos.
 
+**Las exportaciones respetan los filtros de la pantalla.** El boton dice cuantas filas va a
+bajar, asi no hay sorpresas: con "Solo los que faltan" tildado dice *Exportar 35 sin precio*.
+
+El export de los SKU sin precio no es solo la lista: trae descripcion, cuantas lineas del
+stock tapa cada uno, la cantidad, y en que areas y ubicaciones esta, ordenado por el que mas
+pesa. Es para salir a buscar precios sabiendo cual importa.
+
 ### El respaldo
 
 Todo lo que se carga a mano vive en el LocalStorage de **ese** navegador: si se limpia o se

@@ -2378,28 +2378,39 @@ function pintarUbicaciones(){
   t.innerHTML = h + "</tbody>";
   $("#pieUbic").innerHTML = "Mostrando <b>" + entero(Math.min(f.length, 400)) + "</b> de <b>" +
     entero(estado.ubicaciones.length) + "</b>";
+  $("#btnCsvUbic").textContent = "Exportar " + entero(f.length) +
+    (f.length === estado.ubicaciones.length ? "" : " filtradas");
 }
 
 /* ---------- maestro ---------- */
-function pintarMaestro(){
-  const t = $("#tablaMaestro");
-  if (!estado.maestroCrudo.length) {
-    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin maestro</h3>' +
-      "<p>Carga el Base Item Valorizados en Datos.</p></div></td></tr></tbody>";
-    $("#pieMaestro").textContent = "";
-    return;
-  }
+function maestroFiltrado(){
   const q = norm($("#fSku").value);
   const sU = $("#fSoloUsados").checked, sF = $("#fSoloSinCosto").checked, sA = $("#fSoloAmbiguos").checked;
-  const usados = new Set(); estado.lineas.forEach((l) => { if (l.sku) usados.add(String(l.sku).trim().toUpperCase()); });
-  const faltan = new Set((estado.diag.skusSinCosto || []).map((s) => s.toUpperCase()));
-  let filas = sF ? Array.from(faltan).map((s) => [s, null]) : estado.maestroCrudo.filter(([sku]) => {
+  const usados = new Set();
+  estado.lineas.forEach((l) => { if (l.sku) usados.add(String(l.sku).trim().toUpperCase()); });
+  const faltan = new Set((estado.diag.skusSinCosto || []).map((x) => x.toUpperCase()));
+  let filas = sF ? Array.from(faltan).map((x) => [x, null]) : estado.maestroCrudo.filter(([sku]) => {
     const k = String(sku).trim().toUpperCase();
     if (sU && !usados.has(k)) return false;
     if (sA && !estado.maestroAmbiguos[k]) return false;
     return true;
   });
   if (q) filas = filas.filter(([sku]) => norm(sku).includes(q));
+  return { filas: filas, usados: usados, soloFaltan: sF };
+}
+function pintarMaestro(){
+  const t = $("#tablaMaestro");
+  if (!estado.maestroCrudo.length) {
+    t.innerHTML = '<tbody><tr><td><div class="vacio"><h3>Sin maestro</h3>' +
+      "<p>Carga el Base Item Valorizados en Datos.</p></div></td></tr></tbody>";
+    $("#pieMaestro").textContent = "";
+    $("#btnCsvMaestro").textContent = "Exportar";
+    return;
+  }
+  const f0 = maestroFiltrado();
+  const filas = f0.filas, usados = f0.usados;
+  $("#btnCsvMaestro").textContent = "Exportar " + entero(filas.length) +
+    (f0.soloFaltan ? " sin precio" : filas.length === estado.maestroCrudo.length ? "" : " filtrados");
   let h = '<thead><tr><th>SKU</th><th class="cifra">Precio unitario</th><th>Estado</th><th></th></tr></thead><tbody>';
   filas.slice(0, 300).forEach(([sku, costo]) => {
     const k = String(sku).trim().toUpperCase(), amb = estado.maestroAmbiguos[k];
@@ -3029,7 +3040,7 @@ $("#btnMarcaRet").addEventListener("click", () => marcarFiltradas("retencion"));
 $("#btnMarcaTra").addEventListener("click", () => marcarFiltradas("transito"));
 $("#btnMarcaAuto").addEventListener("click", () => marcarFiltradas(""));
 $("#btnCsvUbic").addEventListener("click", () => {
-  const filas = estado.ubicaciones.map((u) => [u.ubicacion, u.area, u.target,
+  const filas = ubicFiltradas().map(({ u }) => [u.ubicacion, u.area, u.target,
     tipoUbic(u.ubicacion, null) === "retencion" ? "Stock retenido" : "Transito operativo",
     u.tipo ? "SI" : ""]);
   bajarXLSX("ubicaciones_criticas", "Ubicaciones",
@@ -3084,8 +3095,30 @@ $("#btnAddSku").addEventListener("click", () => {
   pintarTodo();
 });
 $("#btnCsvMaestro").addEventListener("click", () => {
-  bajarXLSX("maestro_valorizado", "Maestro", ["SKU","Precio unitario"],
-    estado.maestroCrudo.map(([s, c]) => [s, c]), [COL_T,COL_N], [18,16]);
+  const f0 = maestroFiltrado();
+  if (!f0.filas.length) { alert("No hay nada que exportar con ese filtro."); return; }
+  /* contexto desde el stock, para saber que esta tapando cada SKU que falta */
+  const ctx = new Map();
+  estado.lineas.forEach((l) => {
+    const k = String(l.sku).trim().toUpperCase();
+    if (!ctx.has(k)) ctx.set(k, { lineas: 0, cant: 0, val: 0, areas: new Set(), ubic: new Set(), desc: "" });
+    const e = ctx.get(k);
+    e.lineas++; e.cant += num(l.cantidad); e.val += l.valorizado;
+    e.areas.add(l.area); e.ubic.add(l.ubicacion);
+    if (!e.desc && l.descripcion) e.desc = l.descripcion;
+  });
+  const filas = f0.filas.map(([sku, costo]) => {
+    const k = String(sku).trim().toUpperCase(), e = ctx.get(k), amb = estado.maestroAmbiguos[k];
+    return [sku, e ? e.desc : "", costo == null ? "" : costo,
+      costo == null ? "FALTA" : (f0.usados.has(k) ? "en uso" : "sin stock"),
+      amb ? "SI" : "", e ? e.lineas : 0, e ? e.cant : 0,
+      e ? Array.from(e.areas).sort().join(", ") : "",
+      e ? Array.from(e.ubic).sort().slice(0, 8).join(", ") : ""];
+  }).sort((a, b) => b[5] - a[5] || b[6] - a[6]);
+  bajarXLSX(f0.soloFaltan ? "maestro_sin_precio_" + fechaISO(estado.corte) : "maestro_valorizado",
+    f0.soloFaltan ? "Sin precio" : "Maestro",
+    ["SKU","Descripcion","Precio unitario","Estado","Precio repetido","Lineas en el stock","Cantidad","Areas","Ubicaciones"],
+    filas, [COL_T,COL_T,COL_N,COL_T,COL_T,COL_N,COL_N,COL_T,COL_T], [18,38,16,10,15,17,11,14,42]);
 });
 $("#btnBorrarMaestro").addEventListener("click", () => {
   if (!confirm("Vaciar el maestro?\n\nTodo el valorizado va a dar $0.")) return;
