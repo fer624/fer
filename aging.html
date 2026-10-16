@@ -700,6 +700,23 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
     </div>
 
     <div class="tarjeta">
+      <h2>Respaldo</h2>
+      <p class="sub">
+        Las ubicaciones, su tipo, las areas, el maestro de precios, las fechas que ajustaste a
+        mano y el historico viven <b>solo en este navegador</b>. Si se limpia o cambias de
+        maquina, se pierden. Baja un respaldo cada tanto y guardalo donde guardes el resto.
+        El stock de la semana no hace falta: ese lo volves a bajar del WMS.
+      </p>
+      <p class="pie-tabla" id="estadoRespaldo" style="margin:0 0 14px"></p>
+      <div class="acciones" style="margin-top:0">
+        <button class="btn" id="btnBajarRespaldo" type="button">Bajar respaldo</button>
+        <button class="btn suave" type="button" data-abre="inRespaldo">Restaurar de un archivo</button>
+        <input type="file" id="inRespaldo" accept=".json,application/json">
+      </div>
+      <p class="pie-tabla" id="errRespaldo" style="color:var(--mal)"></p>
+    </div>
+
+    <div class="tarjeta">
       <h2>Fuentes</h2>
       <div class="marco"><table class="datos" id="tablaFuentes"></table></div>
     </div>
@@ -819,7 +836,8 @@ const LS = {
   ajustes:"aging.ajustes.v1",
   ambiguos:"aging.ambiguos.v1",
   movhu:"aging.movhu.v1",
-  mapeoHU:"aging.mapeoMovHU.v1"
+  mapeoHU:"aging.mapeoMovHU.v1",
+  respaldo:"aging.ultimoRespaldo.v1"
 };
 
 /* Configuracion de arranque: las ubicaciones criticas y areas tal como estan en
@@ -2004,6 +2022,7 @@ function pintarTodo(){
   pintarUbicaciones();
   pintarMaestro();
   pintarFuentes();
+  pintarRespaldo();
 }
 function pintarCabecera(){
   const hay = estado.lineas.length > 0;
@@ -2060,6 +2079,13 @@ function pintarAvisos(){
         " del resto de " + esc(x.area) + ". Puede ser a proposito o un error de tipeo.",
         "Revisar", () => { irA("ubicaciones"); $("#fUbicArea").value = x.area; pintarUbicaciones(); }));
     }
+    const aMano = Object.keys(estado.ajustes).length +
+      estado.ubicaciones.filter((u) => u.tipo).length +
+      estado.areas.filter((a) => a.tipo).length;
+    if (aMano > 0 && !leer(LS.respaldo, null)) c.push(av("alerta",
+      "<b>Tenes " + entero(aMano) + " cosas cargadas a mano y ningun respaldo</b>: fechas " +
+      "ajustadas y ubicaciones clasificadas. Si se limpia el navegador, se pierden.",
+      "Bajar respaldo", () => { irA("datos"); bajarRespaldo(); }));
     if (d.areasSinConfig.length) c.push(av("alerta", "<b>Area sin configurar: " +
       d.areasSinConfig.map(esc).join(", ") + "</b>. Tiene stock critico pero no tiene responsable.",
       "Configurar", () => irA("ubicaciones")));
@@ -2422,6 +2448,76 @@ function pintarFuentes(){
 }
 
 /* ============================================================
+   10b. RESPALDO
+   Todo lo que se cargo a mano vive en el LocalStorage de ESTE navegador:
+   si se limpia o se cambia de maquina, se pierde. Esto lo saca a un archivo.
+   El stock de la semana no entra: ese se vuelve a bajar del WMS.
+   ============================================================ */
+const PIEZAS = [
+  ["ubicaciones", LS.ubic,     "ubicaciones criticas"],
+  ["areas",       LS.areas,    "areas"],
+  ["maestro",     LS.maestro,  "SKU en el maestro"],
+  ["ambiguos",    LS.ambiguos, "materiales con precio repetido"],
+  ["ajustes",     LS.ajustes,  "fechas ajustadas a mano"],
+  ["movHU",       LS.movhu,    "movimientos de HU"],
+  ["historico",   LS.hist,     "cortes guardados"],
+  ["mapeoMaestro",LS.mapeo,    null],
+  ["mapeoMovHU",  LS.mapeoHU,  null]
+];
+function armarRespaldo(){
+  const datos = {};
+  PIEZAS.forEach(([k, clave]) => { datos[k] = leer(clave, null); });
+  return { formato: "aging-respaldo", version: 1, site: "Finning Cat",
+           creado: new Date().toISOString(), datos };
+}
+function cuantos(v){
+  if (v == null) return 0;
+  if (Array.isArray(v)) return v.length;
+  if (typeof v === "object") return Object.keys(v).length;
+  return 1;
+}
+function resumenRespaldo(r){
+  return PIEZAS.filter(([, , rot]) => rot)
+    .map(([k, , rot]) => ({ n: cuantos(r.datos[k]), rot }))
+    .filter((x) => x.n > 0);
+}
+function bajarRespaldo(){
+  const r = armarRespaldo();
+  const blob = new Blob([JSON.stringify(r)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "aging_respaldo_" + fechaISO(new Date()) + ".json";
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  guardar(LS.respaldo, new Date().toISOString());
+  pintarRespaldo();
+}
+function restaurarRespaldo(r){
+  if (!r || r.formato !== "aging-respaldo") throw new Error("Ese archivo no es un respaldo de Aging.");
+  if (!r.datos) throw new Error("El respaldo esta vacio o incompleto.");
+  PIEZAS.forEach(([k, clave]) => {
+    if (r.datos[k] != null) guardar(clave, r.datos[k]);
+  });
+  /* lo volvemos a leer igual que en el arranque */
+  estado.ubicaciones = leer(LS.ubic, []);
+  estado.areas = leer(LS.areas, []);
+  estado.ajustes = leer(LS.ajustes, {});
+  estado.maestroAmbiguos = leer(LS.ambiguos, {});
+  indexarMovHU(leer(LS.movhu, []));
+  indexarMaestro(leer(LS.maestro, []));
+  reindexarUbic();
+  pintarTodo();
+}
+function pintarRespaldo(){
+  const u = leer(LS.respaldo, null);
+  const n = resumenRespaldo(armarRespaldo());
+  $("#estadoRespaldo").innerHTML = (u
+    ? "Ultimo respaldo: <b>" + esc(new Date(u).toLocaleString("es-AR")) + "</b>"
+    : '<span style="color:var(--mal)"><b>Nunca hiciste un respaldo.</b></span>') +
+    (n.length ? "<br>Hoy guardarias: " + n.map((x) => "<b>" + entero(x.n) + "</b> " + x.rot).join(" · ") : "");
+}
+
+/* ============================================================
    11. EXPORTACION
    ============================================================ */
 function bajarCSV(nombre, filas){
@@ -2762,6 +2858,32 @@ $$("[data-abre]").forEach((b) => b.addEventListener("click", () => $("#" + b.dat
 $("#inLibro").addEventListener("change", (e) => { if (e.target.files[0]) cargarLibro(e.target.files[0]); e.target.value = ""; });
 $("#inMaestro").addEventListener("change", (e) => { if (e.target.files[0]) cargarMaestro(e.target.files[0]); e.target.value = ""; });
 $("#inMovHU").addEventListener("change", (e) => { if (e.target.files[0]) cargarMovHU(e.target.files[0]); e.target.value = ""; });
+$("#btnBajarRespaldo").addEventListener("click", bajarRespaldo);
+$("#inRespaldo").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  $("#errRespaldo").textContent = "";
+  const fr = new FileReader();
+  fr.onerror = () => { $("#errRespaldo").textContent = "No se pudo leer el archivo."; };
+  fr.onload = () => {
+    let r;
+    try { r = JSON.parse(fr.result); }
+    catch (err) { $("#errRespaldo").textContent = "Ese archivo no es un respaldo valido."; return; }
+    try {
+      if (!r || r.formato !== "aging-respaldo") throw new Error("Ese archivo no es un respaldo de Aging.");
+      const n = resumenRespaldo(r);
+      const cuando = r.creado ? new Date(r.creado).toLocaleString("es-AR") : "sin fecha";
+      if (!confirm("Respaldo del " + cuando + "\n\n" +
+          n.map((x) => "· " + x.n + " " + x.rot).join("\n") +
+          "\n\nEsto reemplaza lo que tengas cargado ahora. Seguimos?")) return;
+      restaurarRespaldo(r);
+      $("#errRespaldo").innerHTML = '<span style="color:var(--ok)">Restaurado: ' +
+        n.map((x) => x.n + " " + x.rot).join(" · ") + "</span>";
+    } catch (err) { $("#errRespaldo").textContent = err.message; }
+  };
+  fr.readAsText(file, "UTF-8");
+});
 $("#btnCopiarHU").addEventListener("click", () => {
   const hus = huDelStock();
   if (!hus.length) return;

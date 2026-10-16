@@ -176,6 +176,28 @@ El panel de la derecha es mas ancho y arranca con una **rosca** del reparto por 
 el total de lineas en el centro: es parte-de-un-todo con cuatro tramos, el caso donde una
 rosca efectivamente sirve.
 
+### El respaldo
+
+Todo lo que se carga a mano vive en el LocalStorage de **ese** navegador: si se limpia o se
+cambia de maquina, se pierde. En la solapa **Datos** hay un respaldo que lo saca a un archivo:
+
+| Entra | No entra |
+|---|---|
+| ubicaciones criticas y su tipo | el stock de la semana |
+| areas, responsables y targets | |
+| maestro de precios | |
+| fechas ajustadas a mano | |
+| movimientos de HU | |
+| historico de cortes y mapeos de columnas | |
+
+El stock no entra a proposito: ese se vuelve a bajar del WMS cada lunes.
+
+Sale un `.json` de unos 500 KB (casi todo el maestro). Para restaurarlo se elige el archivo,
+se confirma un resumen de lo que trae y reemplaza lo que haya cargado.
+
+Si hay fechas ajustadas o ubicaciones clasificadas y nunca se hizo un respaldo, la pantalla
+lo avisa.
+
 ### Offline
 
 Es **un solo archivo de 450 KB que se abre con doble clic**. No necesita internet, ni instalar
