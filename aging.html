@@ -601,6 +601,28 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
           <input type="file" id="inMaestro" accept=".xlsx,.xlsm,.xls,.csv,.txt">
           <div class="estado vacio" id="estMaestro">Sin cargar</div>
         </div>
+        <div class="zona" id="zonaMovHU">
+          <h3>Movimientos de HU <span class="chip neutro">opcional</span></h3>
+          <p>Para no completar la <span class="mono">Fecha Aging</span> a mano. Si la base ya
+             la trae cargada, manda la del archivo.</p>
+          <button class="btn" type="button" data-abre="inMovHU">Elegir archivo</button>
+          <input type="file" id="inMovHU" accept=".xlsx,.xlsm,.xls,.csv,.txt">
+          <div class="estado vacio" id="estMovHU">Sin cargar</div>
+        </div>
+      </div>
+
+      <div id="mapeoHU" hidden>
+        <div class="sep"></div>
+        <h2>Columnas de los movimientos</h2>
+        <p class="sub">Alcanza con la HU y la fecha de su ultimo movimiento. Si una HU
+           aparece varias veces, se toma la fecha mas reciente.</p>
+        <div class="filtros">
+          <div><label class="campo" for="hHoja">Hoja</label><select id="hHoja"></select></div>
+          <div><label class="campo" for="hHU">Columna de la HU</label><select id="hHU"></select></div>
+          <div><label class="campo" for="hFecha">Columna de la fecha</label><select id="hFecha"></select></div>
+          <button class="btn" id="btnAplicarHU" type="button">Aplicar</button>
+        </div>
+        <p class="pie-tabla" id="vistaHU"></p>
       </div>
 
       <div id="mapeoMaestro" hidden>
@@ -737,7 +759,9 @@ const LS = {
   mapeo:  "aging.mapeoMaestro.v1",
   sembrado:"aging.sembrado.v1",
   ajustes:"aging.ajustes.v1",
-  ambiguos:"aging.ambiguos.v1"
+  ambiguos:"aging.ambiguos.v1",
+  movhu:"aging.movhu.v1",
+  mapeoHU:"aging.mapeoMovHU.v1"
 };
 
 /* Configuracion de arranque: las ubicaciones criticas y areas tal como estan en
@@ -887,6 +911,9 @@ const estado = {
   maestro: new Map(),   // claveSku -> costo
   maestroCrudo: [],     // [[sku, costo], ...] tal como se cargo
   ajustes: {},          // clave de linea -> {fecha, nota, creado}
+  movHU: new Map(),     // HU -> fecha de su ultimo movimiento
+  movHUCrudo: [],       // [[hu, fechaISO], ...] tal como se cargo
+  libroHU: null,        // archivo de movimientos abierto, para re-mapear
   maestroAmbiguos: {},  // sku repetido en el maestro con precios distintos
   ambiguosClaves: new Set(),
   lineas: [],           // calculadas
@@ -982,6 +1009,8 @@ const COLS = {
   descProd:   ["Descripción de producto","Descripcion de producto","Descripción producto","Texto breve"],
   cantidad:   ["Ctd.","Ctd","QTY_ON_HAND","Cantidad","Stock"],
   fechaAging: ["Fecha Aging","MOVE_DSTAMP"],
+  fechaEM:    ["Fecha EM"],
+  hu:         ["Unidad manipulación","Unidad manipulacion","Unidad de manipulacion","HU","Handling Unit","UM"],
   lote:       ["Lote"],
   tipoStock:  ["Denominación de tipo de stocks","Denominacion de tipo de stocks","Tipo de stock"],
   um:         ["Unidad medida base","UM","Unidad de medida"],
@@ -1025,17 +1054,17 @@ function ingestarStock(filas){
   const ih = filaEncabezado(filas, COLS.ubicacion);
   const head = filas[ih] || [];
   const c = {};
-  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","lote","tipoStock","um"]) {
+  for (const k of ["ubicacion","producto","descProd","cantidad","fechaAging","fechaEM","hu","lote","tipoStock","um"]) {
     c[k] = buscarCol(head, COLS[k]);
   }
   const faltan = [];
-  if (c.ubicacion  < 0) faltan.push("Ubicacion");
-  if (c.producto   < 0) faltan.push("Producto");
-  if (c.cantidad   < 0) faltan.push("Ctd.");
-  if (c.fechaAging < 0) faltan.push("Fecha Aging");
-  if (faltan.length) {
-    throw new Error("Faltan estas columnas: " + faltan.join(", ") +
-      ". El aging se cuenta desde Fecha Aging; Fecha EM no sirve de reemplazo.");
+  if (c.ubicacion < 0) faltan.push("Ubicacion");
+  if (c.producto  < 0) faltan.push("Producto");
+  if (c.cantidad  < 0) faltan.push("Ctd.");
+  if (faltan.length) throw new Error("Faltan estas columnas: " + faltan.join(", "));
+  if (c.fechaAging < 0 && c.fechaEM < 0) {
+    throw new Error("No hay ni Fecha Aging ni Fecha EM: sin una de las dos no se puede " +
+      "calcular la antiguedad.");
   }
 
   const out = [];
@@ -1049,6 +1078,8 @@ function ingestarStock(filas){
       descripcion:c.descProd  > -1 ? f[c.descProd]  : "",
       cantidad:   c.cantidad  > -1 ? f[c.cantidad]  : 0,
       fechaAging: c.fechaAging> -1 ? fecha(f[c.fechaAging]) : null,
+      fechaEM:    c.fechaEM    > -1 ? fecha(f[c.fechaEM])    : null,
+      hu:         c.hu         > -1 && f[c.hu] != null ? String(f[c.hu]).trim() : "",
       lote:       c.lote      > -1 ? f[c.lote]      : "",
       tipoStock:  c.tipoStock > -1 ? f[c.tipoStock] : "",
       um:         c.um        > -1 ? f[c.um]        : ""
@@ -1056,7 +1087,8 @@ function ingestarStock(filas){
   }
   if (!out.length) throw new Error("La hoja Stock no tiene filas con ubicacion.");
   estado.stock = out;
-  estado.fuentes.stock = { filas: out.length, sinFecha: out.filter((x) => !x.fechaAging).length, cuando: new Date() };
+  estado.fuentes.stock = { filas: out.length, sinFecha: out.filter((x) => !x.fechaAging).length,
+    conHU: out.filter((x) => x.hu).length, cuando: new Date() };
   return out.length;
 }
 
@@ -1180,6 +1212,37 @@ function ingestarMaestro(filas, iSku, iCosto){
   return pares.length;
 }
 
+function indexarMovHU(pares){
+  const m = new Map();
+  for (const [hu, f] of pares) {
+    const k = String(hu).trim().toUpperCase();
+    if (!k) continue;
+    const d = fecha(f);
+    if (!d) continue;
+    const prev = m.get(k);
+    if (!prev || d > prev) m.set(k, d);   /* nos quedamos con el mas reciente */
+  }
+  estado.movHU = m;
+  estado.movHUCrudo = pares;
+  guardar(LS.movhu, pares);
+  estado.fuentes.movHU = { filas: m.size, cuando: new Date() };
+}
+function ingestarMovHU(filas, iHU, iFecha){
+  const pares = [];
+  for (const f of filas) {
+    if (!f) continue;
+    const hu = f[iHU];
+    if (hu == null || String(hu).trim() === "") continue;
+    const d = f[iFecha];
+    if (d == null || d === "") continue;
+    if (!fecha(d)) continue;
+    pares.push([String(hu).trim(), fechaISO(fecha(d))]);
+  }
+  if (!pares.length) throw new Error("No encontre pares HU / fecha con esas columnas.");
+  indexarMovHU(pares);
+  return estado.movHU.size;
+}
+
 /* ============================================================
    5. CALCULO
    ============================================================ */
@@ -1230,10 +1293,17 @@ function calcular(){
     const target = Number(cfg.target);
     const tieneTarget = Number.isFinite(target) && target > 0;
 
+    /* De donde sale la fecha, en orden: ajuste a mano > la del archivo >
+       ultimo movimiento de su HU > Fecha EM para el stock sin HU. */
     const clave = claveLinea(f);
     const aj = estado.ajustes[clave];
-    const fechaUsada = aj && aj.fecha ? fecha(aj.fecha) : f.fechaAging;
-    if (aj) usados.add(clave);
+    let fechaUsada = null, origen = "";
+    if (aj && aj.fecha) { fechaUsada = fecha(aj.fecha); origen = "ajuste"; if (aj) usados.add(clave); }
+    else if (f.fechaAging) { fechaUsada = f.fechaAging; origen = "archivo"; }
+    else if (f.hu && estado.movHU.has(String(f.hu).trim().toUpperCase())) {
+      fechaUsada = estado.movHU.get(String(f.hu).trim().toUpperCase()); origen = "movHU";
+    } else if (!f.hu && f.fechaEM) { fechaUsada = f.fechaEM; origen = "fechaEM"; }
+    else if (f.hu) origen = "faltaMovHU";
     const aging = fechaUsada ? diasHabiles(fechaUsada, corte) : null;
 
     let costo = null, costoAmbiguo = false;
@@ -1250,8 +1320,8 @@ function calcular(){
 
     const cant = num(f.cantidad);
     lineas.push({
-      clave, ajustada: !!aj,
-      fechaArchivo: f.fechaAging,
+      clave, ajustada: !!aj, origenFecha: origen, hu: f.hu || "",
+      fechaArchivo: f.fechaAging, fechaEM: f.fechaEM,
       area, target: tieneTarget ? target : null,
       ubicacion: f.ubicacion,
       sku: f.producto == null ? "" : String(f.producto).trim(),
@@ -1331,6 +1401,8 @@ function calcular(){
     skusAmbiguosEnUso: Array.from(new Set(lineas.filter((l) => l.costoAmbiguo)
       .map((l) => String(l.sku).trim().toUpperCase()))),
     lineasSinFecha: lineas.filter((l) => l.sinFecha).length,
+    origenes: lineas.reduce((a, l) => { a[l.origenFecha || "ninguno"] = (a[l.origenFecha || "ninguno"] || 0) + 1; return a; }, {}),
+    sinMovHU: lineas.filter((l) => l.origenFecha === "faltaMovHU").length,
     areasSinConfig: resumen.filter((r) => !r.enConfig && r.lineas > 0).map((r) => r.area),
     targetsMezclados: (function(){
       const out = [];
@@ -1722,11 +1794,13 @@ function pintarCtxLinea(l){
   h += par("Valorizado", plata(l.valorizado), l.fuera);
   h += par("Dias habiles", l.aging == null ? "—" : entero(l.aging), l.fuera);
   h += par("Target", l.target == null ? "—" : entero(l.target) + " dias");
+  if (l.hu) h += par("HU", esc(l.hu));
   if (l.lote) h += par("Lote", esc(l.lote));
   if (l.tipoStock) h += par("Tipo de stock", esc(l.tipoStock));
   h += "<h3>Fecha aging</h3>";
   h += '<input type="date" class="fecha-ed' + (l.ajustada ? " tocada" : "") +
     '" id="ctxFecha" value="' + fechaISO(l.fechaAging) + '" style="width:100%">';
+  h += '<div style="margin:9px 0 0">' + chipOrigen(l) + "</div>";
   h += '<p style="font-size:11.5px;color:var(--t2);margin:7px 0 0">' +
     (l.ajustada ? "Ajustada a mano. En el archivo figura " +
       (l.fechaArchivo ? fechaAR(l.fechaArchivo) : "vacia") + ". Borra el campo para volver a esa."
@@ -1808,6 +1882,10 @@ function pintarAvisos(){
         (peor ? " (el peor va de " + plata(peor.min) + " a " + plata(peor.max) + ")" : "") + ".",
         "Ver", () => { irA("maestro"); $("#fSoloAmbiguos").checked = true; pintarMaestro(); }));
     }
+    if (d.sinMovHU) c.push(av("alerta", "<b>" + entero(d.sinMovHU) +
+      " lineas tienen HU pero no hay movimientos cargados</b>, asi que se quedaron sin fecha. " +
+      "Carga el export de movimientos de HU y se completan solas.",
+      "Cargar", () => irA("datos")));
     if (d.lineasSinFecha) c.push(av("alerta", "<b>" + entero(d.lineasSinFecha) +
       " lineas sin Fecha Aging</b>. No se les puede calcular antiguedad.",
       "Ver", () => { irA("lineas"); $("#fSoloProblemas").checked = true; pintarLineas(); }));
@@ -1889,7 +1967,7 @@ function pintarLineas(){
   const f = lineasFiltradas(), vis = f.slice(0, TOPE);
   let h = "<thead><tr><th>Area</th><th>Ubicacion</th><th>SKU</th><th>Descripcion</th>" +
     '<th class="cifra">Cant.</th><th class="cifra">Precio unit.</th><th class="cifra">Valorizado</th>' +
-    '<th>Fecha aging</th><th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
+    '<th>Fecha aging</th><th>De donde</th><th class="cifra">Dias</th><th class="cifra">Target</th><th>Estado</th></tr></thead><tbody>';
   for (const l of vis) {
     const b = banda(l);
     const chip = l.aging == null ? '<span class="chip neutro">sin fecha</span>'
@@ -1906,7 +1984,9 @@ function pintarLineas(){
       '<td class="cifra">' + (l.costo == null ? "—" : fmtMoneda.format(l.costo)) + "</td>" +
       '<td class="cifra">' + (l.sinCosto ? "—" : fmtMoneda.format(l.valorizado)) + "</td>" +
       '<td><input type="date" class="fecha-ed' + (l.ajustada ? " tocada" : "") +
-        '" data-clave="' + esc(l.clave) + '" value="' + fechaISO(l.fechaAging) + '"></td>' +
+        '" data-clave="' + esc(l.clave) + '" value="' + fechaISO(l.fechaAging) +
+        '" title="' + esc(ORIGENES[l.origenFecha] || "") + '"></td>' +
+      "<td>" + chipOrigen(l) + "</td>" +
       '<td class="cifra"><b>' + (l.aging == null ? "—" : entero(l.aging)) + "</b></td>" +
       '<td class="cifra">' + (l.target == null ? "—" : entero(l.target)) + "</td>" +
       "<td>" + chip + extra + "</td></tr>";
@@ -1916,6 +1996,26 @@ function pintarLineas(){
   $("#pieLineas").innerHTML = "Mostrando <b>" + entero(vis.length) + "</b> de <b>" +
     entero(f.length) + "</b> lineas · valorizado filtrado <b>" + plata(tot) + "</b>" +
     (f.length > vis.length ? " · exporta para verlas todas" : "");
+}
+
+const ORIGENES = {
+  ajuste:     "Pisada a mano desde la herramienta",
+  archivo:    "Viene cargada en la columna Fecha Aging del archivo",
+  movHU:      "Ultimo movimiento de su HU",
+  fechaEM:    "Fecha EM: es stock sin HU, no se movio desde que entro",
+  faltaMovHU: "Tiene HU pero no cargaste los movimientos"
+};
+const CHIP_ORIGEN = {
+  ajuste:     ['avisa', 'a mano'],
+  archivo:    ['neutro', 'archivo'],
+  movHU:      ['ok', 'mov. HU'],
+  fechaEM:    ['ok', 'Fecha EM'],
+  faltaMovHU: ['mal', 'falta mov.']
+};
+function chipOrigen(l){
+  const c = CHIP_ORIGEN[l.origenFecha];
+  if (!c) return '<span class="chip mal">sin fecha</span>';
+  return '<span class="chip ' + c[0] + '" title="' + esc(ORIGENES[l.origenFecha]) + '">' + c[1] + "</span>";
 }
 
 /* ---------- ajustes de fecha ---------- */
@@ -2133,7 +2233,7 @@ function pintarFuentes(){
   const f = estado.fuentes;
   const cuando = (x) => x && x.cuando ? new Date(x.cuando).toLocaleString("es-AR") : "—";
   const fila = (n, ok, d) => "<tr><td><b>" + n + "</b></td><td>" +
-    (ok ? '<span class="chip ok">cargado</span>' : '<span class="chip mal">falta</span>') +
+    (ok ? '<span class="chip ok">cargado</span>' : '<span class="chip neutro">sin cargar</span>') +
     "</td><td>" + d + "</td></tr>";
   $("#tablaFuentes").innerHTML = "<thead><tr><th>Fuente</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>" +
     fila("Base del WMS", !!f.stock, f.stock ? entero(f.stock.filas) + " filas, " +
@@ -2142,8 +2242,15 @@ function pintarFuentes(){
       " ubicaciones" + (f.ubicaciones ? " · " + cuando(f.ubicaciones) : " (guardadas en este navegador)")) +
     fila("Areas", estado.areas.length > 0, entero(estado.areas.length) + " areas" +
       (f.areas ? " · " + cuando(f.areas) : " (guardadas en este navegador)")) +
+    fila("Movimientos de HU", estado.movHU.size > 0, estado.movHU.size > 0
+      ? entero(estado.movHU.size) + " HU con fecha" + (f.movHU ? " · " + cuando(f.movHU) : " (guardados en este navegador)")
+      : "Opcional: solo si la base no trae la Fecha Aging cargada") +
     fila("Maestro valorizado", estado.maestroCrudo.length > 0, entero(estado.maestroCrudo.length) +
       " SKU" + (f.maestro ? " · " + cuando(f.maestro) : " (guardado en este navegador)")) +
+    (estado.diag.origenes ? '<tr><td><b>Fechas de aging</b></td><td></td><td>' +
+      Object.keys(estado.diag.origenes).map((k) =>
+        (CHIP_ORIGEN[k] ? CHIP_ORIGEN[k][1] : k) + ": <b>" + entero(estado.diag.origenes[k]) + "</b>")
+        .join(" &middot; ") + "</td></tr>" : "") +
     "</tbody>";
 }
 
@@ -2173,12 +2280,13 @@ function exportarResumen(){
 }
 function exportarLineas(){
   const f = [["Area","Ubicacion","SKU","Descripcion","Lote","Cantidad","UM","Precio","Valorizado",
-    "Fecha aging","Fecha del archivo","Ajustada","Dias","Target","Frenada","Atraso","Observacion"]];
+    "Fecha aging","De donde","HU","Fecha EM","Ajustada","Dias","Target","Frenada","Atraso","Observacion"]];
   for (const l of lineasFiltradas()) {
     const b = banda(l);
     f.push([l.area, l.ubicacion, l.sku, l.descripcion, l.lote, dec(l.cantidad), l.um,
       l.costo == null ? "" : dec(l.costo.toFixed(4)), l.sinCosto ? "" : dec(l.valorizado.toFixed(2)),
-      fechaAR(l.fechaAging), fechaAR(l.fechaArchivo), l.ajustada ? "X" : "",
+      fechaAR(l.fechaAging), (CHIP_ORIGEN[l.origenFecha] || ["", ""])[1], l.hu || "",
+      fechaAR(l.fechaEM), l.ajustada ? "X" : "",
       l.aging == null ? "" : l.aging, l.target == null ? "" : l.target, l.fuera ? "X" : "",
       b == null ? "" : BANDAS[b].rot,
       [l.sinCosto ? "sin precio" : "", l.costoAmbiguo ? "precio dudoso" : "",
@@ -2292,6 +2400,67 @@ function aplicarMaestro(nombre){
   }
 }
 
+async function cargarMovHU(file){
+  estadoZona("#zonaMovHU", "#estMovHU", "", "Leyendo " + esc(file.name) + "...");
+  try {
+    const res = await leerArchivo(file);
+    estado.libroHU = res;
+    const mapeo = leer(LS.mapeoHU, { hoja: null, iHU: null, iFecha: null });
+    if (res.tipo === "excel") {
+      const sel = $("#hHoja");
+      sel.innerHTML = res.nombres.map((n) => '<option value="' + esc(n) + '">' + esc(n) + "</option>").join("");
+      sel.value = mapeo.hoja && res.nombres.indexOf(mapeo.hoja) > -1 ? mapeo.hoja : res.nombres[0];
+    } else $("#hHoja").innerHTML = '<option value="">(archivo plano)</option>';
+    $("#mapeoHU").hidden = false;
+    poblarColumnasHU(mapeo.iHU, mapeo.iFecha);
+    aplicarMovHU(file.name);
+  } catch (e) {
+    estadoZona("#zonaMovHU", "#estMovHU", "error", esc(e.message));
+  }
+}
+function filasHU(){
+  const r = estado.libroHU;
+  if (!r) return [];
+  return r.tipo === "excel" ? (r.hojas[$("#hHoja").value] || []) : (r.filas || []);
+}
+function poblarColumnasHU(iHU, iFecha){
+  const filas = filasHU();
+  const head = filas[filaEncabezado(filas, COLS.hu)] || filas[0] || [];
+  const ancho = Math.max(head.length, 6);
+  const letra = (i) => { let s = "", n = i; do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0); return s; };
+  const ops = [];
+  for (let i = 0; i < ancho; i++) {
+    const m = head[i] == null ? "" : String(head[i]).slice(0, 26);
+    ops.push('<option value="' + i + '">' + letra(i) + (m ? " — " + esc(m) : "") + "</option>");
+  }
+  $("#hHU").innerHTML = ops.join(""); $("#hFecha").innerHTML = ops.join("");
+  /* si no hay un mapeo guardado, los buscamos por nombre */
+  const porNombre = (alias, def) => {
+    const k = buscarCol(head, alias);
+    return k > -1 ? k : def;
+  };
+  $("#hHU").value = Math.min(iHU != null ? iHU : porNombre(COLS.hu, 0), ancho - 1);
+  $("#hFecha").value = Math.min(iFecha != null ? iFecha
+    : porNombre(["Fecha de ultimo movimiento","Fecha ultimo movimiento","Fecha de último movimiento",
+                 "Ultimo movimiento","Último movimiento","Fecha movimiento","Fecha"], 1), ancho - 1);
+}
+function aplicarMovHU(nombre){
+  try {
+    const filas = filasHU();
+    const ih = filaEncabezado(filas, COLS.hu);
+    const iHU = +$("#hHU").value, iFecha = +$("#hFecha").value;
+    const n = ingestarMovHU(filas.slice(ih + 1), iHU, iFecha);
+    guardar(LS.mapeoHU, { hoja: $("#hHoja").value || null, iHU, iFecha });
+    $("#vistaHU").innerHTML = "Primeros movimientos: " + estado.movHUCrudo.slice(0, 3)
+      .map(([h, f]) => esc(h) + " = " + esc(fechaAR(fecha(f)))).join(" · ");
+    estadoZona("#zonaMovHU", "#estMovHU", "listo",
+      esc(nombre || "movimientos") + "<br>" + entero(n) + " HU con fecha");
+    pintarTodo();
+  } catch (e) {
+    estadoZona("#zonaMovHU", "#estMovHU", "error", esc(e.message));
+  }
+}
+
 /* ============================================================
    13. EVENTOS
    ============================================================ */
@@ -2398,7 +2567,10 @@ $("#tablaHist").addEventListener("click", (e) => {
 $$("[data-abre]").forEach((b) => b.addEventListener("click", () => $("#" + b.dataset.abre).click()));
 $("#inLibro").addEventListener("change", (e) => { if (e.target.files[0]) cargarLibro(e.target.files[0]); e.target.value = ""; });
 $("#inMaestro").addEventListener("change", (e) => { if (e.target.files[0]) cargarMaestro(e.target.files[0]); e.target.value = ""; });
-[["#zonaLibro", cargarLibro], ["#zonaMaestro", cargarMaestro]].forEach(([sel, fn]) => {
+$("#inMovHU").addEventListener("change", (e) => { if (e.target.files[0]) cargarMovHU(e.target.files[0]); e.target.value = ""; });
+$("#hHoja").addEventListener("change", () => poblarColumnasHU(+$("#hHU").value, +$("#hFecha").value));
+$("#btnAplicarHU").addEventListener("click", () => aplicarMovHU());
+[["#zonaLibro", cargarLibro], ["#zonaMaestro", cargarMaestro], ["#zonaMovHU", cargarMovHU]].forEach(([sel, fn]) => {
   const z = $(sel);
   ["dragenter","dragover"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add("encima"); }));
   ["dragleave","drop"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.remove("encima"); }));
@@ -2536,11 +2708,15 @@ $("#btnBorrarMaestro").addEventListener("click", () => {
     sembrarConfig();
     guardar(LS.sembrado, true);
   }
+  const mh = leer(LS.movhu, []);
+  if (mh.length) indexarMovHU(mh);
   const m = leer(LS.maestro, []);
   if (m.length) indexarMaestro(m);
   $("#fCorte").value = fechaISO(estado.corte);
   if (m.length) estadoZona("#zonaMaestro", "#estMaestro", "listo",
     "Guardado en este navegador<br>" + entero(m.length) + " SKU valorizados");
+  if (estado.movHU.size) estadoZona("#zonaMovHU", "#estMovHU", "listo",
+    "Guardado en este navegador<br>" + entero(estado.movHU.size) + " HU con fecha");
   pintarTodo();
   irA(estado.lineas.length ? "mapa" : "datos");
 })();

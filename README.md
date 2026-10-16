@@ -61,7 +61,8 @@ valorizado, dias y target. Aca tambien se edita la `Fecha Aging` de cada linea.
 1. **Datos** → arrastrar el `Base_Aging_ddmmaa.XLSX` del lunes. Es el export crudo del WMS,
    con la columna `Fecha Aging` completada. Tambien acepta el libro completo
    `Aging_ddmmaa.xlsx`, del que ademas lee las hojas de configuracion.
-2. **Datos** → arrastrar `Base Item Valorizados.xlsx`: queda guardado en el navegador (unos
+2. **Datos** → arrastrar el export de **movimientos de HU** (opcional, pero evita completar
+   la `Fecha Aging` a mano) y `Base Item Valorizados.xlsx`: queda guardado en el navegador (unos
    470 KB con los 22.398 materiales). Espera el `Material` en la columna A y el
    `Precio interno periodico` en la H. Los precios estan en USD.
 3. **Panorama** → mirar, y **Reporte PDF** para imprimirlo o guardarlo.
@@ -100,6 +101,27 @@ sola hoja.
 **Las celdas muy chicas** se agrandan hasta un minimo y, cuando hay varias, se les reserva una
 franja al pie: repartidas junto con las grandes quedarian en tiras de pocos pixeles y
 desaparecerian de la vista. La cifra que se lee adentro y en el globo siempre es la real.
+
+### De donde sale la Fecha Aging
+
+No hace falta completarla a mano. Si la columna viene vacia, se deriva asi, en orden:
+
+| Orden | Fuente | Cuando aplica |
+|---|---|---|
+| 1 | **Ajuste a mano** | si pisaste la fecha desde la herramienta |
+| 2 | **Columna `Fecha Aging`** | si el archivo la trae cargada |
+| 3 | **Ultimo movimiento de su HU** | si la linea tiene HU y cargaste el export de movimientos |
+| 4 | **`Fecha EM`** | stock sin HU: no se movio desde que entro al almacen |
+
+La regla sale de los datos. Sobre la base del 13-oct, de 463 lineas:
+
+- **422 tienen HU** y en ninguna coincide `Fecha Aging` con `Fecha EM`: son bultos armados
+  para despacho, que entraron al almacen mucho antes de llegar a la ubicacion.
+- **41 no tienen HU** y en 40 las dos fechas coinciden: es stock que no se movio.
+
+Verificado borrando la columna `Fecha Aging` del archivo: con el export de movimientos de
+HU y dos ajustes a mano, las seis areas reproducen el KPI al centavo. Cada linea muestra de
+donde salio su fecha, y esa columna va tambien en el CSV.
 
 ### Los ajustes de fecha
 
