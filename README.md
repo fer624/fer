@@ -119,6 +119,11 @@ La regla sale de los datos. Sobre la base del 13-oct, de 463 lineas:
   para despacho, que entraron al almacen mucho antes de llegar a la ubicacion.
 - **41 no tienen HU** y en 40 las dos fechas coinciden: es stock que no se movio.
 
+En la zona de carga hay un boton **Copiar las HU** que pone en el portapapeles la lista de
+HU distintas del stock (162 para las 422 lineas de la base del 13-oct), lista para pegar en
+EWM. Asi no hay que sacarla del Excel ni se escapa ninguna. Si el navegador no deja escribir
+el portapapeles, la baja en CSV.
+
 Verificado borrando la columna `Fecha Aging` del archivo: con el export de movimientos de
 HU y dos ajustes a mano, las seis areas reproducen el KPI al centavo. Cada linea muestra de
 donde salio su fecha, y esa columna va tambien en el CSV.

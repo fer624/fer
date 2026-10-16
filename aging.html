@@ -605,7 +605,10 @@ input.fecha-ed.tocada{background:var(--avisa-suave);border-color:#ecd9a4;color:#
           <h3>Movimientos de HU <span class="chip neutro">opcional</span></h3>
           <p>Para no completar la <span class="mono">Fecha Aging</span> a mano. Si la base ya
              la trae cargada, manda la del archivo.</p>
-          <button class="btn" type="button" data-abre="inMovHU">Elegir archivo</button>
+          <div class="acciones" style="justify-content:center;margin-top:0">
+            <button class="btn suave" type="button" id="btnCopiarHU" disabled>Copiar las HU</button>
+            <button class="btn" type="button" data-abre="inMovHU">Elegir archivo</button>
+          </div>
           <input type="file" id="inMovHU" accept=".xlsx,.xlsm,.xls,.csv,.txt">
           <div class="estado vacio" id="estMovHU">Sin cargar</div>
         </div>
@@ -1854,6 +1857,10 @@ function pintarCabecera(){
   const hay = estado.lineas.length > 0;
   $("#btnExportar").disabled = !hay;
   $("#btnReporte").disabled = !hay;
+  const hus = estado.stock.length ? huDelStock().length : 0;
+  const bh = $("#btnCopiarHU");
+  bh.disabled = hus === 0;
+  bh.textContent = hus ? "Copiar las " + entero(hus) + " HU" : "Copiar las HU";
   $("#btnGuardarCorte").disabled = !hay;
   const f = estado.fuentes.stock;
   $("#estadoFuente").innerHTML = hay
@@ -1884,8 +1891,8 @@ function pintarAvisos(){
     }
     if (d.sinMovHU) c.push(av("alerta", "<b>" + entero(d.sinMovHU) +
       " lineas tienen HU pero no hay movimientos cargados</b>, asi que se quedaron sin fecha. " +
-      "Carga el export de movimientos de HU y se completan solas.",
-      "Cargar", () => irA("datos")));
+      "Copia las " + entero(huDelStock().length) + " HU, pegalas en EWM y trae el export.",
+      "Copiar las HU", () => { irA("datos"); setTimeout(() => $("#btnCopiarHU").click(), 150); }));
     if (d.lineasSinFecha) c.push(av("alerta", "<b>" + entero(d.lineasSinFecha) +
       " lineas sin Fecha Aging</b>. No se les puede calcular antiguedad.",
       "Ver", () => { irA("lineas"); $("#fSoloProblemas").checked = true; pintarLineas(); }));
@@ -2461,6 +2468,31 @@ function aplicarMovHU(nombre){
   }
 }
 
+/* La lista de HU del stock, lista para pegar en EWM. Evita copiarla del Excel
+   y que se escape alguna. */
+function huDelStock(){
+  const set = new Set();
+  estado.stock.forEach((f) => { if (f.hu) set.add(String(f.hu).trim()); });
+  return Array.from(set);
+}
+function alPortapapeles(txt){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(txt).then(() => true).catch(() => viejoCopiar(txt));
+  }
+  return Promise.resolve(viejoCopiar(txt));
+}
+function viejoCopiar(txt){
+  try {
+    const t = document.createElement("textarea");
+    t.value = txt;
+    t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    const ok = document.execCommand("copy");
+    t.remove();
+    return ok;
+  } catch (e) { return false; }
+}
+
 /* ============================================================
    13. EVENTOS
    ============================================================ */
@@ -2568,6 +2600,17 @@ $$("[data-abre]").forEach((b) => b.addEventListener("click", () => $("#" + b.dat
 $("#inLibro").addEventListener("change", (e) => { if (e.target.files[0]) cargarLibro(e.target.files[0]); e.target.value = ""; });
 $("#inMaestro").addEventListener("change", (e) => { if (e.target.files[0]) cargarMaestro(e.target.files[0]); e.target.value = ""; });
 $("#inMovHU").addEventListener("change", (e) => { if (e.target.files[0]) cargarMovHU(e.target.files[0]); e.target.value = ""; });
+$("#btnCopiarHU").addEventListener("click", () => {
+  const hus = huDelStock();
+  if (!hus.length) return;
+  const b = $("#btnCopiarHU"), rot = b.textContent;
+  alPortapapeles(hus.join("\n")).then((ok) => {
+    if (ok) { b.textContent = "✓ " + entero(hus.length) + " HU copiadas"; }
+    else { bajarCSV("hu_del_stock.csv", [["Unidad manipulacion"]].concat(hus.map((h) => [h])));
+           b.textContent = "✓ bajadas en CSV"; }
+    setTimeout(() => { b.textContent = rot; }, 2600);
+  });
+});
 $("#hHoja").addEventListener("change", () => poblarColumnasHU(+$("#hHU").value, +$("#hFecha").value));
 $("#btnAplicarHU").addEventListener("click", () => aplicarMovHU());
 [["#zonaLibro", cargarLibro], ["#zonaMaestro", cargarMaestro], ["#zonaMovHU", cargarMovHU]].forEach(([sel, fn]) => {
