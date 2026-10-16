@@ -33,8 +33,15 @@ subtotal, porque no todas las ubicaciones significan lo mismo:
 | **Transito operativo** | mercaderia de paso hacia recepcion o despacho | que haya stock es normal; lo que importa es que no se frene |
 
 El tipo se **deriva del target**, que ya codifica la diferencia: hasta 7 dias es transito,
-mas es retencion. Se corrige a mano con el desplegable **Tipo** en la solapa Ubicaciones, y
-la eleccion queda guardada.
+mas es retencion. Manda lo mas especifico que haya cargado: **ubicacion > area > target**.
+
+El corte se hace **por ubicacion**, no por area, porque dentro de un area puede haber de las
+dos: `0900-SLOTTING` tiene target 1 y es transito, mientras el resto de 0900 tiene 90 y es
+retencion. Un area con ubicaciones de los dos tipos aparece en las dos secciones, con las
+que le corresponden a cada una.
+
+Se fija en la solapa **Ubicaciones**, con un desplegable por fila o marcando en bloque todo
+lo que haya quedado filtrado. La eleccion queda guardada y se exporta en el CSV.
 
 Dentro de cada seccion hay un bloque por area, y dentro **una barra por ubicacion**,
 ordenadas de mayor a menor. Todas las barras comparten la misma escala, asi se comparan
@@ -152,6 +159,12 @@ diferencia es que marca esas lineas como "precio dudoso" y deja ver el rango.
 
 Al cargar un maestro con menos de la mitad de los SKU que el guardado, pregunta si reemplazar
 o fusionar, para no perder precios con un archivo parcial o mal mapeado.
+
+### La marca
+
+El encabezado del PDF y la barra lateral llevan los logos de **Inventory Management** y
+**CEVA Logistics**, y el site **Finning Cat**. Van embebidos en el HTML como los demas
+recursos, asi que el archivo sigue siendo uno solo y funciona sin internet.
 
 ### Offline
 
