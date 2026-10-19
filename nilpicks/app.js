@@ -269,17 +269,26 @@ function indexarTomas(filas, mapa) {
   const idx = new Map();
   filas.forEach((f) => {
     if (limpiar(valor(f, mapa, 'codigoExcepcion'))) return;        // solo tomas limpias
+
+    /* Una tarea puede venir partida en dos tramos, y el tramo interno llega
+       sin documento y sin ubicación de procedencia. Ese no prueba nada: sin
+       gaveta no se puede saber si la línea salió de la misma o de otra, y
+       sin fecha de confirmación no hay toma confirmada. */
+    const documento = limpiar(valor(f, mapa, 'documento'));
+    const ubicacion = limpiar(valor(f, mapa, 'ubicacion'));
+    const fecha = aFechaISO(valor(f, mapa, 'fechaConfirmacion'));
+    if (!documento || !ubicacion || !fecha) return;
+
     const clave = [
-      limpiar(valor(f, mapa, 'documento')),
+      documento,
       limpiar(valor(f, mapa, 'item')),
       limpiar(valor(f, mapa, 'producto')),
     ].join('|');
-    const fecha = aFechaISO(valor(f, mapa, 'fechaConfirmacion'));
     const hora = aHora(valor(f, mapa, 'horaConfirmacion'));
     const lista = idx.get(clave) || [];
     lista.push({
       tarea: limpiar(valor(f, mapa, 'tareaAlmacen')),
-      ubicacion: limpiar(valor(f, mapa, 'ubicacion')),
+      ubicacion,
       cantidad: aNumero(valor(f, mapa, 'cantidadReal')),
       usuario: limpiar(valor(f, mapa, 'confirmadoPor')) || limpiar(valor(f, mapa, 'usuario')),
       fecha,
@@ -413,6 +422,8 @@ function construirIntentos(filas, pedidos) {
   const intentos = [];
   let bidf = 0;
 
+  let incompletos = 0;
+
   filas.forEach((f) => {
     const cod = limpiar(valor(f, mapa, 'codigoExcepcion')).toUpperCase();
     if (!COD_EXCEPCION.includes(cod)) return;
@@ -423,6 +434,12 @@ function construirIntentos(filas, pedidos) {
     const ubicacion = limpiar(valor(f, mapa, 'ubicacion'));
     const fecha = aFechaISO(valor(f, mapa, 'fechaConfirmacion'));
     const hora = aHora(valor(f, mapa, 'horaConfirmacion'));
+
+    /* Sin documento, producto, gaveta o fecha no hay caso que armar ni
+       cíclico que pedir. Pasa con las filas en blanco del final del export
+       y con los tramos internos de una tarea partida en dos. */
+    if (!documento || !producto || !ubicacion || !fecha) { incompletos++; return; }
+
     const extra = pedidos.get(documento) || {};
 
     intentos.push({
@@ -449,7 +466,7 @@ function construirIntentos(filas, pedidos) {
   });
 
   intentos.sort((a, b) => a.momento - b.momento);
-  return { intentos, bidf, mapa };
+  return { intentos, bidf, incompletos, mapa };
 }
 
 function casoNuevo(intento, secuencia) {
@@ -486,7 +503,7 @@ function casoNuevo(intento, secuencia) {
  */
 function procesar(filasPicking, filasPedidos, casosExistentes) {
   const pedidos = indexarPedidos(filasPedidos);
-  const { intentos, bidf, mapa } = construirIntentos(filasPicking, pedidos);
+  const { intentos, bidf, incompletos, mapa } = construirIntentos(filasPicking, pedidos);
   const tomas = indexarTomas(filasPicking, mapa);
 
   const porGrupo = new Map();
@@ -581,6 +598,7 @@ function procesar(filasPicking, filasPedidos, casosExistentes) {
     duplicados,
     reclasificados,
     faltantes,
+    incompletos,
     cerradosAuto: casos.filter((c) => c.cierreAutomatico).length,
   };
 }
@@ -704,7 +722,7 @@ async function procesarArchivos() {
     };
     await DB.logImportacion(registro);
 
-    mostrarResumen(registro, filasPic.length - r.bidf, r.faltantes);
+    mostrarResumen(registro, filasPic.length - r.bidf, r.faltantes, r.incompletos);
     await recargar();
     await pintarImportaciones();
     avisar(`${r.nuevos} casos nuevos, ${r.reintentos} reintentos, ${r.cerradosAuto} cerrados solos.`, 'ok');
@@ -717,7 +735,7 @@ async function procesarArchivos() {
   }
 }
 
-function mostrarResumen(r, tomasLimpias, faltantes = []) {
+function mostrarResumen(r, tomasLimpias, faltantes = [], incompletos = 0) {
   const datos = [
     ['Tareas BIDF', numeroLindo(r.bidf)],
     ['Casos nuevos', numeroLindo(r.nuevos)],
@@ -737,6 +755,10 @@ function mostrarResumen(r, tomasLimpias, faltantes = []) {
       ? `El archivo trajo ${numeroLindo(tomasLimpias)} tareas sin excepción, que son las que permiten detectar las retomas.`
       : 'Atención: el archivo no trae ninguna tarea sin excepción. Sin esas filas no hay forma de detectar las retomas y todo va a quedar como Nil Pick. Exportá el reporte de picking completo, sin filtrar por código de excepción.',
   ];
+
+  if (incompletos) {
+    avisos.push(`Se saltearon ${numeroLindo(incompletos)} filas BIDF sin documento, producto, ubicación o fecha de confirmación. Suelen ser filas en blanco del export o tramos internos de una tarea partida en dos.`);
+  }
 
   if (faltantes.length) {
     avisos.push(`El reporte no trae ${faltantes.join(', ')}. Los casos se cargan igual, pero el ranking o el dato que sale de esa columna va a quedar en "(sin dato)". Si la necesitás, agregala al layout del export de SAP.`);

@@ -148,9 +148,21 @@ Fechas: toma `dd.mm.aaaa`, `dd/mm/aaaa`, `aaaa-mm-dd`, fecha real de Excel o
 número de serie. Las horas de SAP vienen como celda con fecha base 1899 y se
 muestran como HH:MM:SS. Cantidades: tolera `1.250,5` y `1,250.5`.
 
-Hoy solo se toma el código **BIDF**. En los reportes también aparece **BIDP**:
-si alguna vez lo querés seguir, se agrega a la constante `COD_EXCEPCION` de
-`app.js`.
+Hoy solo se toma el código **BIDF**. En los reportes también aparece **BIDP**
+(en el export de septiembre 2026 son 15 tareas contra 138 BIDF): si alguna vez
+lo querés seguir, se agrega a la constante `COD_EXCEPCION` de `app.js`.
+
+### Filas que se saltean
+
+Una tarea de almacén puede venir **partida en dos tramos**, y el tramo interno
+llega sin documento y sin ubicación de procedencia. Esa fila no prueba nada:
+sin gaveta no se puede saber si la línea salió de la misma o de otra. Lo mismo
+con las filas en blanco del final del export.
+
+Por eso se descarta toda fila sin documento, producto, ubicación o fecha de
+confirmación, de los dos lados: no genera caso si es BIDF, y no cuenta como
+retoma si es una toma limpia. Si se saltea alguna fila BIDF, la importación lo
+dice en el resumen.
 
 ## Estructura
 
