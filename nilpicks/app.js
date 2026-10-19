@@ -244,14 +244,32 @@ function avisar(mensaje, tipo = '') {
    3. Lectura de archivos
    ========================================================================= */
 
+/**
+ * Lee el archivo y devuelve { encabezados, filas }, con cada fila como un
+ * array de celdas.
+ *
+ * Un export de SAP trae más de 120 columnas y la app usa 17. Armar un objeto
+ * con todas las columnas por cada fila cuesta carísimo cuando se cargan
+ * varios meses de una: con 32.000 filas eran 850 MB de memoria y medio minuto
+ * con la pantalla congelada. Con arrays, y leyendo la hoja en modo denso, se
+ * trabaja sobre lo mismo a una fracción del costo.
+ */
 function leerExcel(file) {
   return new Promise((resolve, reject) => {
     const lector = new FileReader();
     lector.onload = (ev) => {
       try {
-        const libro = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
+        const libro = XLSX.read(new Uint8Array(ev.target.result), {
+          type: 'array',
+          cellDates: true,
+          dense: true,
+          cellFormula: false,
+          cellHTML: false,
+          cellStyles: false,
+        });
         const hoja = libro.Sheets[libro.SheetNames[0]];
-        resolve(XLSX.utils.sheet_to_json(hoja, { defval: '' }));
+        const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '', blankrows: false });
+        resolve({ encabezados: filas.length ? filas[0] : [], filas: filas.slice(1) });
       } catch (err) {
         reject(err);
       }
@@ -261,22 +279,25 @@ function leerExcel(file) {
   });
 }
 
-/** Diccionario {campoLógico: nombreRealDeColumna} según los encabezados. */
-function mapearColumnas(fila, diccionario) {
+/** Diccionario {campoLógico: índice de columna} según los encabezados. */
+function mapearColumnas(encabezados, diccionario) {
   const reales = {};
-  Object.keys(fila || {}).forEach((k) => { reales[normalizar(k)] = k; });
+  (encabezados || []).forEach((h, i) => {
+    const n = normalizar(h);
+    if (n && !(n in reales)) reales[n] = i;      // ante empate, gana la primera
+  });
 
   const mapa = {};
   Object.entries(diccionario).forEach(([campo, alias]) => {
-    const encontrado = alias.find((a) => reales[a]);
-    if (encontrado) mapa[campo] = reales[encontrado];
+    const encontrado = alias.find((a) => a in reales);
+    if (encontrado !== undefined) mapa[campo] = reales[encontrado];
   });
   return mapa;
 }
 
 function valor(fila, mapa, campo) {
-  const col = mapa[campo];
-  return col ? fila[col] : '';
+  const i = mapa[campo];
+  return i === undefined ? '' : fila[i];
 }
 
 /* =========================================================================
@@ -326,11 +347,11 @@ function indexarTomas(filas, mapa) {
 }
 
 /** Datos de contacto por documento, del reporte de pedidos (si vino). */
-function indexarPedidos(filas) {
-  if (!filas.length) return new Map();
-  const mapa = mapearColumnas(filas[0], COLS_PEDIDOS);
+function indexarPedidos(hoja) {
+  if (!hoja || !hoja.filas.length) return new Map();
+  const mapa = mapearColumnas(hoja.encabezados, COLS_PEDIDOS);
   const idx = new Map();
-  filas.forEach((f) => {
+  hoja.filas.forEach((f) => {
     const doc = limpiar(valor(f, mapa, 'documento'));
     if (!doc) return;
     idx.set(doc, {
@@ -451,13 +472,18 @@ function refrescar(caso) {
    ========================================================================= */
 
 /** Saca del reporte de picking los intentos fallidos (las tareas BIDF). */
-function construirIntentos(filas, pedidos) {
-  const mapa = mapearColumnas(filas[0], COLS_PICKING);
+function construirIntentos(hoja, pedidos) {
+  const { encabezados, filas } = hoja;
+  const mapa = mapearColumnas(encabezados, COLS_PICKING);
 
-  if (!mapa.documento || !mapa.codigoExcepcion) {
+  // Ojo: el índice puede ser 0 (la primera columna del archivo), que es
+  // falsy. La pregunta es si el campo está mapeado, no si el índice es > 0.
+  const tiene = (campo) => mapa[campo] !== undefined;
+
+  if (!tiene('documento') || !tiene('codigoExcepcion')) {
     throw new Error('El reporte de picking no tiene las columnas Documento y Código de excepción.');
   }
-  if (!mapa.ubicacion) {
+  if (!tiene('ubicacion')) {
     throw new Error('El reporte de picking no tiene la columna Ubic.procedencia, y sin la gaveta no hay cíclico que pedir.');
   }
 
@@ -488,7 +514,7 @@ function construirIntentos(filas, pedidos) {
     const extra = pedidos.get(documento) || {};
     const cantidad = aNumero(valor(f, mapa, 'cantidad'));
     const sacado = aNumero(valor(f, mapa, 'cantidadReal'));
-    const faltante = mapa.diferencia
+    const faltante = tiene('diferencia')
       ? Math.abs(aNumero(valor(f, mapa, 'diferencia')))
       : Math.max(0, cantidad - sacado);
 
@@ -557,10 +583,10 @@ function casoNuevo(intento, secuencia) {
  * es lo que permite que una retoma del día siguiente cierre el caso) y deja
  * cada caso con el estado que le corresponde.
  */
-function procesar(filasPicking, filasPedidos, casosExistentes) {
-  const pedidos = indexarPedidos(filasPedidos);
-  const { intentos, bidf, parciales, incompletos, mapa } = construirIntentos(filasPicking, pedidos);
-  const tomas = indexarTomas(filasPicking, mapa);
+function procesar(hojaPicking, hojaPedidos, casosExistentes) {
+  const pedidos = indexarPedidos(hojaPedidos);
+  const { intentos, bidf, parciales, incompletos, mapa } = construirIntentos(hojaPicking, pedidos);
+  const tomas = indexarTomas(hojaPicking.filas, mapa);
 
   const porGrupo = new Map();
   casosExistentes.forEach((c) => {
@@ -643,7 +669,7 @@ function procesar(filasPicking, filasPedidos, casosExistentes) {
     confirmadoPor: 'Confirmado por',
   };
   const faltantes = Object.entries(OPCIONALES)
-    .filter(([campo]) => !mapa[campo])
+    .filter(([campo]) => mapa[campo] === undefined)
     .map(([, nombre]) => nombre);
 
   const casos = [...tocados.values()];
@@ -757,20 +783,20 @@ async function procesarArchivos() {
   btn.textContent = 'Procesando…';
 
   try {
-    const [filasPic, filasPed] = await Promise.all([
+    const [hojaPic, hojaPed] = await Promise.all([
       leerExcel(App.archivos.picking),
-      App.archivos.pedidos ? leerExcel(App.archivos.pedidos) : Promise.resolve([]),
+      App.archivos.pedidos ? leerExcel(App.archivos.pedidos) : Promise.resolve(null),
     ]);
 
-    if (!filasPic.length) throw new Error('El reporte de picking no tiene filas.');
+    if (!hojaPic.filas.length) throw new Error('El reporte de picking no tiene filas.');
 
-    const r = procesar(filasPic, filasPed, await DB.getCasos());
+    const r = procesar(hojaPic, hojaPed, await DB.getCasos());
     await DB.putCasos(r.casos);
 
     const registro = {
       ts: new Date().toISOString(),
       archivo: App.archivos.picking.name,
-      filas: filasPic.length,
+      filas: hojaPic.filas.length,
       bidf: r.bidf,
       nuevos: r.nuevos,
       reintentos: r.reintentos,
@@ -780,7 +806,7 @@ async function procesarArchivos() {
     };
     await DB.logImportacion(registro);
 
-    mostrarResumen(registro, filasPic.length - r.bidf, r.faltantes, r.incompletos);
+    mostrarResumen(registro, hojaPic.filas.length - r.bidf, r.faltantes, r.incompletos);
     await recargar();
     await pintarImportaciones();
     avisar(`${r.nuevos} casos nuevos, ${r.reintentos} reintentos, ${r.cerradosAuto} cerrados solos.`, 'ok');
