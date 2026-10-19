@@ -31,6 +31,18 @@ const COD_EXCEPCION = {
 
 const CLASIFICACIONES = ['Nil Pick', 'Repicking', 'Diferencia parcial'];
 
+/* Un color por clasificación, el mismo en todos los gráficos de la app.
+   Validados para daltonismo: el peor par da ΔE 13,3 en deuteranopía. El
+   verde que usaba Repicking daba 5,7 contra el ámbar de Nil Pick, o sea
+   indistinguibles para quien tiene protanopía. */
+const COLOR = {
+  'Nil Pick': '#B26A00',
+  Repicking: '#0057B8',
+  'Diferencia parcial': '#8C1D6E',
+};
+
+const SUPERFICIE = '#FFFFFF';   // fondo de los paneles: separa los tramos apilados
+
 /** Clase CSS de la etiqueta de cada clasificación. */
 function claseTag(clasificacion) {
   if (clasificacion === 'Nil Pick') return 'tag--nil';
@@ -700,6 +712,8 @@ const App = {
   archivos: { picking: null, pedidos: null },
   vista: 'kpi',
   grafico: null,
+  graficosRank: {},
+  seleccion: new Set(),
   filtroClasificacion: new Set(),
   filtroEstado: new Set(),
   site: SITES[0],
@@ -900,6 +914,7 @@ function unidades() {
       documentos: new Set(),
       cantidad: 0,
       desde: '',
+      hasta: '',
       nil: 0,
       repick: 0,
       parcial: 0,
@@ -909,6 +924,8 @@ function unidades() {
     u.documentos.add(c.documento);
     u.cantidad += aNumero(c.cantidad);
     if (!u.desde || (c.fecha && c.fecha < u.desde)) u.desde = c.fecha;
+    const ultima = c.fechaUltimo || c.fecha;
+    if (!u.hasta || (ultima && ultima > u.hasta)) u.hasta = ultima;
     if (c.clasificacion === 'Nil Pick') u.nil++;
     else if (c.clasificacion === 'Diferencia parcial') { u.parcial++; u.faltante += aNumero(c.faltante); }
     else u.repick++;
@@ -946,13 +963,27 @@ function unidades() {
   });
 }
 
+/**
+ * Días desde el ÚLTIMO fallo de la gaveta, no desde el primero. Una gaveta
+ * que falló en julio y volvió a fallar la semana pasada no es vieja: sigue
+ * activa, y cerrarla en bloque por antigua sería un error.
+ */
+function antiguedad(u) {
+  const ref = u.hasta || u.desde;
+  if (!ref) return 0;
+  const [a, m, d] = ref.split('-').map(Number);
+  return Math.round((Date.now() - new Date(a, m - 1, d).getTime()) / 86400000);
+}
+
 function unidadesFiltradas() {
   const filtro = $('#ciclicosFiltro').value;
+  const dias = Number($('#ciclicosAntiguedad').value) || 0;
   const q = normalizar($('#ciclicosBusqueda').value);
   return unidades().filter((u) => {
     if (filtro === 'pendientes' && u.estado !== 'A contar') return false;
     if (filtro === 'contados' && u.estado !== 'Contado') return false;
     if (filtro === 'abiertos' && u.estado === 'Cerrado') return false;
+    if (dias && antiguedad(u) <= dias) return false;
     if (q && !normalizar(`${u.ubicacion} ${u.producto} ${u.descripcion}`).includes(q)) return false;
     return true;
   });
@@ -983,6 +1014,7 @@ function pintarCiclicos() {
       : '—';
     return `
       <tr data-clave="${esc(u.clave)}">
+        <td class="chk">${u.estado === 'Cerrado' ? '' : `<input type="checkbox" data-sel="${esc(u.clave)}"${App.seleccion.has(u.clave) ? ' checked' : ''}>`}</td>
         <td><strong>${esc(u.ubicacion)}</strong></td>
         <td>${esc(u.producto)}</td>
         <td class="desc">${esc(u.descripcion)}</td>
@@ -991,7 +1023,7 @@ function pintarCiclicos() {
           <span class="tag ${u.clasePrincipal}">${esc(u.motivo)}</span>
           ${u.faltante ? `<div class="menudo">faltan ${numeroLindo(u.faltante)} un. según SAP</div>` : ''}
         </td>
-        <td>${fechaLinda(u.desde)}</td>
+        <td>${fechaLinda(u.desde)}<div class="menudo">${u.hasta && u.hasta !== u.desde ? `último ${fechaLinda(u.hasta)} · ` : ''}hace ${numeroLindo(antiguedad(u))} días</div></td>
         <td class="num">${numeroLindo(u.cantidad)}</td>
         <td class="num">${hayNumero(u.contado) ? numeroLindo(u.contado) : '—'}</td>
         <td class="num">${dif}</td>
@@ -1004,8 +1036,115 @@ function pintarCiclicos() {
     btn.addEventListener('click', () => abrirUnidad(btn.closest('tr').dataset.clave));
   });
 
+  $$('#ciclicosCuerpo input[data-sel]').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      if (chk.checked) App.seleccion.add(chk.dataset.sel);
+      else App.seleccion.delete(chk.dataset.sel);
+      pintarSeleccion();
+    });
+  });
+
+  // La selección se limita a lo que está a la vista
+  const visibles = new Set(lista.map((u) => u.clave));
+  [...App.seleccion].forEach((c) => { if (!visibles.has(c)) App.seleccion.delete(c); });
+  pintarSeleccion();
+
   $('#ciclicosVacio').hidden = lista.length > 0;
   $('#tablaCiclicos').style.display = lista.length ? '' : 'none';
+}
+
+/** Barra de acciones en bloque: aparece cuando hay algo seleccionado. */
+function pintarSeleccion() {
+  const n = App.seleccion.size;
+  $('#ciclicosMasiva').hidden = n === 0;
+  $('#masivaCuenta').textContent = n === 1 ? '1 gaveta seleccionada' : `${numeroLindo(n)} gavetas seleccionadas`;
+
+  const abiertas = unidadesFiltradas().filter((u) => u.estado !== 'Cerrado');
+  const todas = $('#ciclicosTodos');
+  todas.checked = abiertas.length > 0 && abiertas.every((u) => App.seleccion.has(u.clave));
+  todas.indeterminate = n > 0 && !todas.checked;
+}
+
+/**
+ * Cierre en bloque. Sirve sobre todo al cargar meses viejos: lo de julio y
+ * agosto ya se gestionó en su momento, y no tiene sentido que aparezca como
+ * pendiente de contar.
+ *
+ * La diferencia entre las dos opciones no es cosmética: "ya ajustado" suma a
+ * la columna Ajustadas del KPI del mes, y "sin ajuste" no. Las unidades no se
+ * inventan: quedan vacías, porque la app no las conoce.
+ */
+function abrirCierreMasivo() {
+  const sel = unidadesFiltradas().filter((u) => App.seleccion.has(u.clave) && u.estado !== 'Cerrado');
+  if (!sel.length) { avisar('No hay gavetas abiertas seleccionadas.', 'error'); return; }
+
+  const casos = sel.reduce((a, u) => a + u.casos.filter((c) => c.estado !== 'Cerrado').length, 0);
+  const meses = [...new Set(sel.map((u) => (u.desde || '').slice(0, 7)).filter(Boolean))].sort();
+
+  $('#modalTitulo').textContent = 'Cerrar en bloque';
+  $('#modalSub').textContent = `${numeroLindo(sel.length)} gavetas · ${numeroLindo(casos)} casos abiertos`;
+  $('#modalCuerpo').innerHTML = `
+    <div class="paso" data-activo="si">
+      <div class="paso__titulo">Qué pasó con estas gavetas</div>
+      <div class="campo">
+        <label class="campo__etiqueta" for="masivaMotivo">Cierre</label>
+        <select id="masivaMotivo">
+          <option value="ajustado">Ya se ajustaron, fuera de la app</option>
+          <option value="sin">Se cierran sin ajuste</option>
+        </select>
+      </div>
+      <p class="barra__sub" id="masivaAyuda"></p>
+      <div class="campo">
+        <label class="campo__etiqueta" for="masivaObs">Observación</label>
+        <textarea id="masivaObs" placeholder="Queda guardada en cada caso">Cierre en bloque de casos anteriores al uso de la app</textarea>
+      </div>
+      <div class="paso__acciones">
+        <button class="btn btn--primario" id="btnConfirmarMasivo">Cerrar ${numeroLindo(sel.length)} gavetas</button>
+      </div>
+    </div>
+
+    <div class="paso">
+      <div class="paso__titulo">Qué se cierra</div>
+      <p class="barra__sub">Meses alcanzados: ${meses.map(mesLindo).join(', ') || '—'}</p>
+      <ul class="lista">
+        ${sel.slice(0, 12).map((u) => `<li><strong>${esc(u.ubicacion)}</strong> · ${esc(u.producto)} · ${u.casos.length} caso(s) · último fallo ${fechaLinda(u.hasta || u.desde)}, hace ${numeroLindo(antiguedad(u))} días</li>`).join('')}
+        ${sel.length > 12 ? `<li>…y ${numeroLindo(sel.length - 12)} más</li>` : ''}
+      </ul>
+    </div>`;
+
+  const ayuda = () => {
+    $('#masivaAyuda').textContent = $('#masivaMotivo').value === 'ajustado'
+      ? 'Suman a la columna Ajustadas del KPI de su mes. Las unidades quedan vacías: la app no las conoce, y no se inventan.'
+      : 'Se cierran sin contar ni ajustar. No suman a Ajustadas; solo dejan de figurar como pendientes.';
+  };
+  ayuda();
+  $('#masivaMotivo').addEventListener('change', ayuda);
+
+  $('#btnConfirmarMasivo').addEventListener('click', async () => {
+    const ajustado = $('#masivaMotivo').value === 'ajustado';
+    const obs = $('#masivaObs').value;
+    const ts = new Date().toISOString();
+
+    const lista = [];
+    sel.forEach((u) => u.casos.filter((c) => c.estado !== 'Cerrado').forEach((c) => lista.push({
+      ...c,
+      estado: 'Cerrado',
+      cerradoAMano: true,
+      cierreMasivo: true,
+      ajustado,
+      unidadesAjuste: '',
+      observaciones: [c.observaciones, obs].filter(Boolean).join(' — '),
+      fechaCierre: ts,
+    })));
+
+    await DB.putCasos(lista);
+    App.seleccion.clear();
+    await recargar();
+    cerrarModal();
+    avisar(`${numeroLindo(sel.length)} gavetas cerradas${ajustado ? ' como ya ajustadas' : ' sin ajuste'}.`, 'ok');
+  });
+
+  $('#modal').classList.add('is-abierto');
 }
 
 /* =========================================================================
@@ -1248,7 +1387,18 @@ function prepararFiltros() {
   });
 
   $('#ciclicosFiltro').addEventListener('change', pintarCiclicos);
+  $('#ciclicosAntiguedad').addEventListener('change', pintarCiclicos);
   $('#ciclicosBusqueda').addEventListener('input', pintarCiclicos);
+
+  $('#ciclicosTodos').addEventListener('change', (e) => {
+    const abiertas = unidadesFiltradas().filter((u) => u.estado !== 'Cerrado');
+    abiertas.forEach((u) => {
+      if (e.target.checked) App.seleccion.add(u.clave); else App.seleccion.delete(u.clave);
+    });
+    pintarCiclicos();
+  });
+  $('#btnLimpiarSeleccion').addEventListener('click', () => { App.seleccion.clear(); pintarCiclicos(); });
+  $('#btnCerrarMasivo').addEventListener('click', abrirCierreMasivo);
 }
 
 function aplicarFiltros() {
@@ -1535,11 +1685,100 @@ function rankingsDelPeriodo() {
     : App.casos.filter((c) => c.fecha && c.fecha.slice(0, 7) === clave);
 }
 
+/** Etiqueta corta para el eje: el código entero no entra. */
+function recortar(txt, n = 24) {
+  const t = String(txt || '');
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+}
+
+/** Leyenda compartida: cuatro gráficos con las mismas tres series. */
+function pintarLeyenda() {
+  $('#rankLeyenda').innerHTML = Object.entries(COLOR).map(([nombre, color]) => `
+    <span class="leyenda__item">
+      <span class="leyenda__marca" style="background:${color}"></span>${esc(nombre)}
+    </span>`).join('');
+}
+
+/** Barras horizontales apiladas: el nombre de la gaveta o del producto es
+    largo, así que va en el eje vertical y se lee entero en el tooltip. */
+function dibujarRanking(canvas, r, palabra) {
+  const previo = App.graficosRank[canvas.id];
+  if (previo) previo.destroy();
+
+  const etiquetas = r.filas.map((f) => recortar(f.clave));
+  const completas = r.filas.map((f) => String(f.clave));
+
+  App.graficosRank[canvas.id] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: etiquetas,
+      datasets: [
+        { label: 'Nil Pick', data: r.filas.map((f) => f.nil), backgroundColor: COLOR['Nil Pick'] },
+        { label: 'Repicking', data: r.filas.map((f) => f.repick), backgroundColor: COLOR.Repicking },
+        { label: 'Diferencia parcial', data: r.filas.map((f) => f.parcial), backgroundColor: COLOR['Diferencia parcial'] },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      datasets: { bar: { borderWidth: 2, borderColor: SUPERFICIE, borderRadius: 4 } },
+      scales: {
+        x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#EBF0F6' }, border: { display: false } },
+        y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { font: { size: 11.5 }, autoSkip: false } },
+      },
+      plugins: {
+        legend: { display: false },          // una sola leyenda para los cuatro
+        tooltip: {
+          callbacks: {
+            title: (items) => completas[items[0].dataIndex],
+            label: (i) => `${i.dataset.label}: ${numeroLindo(i.raw)}`,
+            footer: (items) => {
+              const f = r.filas[items[0].dataIndex];
+              const pct = r.total ? ((f.total / r.total) * 100).toFixed(0) : 0;
+              return `Total: ${numeroLindo(f.total)} ${palabra} · ${pct}%`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 function pintarRankings() {
   const lista = rankingsDelPeriodo();
   const unidad = $('#kpiUnidad').value;
   const tope = Number($('#rankTope').value);
   const palabra = unidad === 'tareas' ? 'tareas BIDF' : 'casos';
+  const comoGrafico = $('#rankVista').value === 'grafico';
+
+  pintarLeyenda();
+  $('#rankLeyenda').hidden = !comoGrafico;
+
+  // Los gráficos viejos se destruyen antes de reemplazar el HTML
+  Object.values(App.graficosRank).forEach((g) => g.destroy());
+  App.graficosRank = {};
+
+  const calculados = DIMENSIONES.map((dim) => ({ dim, r: ranking(lista, dim, unidad, tope) }));
+
+  if (comoGrafico) {
+    $('#rankings').innerHTML = calculados.map(({ dim, r }) => `
+      <div class="rank">
+        <div class="rank__titulo">${dim.titulo}
+          <span class="rank__sub">${numeroLindo(r.distintos)} distintos · ${numeroLindo(r.total)} ${palabra}</span>
+        </div>
+        ${r.filas.length
+          ? `<div class="rank__lienzo" style="height:${Math.max(120, r.filas.length * 30 + 30)}px"><canvas id="gRank${dim.campo}"></canvas></div>`
+          : '<div class="rank__vacio">Sin datos en el período.</div>'}
+        ${r.resto > 0 ? `<div class="menudo">+ otros ${numeroLindo(r.resto)}, con ${numeroLindo(r.restoTotal)} ${palabra}</div>` : ''}
+      </div>`).join('');
+
+    calculados.forEach(({ dim, r }) => {
+      const canvas = $(`#gRank${dim.campo}`);
+      if (canvas && r.filas.length) dibujarRanking(canvas, r, palabra);
+    });
+    return;
+  }
 
   $('#rankings').innerHTML = DIMENSIONES.map((dim) => {
     const r = ranking(lista, dim, unidad, tope);
@@ -1602,9 +1841,9 @@ function dibujarGrafico(meses, unidad) {
   const datos = {
     labels: meses.map((m) => mesLindo(m.clave)),
     datasets: [
-      { label: 'Nil Picks', data: meses.map((m) => m.nil), backgroundColor: '#B26A00' },
-      { label: 'Repicking', data: meses.map((m) => m.repick), backgroundColor: '#1F7A4C' },
-      { label: 'Diferencia parcial', data: meses.map((m) => m.parcial), backgroundColor: '#6C4BA6' },
+      { label: 'Nil Picks', data: meses.map((m) => m.nil), backgroundColor: COLOR['Nil Pick'] },
+      { label: 'Repicking', data: meses.map((m) => m.repick), backgroundColor: COLOR.Repicking },
+      { label: 'Diferencia parcial', data: meses.map((m) => m.parcial), backgroundColor: COLOR['Diferencia parcial'] },
     ],
   };
 
@@ -1620,11 +1859,13 @@ function dibujarGrafico(meses, unidad) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // 2px de aire entre tramos apilados, del color del panel
+      datasets: { bar: { borderWidth: 2, borderColor: SUPERFICIE, borderRadius: 4 } },
       scales: {
         x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#EBF0F6' }, border: { display: false } },
       },
-      plugins: { legend: { position: 'bottom' } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 11, boxHeight: 11, usePointStyle: false } } },
     },
   });
 }
@@ -1882,6 +2123,7 @@ async function iniciar() {
   $('#kpiUnidad').addEventListener('change', pintarKpi);
   $('#rankAlcance').addEventListener('change', pintarRankings);
   $('#rankTope').addEventListener('change', pintarRankings);
+  $('#rankVista').addEventListener('change', pintarRankings);
 
   await DB.open();
 

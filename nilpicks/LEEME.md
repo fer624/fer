@@ -94,6 +94,22 @@ El repicking en la misma gaveta nace cerrado, sin pasar por la lista.
 Si cargás un conteo o cerrás a mano, una importación posterior **no te pisa el
 trabajo**.
 
+### Los colores
+
+Las tres clasificaciones tienen un color fijo en todos los gráficos:
+
+| | |
+|---|---|
+| Nil Pick | ámbar `#B26A00` |
+| Repicking | azul `#0057B8` |
+| Diferencia parcial | magenta `#8C1D6E` |
+
+Están elegidos para que se distingan también con daltonismo: el peor par da
+ΔE 13,3 en deuteranopía. El verde que usaba Repicking daba 5,7 contra el ámbar
+de Nil Pick, o sea indistinguibles para quien tiene protanopía. El verde quedó
+solo para estados (cerrado, archivo cargado), que antes significaba las dos
+cosas a la vez.
+
 ## Cíclicos
 
 Cada fila es **una gaveta y un producto**, no un pedido: si tres pedidos fallaron
@@ -111,6 +127,26 @@ Tres salidas:
 
 El filtro de arriba (a contar / contados sin ajustar / abiertos / todos) manda
 sobre lo que se exporta y lo que se imprime.
+
+### Cerrar en bloque
+
+Sirve sobre todo la primera vez, al cargar meses viejos: lo de julio y agosto
+ya se gestionó en su momento y no tiene sentido que aparezca como pendiente.
+
+Se filtra por **antigüedad**, se seleccionan las gavetas con las casillas (o
+todas de una con la del encabezado) y se cierran juntas. Hay dos opciones, y
+la diferencia no es cosmética:
+
+- **Ya se ajustaron, fuera de la app**: suman a la columna *Ajustadas* del KPI
+  de su mes.
+- **Se cierran sin ajuste**: no suman; solo dejan de figurar como pendientes.
+
+Las unidades ajustadas quedan **vacías** en los dos casos: la app no las
+conoce y no se inventan.
+
+La antigüedad se mide desde el **último** fallo, no desde el primero. Una
+gaveta que falló en julio y volvió a fallar la semana pasada no es vieja:
+sigue activa, y cerrarla por antigua sería un error.
 
 La **cantidad de la tarea** es lo que el pickeador tenía que sacar, **no** el
 saldo de la gaveta: eso no viene en el reporte. Para que la diferencia sirva,
@@ -140,8 +176,9 @@ Picks y Repicking, porque no es lo mismo un usuario que genera muchas
 excepciones que después se recuperan solas que uno cuyas líneas terminan todas
 en conteo.
 
-Se pueden ver del mes elegido o de todo el histórico, y en top 10, top 20 o
-completos. Al exportar el Excel del KPI, los cuatro rankings van **enteros**,
+Se ven como **barras horizontales apiladas** por clasificación, o como tabla si
+preferís los números exactos (selector *Ver como*). Del mes elegido o de todo
+el histórico, y en top 10, top 20 o completos. Al exportar el Excel del KPI, los cuatro rankings van **enteros**,
 una hoja cada uno, sin importar el top elegido en pantalla.
 
 El ranking de usuarios tiene una particularidad: contando **por tareas** usa el

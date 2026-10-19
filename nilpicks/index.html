@@ -133,7 +133,10 @@
       <div class="seccion">
         <div class="panel">
           <div class="panel__cabecera">
-            <h2 class="seccion__titulo">Dónde se concentra</h2>
+            <div>
+              <h2 class="seccion__titulo">Dónde se concentra</h2>
+              <div class="leyenda" id="rankLeyenda"></div>
+            </div>
             <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
               <div class="campo" style="max-width:200px;">
                 <label class="campo__etiqueta" for="rankAlcance">Período</label>
@@ -148,6 +151,13 @@
                   <option value="10">Top 10</option>
                   <option value="20">Top 20</option>
                   <option value="0">Todos</option>
+                </select>
+              </div>
+              <div class="campo" style="max-width:130px;">
+                <label class="campo__etiqueta" for="rankVista">Ver como</label>
+                <select id="rankVista">
+                  <option value="grafico">Gráfico</option>
+                  <option value="tabla">Tabla</option>
                 </select>
               </div>
             </div>
@@ -171,19 +181,39 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.7" y2="16.7"/></svg>
             <input type="search" id="ciclicosBusqueda" placeholder="Buscar ubicación o producto">
           </div>
-          <div class="campo" style="max-width:230px;">
-            <select id="ciclicosFiltro">
-              <option value="pendientes">A contar</option>
-              <option value="contados">Contados, sin ajustar</option>
-              <option value="abiertos">Todo lo abierto</option>
-              <option value="todos">Todos, incluso cerrados</option>
-            </select>
+          <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+            <div class="campo" style="max-width:220px;">
+              <label class="campo__etiqueta" for="ciclicosFiltro">Estado</label>
+              <select id="ciclicosFiltro">
+                <option value="pendientes">A contar</option>
+                <option value="contados">Contados, sin ajustar</option>
+                <option value="abiertos">Todo lo abierto</option>
+                <option value="todos">Todos, incluso cerrados</option>
+              </select>
+            </div>
+            <div class="campo" style="max-width:220px;">
+              <label class="campo__etiqueta" for="ciclicosAntiguedad">Antigüedad</label>
+              <select id="ciclicosAntiguedad">
+                <option value="0">Cualquiera</option>
+                <option value="15">Sin fallar hace +15 días</option>
+                <option value="30">Sin fallar hace +30 días</option>
+                <option value="60">Sin fallar hace +60 días</option>
+                <option value="90">Sin fallar hace +90 días</option>
+              </select>
+            </div>
           </div>
+        </div>
+
+        <div class="masiva" id="ciclicosMasiva" hidden>
+          <span id="masivaCuenta">0 gavetas seleccionadas</span>
+          <button class="btn btn--chico btn--primario" id="btnCerrarMasivo">Cerrar en bloque</button>
+          <button class="btn btn--chico" id="btnLimpiarSeleccion">Deseleccionar</button>
         </div>
         <div class="tabla-scroll">
           <table class="tabla" id="tablaCiclicos">
             <thead>
               <tr>
+                <th class="chk"><input type="checkbox" id="ciclicosTodos" title="Seleccionar todo lo filtrado"></th>
                 <th>Ubicación</th>
                 <th>Producto</th>
                 <th class="desc">Descripción</th>
