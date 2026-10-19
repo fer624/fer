@@ -19,8 +19,19 @@ Sirve para dos cosas, y nada más:
 
 ## La regla
 
-Se toman del reporte de picking las tareas con código de excepción **BIDF**. Para
-cada una se busca, en el mismo archivo, otra tarea de **la misma línea**
+Se toman del reporte de picking las tareas con código de excepción. Hay dos, y
+no son lo mismo — sale de los propios datos: en las 138 filas BIDF del reporte
+de septiembre la cantidad real es **siempre 0**, y en las 15 BIDP está
+**siempre entre 1 y la prevista**.
+
+| Código | Qué pasó |
+|---|---|
+| **BIDF** | No sacó nada. Diferencia total. |
+| **BIDP** | Sacó menos de lo pedido. Diferencia parcial, ya medida por SAP. |
+
+## BIDF: la regla de la retoma
+
+Para cada BIDF se busca, en el mismo archivo, otra tarea de **la misma línea**
 (documento + posición + producto) confirmada después y **sin** código de
 excepción. Esa es la prueba de que el material salió.
 
@@ -30,7 +41,24 @@ excepción. Esa es la prueba de que el material salió.
 | Retoma desde **otra gaveta** | Repicking | **Va a cíclico.** La gaveta original quedó con stock fantasma. |
 | **Sin** retoma | Nil Pick | **Va a cíclico.** La gaveta decía que había stock y no estaba. |
 
-Eso es todo. No hay más categorías.
+## BIDP: diferencia parcial
+
+Una toma parcial **siempre va a cíclico y nunca se cierra sola**, aunque el
+resto de la cantidad se haya completado desde otra gaveta: que la línea se
+termine en otro lado no dice nada sobre el faltante que quedó en ésta. Es la
+diferencia importante con un BIDF, donde la retoma en la misma gaveta sí
+prueba que no había diferencia.
+
+El faltante llega **ya calculado** en la columna *Ctd.dif.dest.en UMB*, así que
+el caso nace con la cantidad conocida y el ajuste viene propuesto en el conteo.
+Si esa columna no viniera, se calcula como prevista menos real.
+
+Una toma parcial va a su **propio caso**, aunque la misma línea haya tenido
+también un BIDF: son dos problemas distintos y el KPI los cuenta aparte. Pero
+las dos caen en el **mismo cíclico** si es la misma gaveta y el mismo producto,
+porque el contador va una sola vez.
+
+No hay más categorías.
 
 > **Importante:** el reporte de picking tiene que venir **completo**. Si lo filtrás
 > por código de excepción, la app se queda sin las tareas limpias, no puede ver

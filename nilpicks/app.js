@@ -14,9 +14,29 @@
 
 /* Códigos de excepción que generan caso. En los reportes también aparece
    BIDP: si alguna vez se quiere seguir, se agrega acá y listo. */
-const COD_EXCEPCION = ['BIDF'];
+/* Códigos de excepción que generan caso, y qué tipo de falla es cada uno.
+   Sale de los datos: en las 138 filas BIDF del reporte la cantidad real es
+   siempre 0, y en las 15 BIDP está siempre entre 1 y la prevista.
 
-const CLASIFICACIONES = ['Nil Pick', 'Repicking'];
+     · total   -> no sacó nada. Puede terminar en Nil Pick o en Repicking,
+                  según haya o no una retoma.
+     · parcial -> sacó menos de lo pedido. La diferencia ya está medida y la
+                  gaveta quedó con faltante, así que siempre va a cíclico:
+                  nunca se cierra sola, aunque el resto de la cantidad se
+                  haya completado desde otra gaveta. */
+const COD_EXCEPCION = {
+  BIDF: 'total',
+  BIDP: 'parcial',
+};
+
+const CLASIFICACIONES = ['Nil Pick', 'Repicking', 'Diferencia parcial'];
+
+/** Clase CSS de la etiqueta de cada clasificación. */
+function claseTag(clasificacion) {
+  if (clasificacion === 'Nil Pick') return 'tag--nil';
+  if (clasificacion === 'Diferencia parcial') return 'tag--parcial';
+  return 'tag--repick';
+}
 
 /* A contar → Contado → Cerrado. El cierre es el ajuste (o la decisión de que
    no hace falta ajustar). El repicking en la misma gaveta nace cerrado. */
@@ -38,6 +58,9 @@ const COLS_PICKING = {
   descripcion: ['descripciondeproducto', 'descripcionproducto', 'textobreve'],
   cantidad: ['ctdprevprocedumb', 'ctdprevprocumb', 'cantidadprevista'],
   cantidadReal: ['ctdrealdestumb', 'ctdrealdestinoumb', 'cantidadreal'],
+  /* Faltante que calcula SAP en una toma parcial. Si no viene, se saca de
+     la resta entre la cantidad prevista y la real. */
+  diferencia: ['ctddifdestenumb', 'ctddifdestumb', 'ctddiferenciaumb', 'cantidaddiferencia'],
   ubicacion: ['ubicprocedencia', 'ubicaciondeprocedencia', 'ubicacionprocedencia'],
   fechaConfirmacion: ['fechaconfirmacion', 'fechadeconfirmacion'],
   horaConfirmacion: ['horadeconfirmacion', 'horaconfirmacion'],
@@ -341,6 +364,17 @@ function buscarRetoma(caso, tomas) {
  * No pisa nada que ya se haya contado.
  */
 function clasificar(caso) {
+  /* Toma parcial: el pickeador sacó algo, pero menos de lo pedido. La gaveta
+     quedó con un faltante ya medido, así que no se busca retoma ni se cierra
+     sola: que el resto de la cantidad se haya completado desde otra gaveta no
+     dice nada sobre la diferencia que quedó en esta. */
+  if (caso.tipoFalla === 'parcial') {
+    caso.clasificacion = 'Diferencia parcial';
+    caso.tipoRepicking = '';
+    caso.motivo = `Se pidieron ${numeroLindo(caso.cantidad)} y se sacaron ${numeroLindo(caso.sacado)}: faltaron ${numeroLindo(caso.faltante)} en la gaveta.`;
+    return caso;
+  }
+
   if (caso.retoma) {
     const enSitio = caso.retoma.ubicacion === caso.ubicacion;
     caso.clasificacion = 'Repicking';
@@ -358,6 +392,8 @@ function clasificar(caso) {
 
 /** ¿Este caso genera trabajo de conteo? */
 function requiereConteo(caso) {
+  // La toma parcial siempre: dejó un faltante medido en la gaveta
+  if (caso.tipoFalla === 'parcial') return true;
   return !(caso.clasificacion === 'Repicking' && caso.tipoRepicking === 'En sitio');
 }
 
@@ -389,6 +425,12 @@ function refrescar(caso) {
   caso.item = ultimo.item;
   caso.descripcion = ultimo.descripcion;
   caso.cantidad = ultimo.cantidad;
+  caso.tipoFalla = ultimo.tipoFalla;
+  caso.codigoExcepcion = ultimo.codigoExcepcion;
+  caso.sacado = ultimo.sacado;
+  // El faltante de una toma parcial es el del último intento, no la suma:
+  // cada intento mide el saldo de la gaveta en ese momento.
+  caso.faltante = ultimo.faltante;
   caso.usuario = ultimo.usuario;
   caso.tipoStock = ultimo.tipoStock;
   caso.tipoAlmacen = ultimo.tipoAlmacen || caso.tipoAlmacen || '';
@@ -423,11 +465,14 @@ function construirIntentos(filas, pedidos) {
   let bidf = 0;
 
   let incompletos = 0;
+  let parciales = 0;
 
   filas.forEach((f) => {
     const cod = limpiar(valor(f, mapa, 'codigoExcepcion')).toUpperCase();
-    if (!COD_EXCEPCION.includes(cod)) return;
+    const tipoFalla = COD_EXCEPCION[cod];
+    if (!tipoFalla) return;
     bidf++;
+    if (tipoFalla === 'parcial') parciales++;
 
     const documento = limpiar(valor(f, mapa, 'documento'));
     const producto = limpiar(valor(f, mapa, 'producto'));
@@ -441,17 +486,28 @@ function construirIntentos(filas, pedidos) {
     if (!documento || !producto || !ubicacion || !fecha) { incompletos++; return; }
 
     const extra = pedidos.get(documento) || {};
+    const cantidad = aNumero(valor(f, mapa, 'cantidad'));
+    const sacado = aNumero(valor(f, mapa, 'cantidadReal'));
+    const faltante = mapa.diferencia
+      ? Math.abs(aNumero(valor(f, mapa, 'diferencia')))
+      : Math.max(0, cantidad - sacado);
 
     intentos.push({
-      // El caso es el problema: mismo pedido, mismo producto, misma gaveta
-      grupo: [documento, producto, ubicacion].join('|'),
+      /* El caso es el problema: mismo pedido, mismo producto, misma gaveta.
+         La toma parcial va en su propio caso: una línea puede tener un BIDP
+         un día y un BIDF otro, y son dos problemas distintos. */
+      grupo: [documento, producto, ubicacion].concat(tipoFalla === 'parcial' ? ['BIDP'] : []).join('|'),
+      tipoFalla,
+      codigoExcepcion: cod,
       documento,
       producto,
       ubicacion,
       item: limpiar(valor(f, mapa, 'item')),
       tarea: limpiar(valor(f, mapa, 'tareaAlmacen')),
       descripcion: limpiar(valor(f, mapa, 'descripcion')),
-      cantidad: aNumero(valor(f, mapa, 'cantidad')),
+      cantidad,
+      sacado,
+      faltante,
       tipoStock: limpiar(valor(f, mapa, 'tipoStock')),
       tipoAlmacen: limpiar(valor(f, mapa, 'tipoAlmacen')),
       usuario: limpiar(valor(f, mapa, 'confirmadoPor'))
@@ -466,7 +522,7 @@ function construirIntentos(filas, pedidos) {
   });
 
   intentos.sort((a, b) => a.momento - b.momento);
-  return { intentos, bidf, incompletos, mapa };
+  return { intentos, bidf, parciales, incompletos, mapa };
 }
 
 function casoNuevo(intento, secuencia) {
@@ -503,7 +559,7 @@ function casoNuevo(intento, secuencia) {
  */
 function procesar(filasPicking, filasPedidos, casosExistentes) {
   const pedidos = indexarPedidos(filasPedidos);
-  const { intentos, bidf, incompletos, mapa } = construirIntentos(filasPicking, pedidos);
+  const { intentos, bidf, parciales, incompletos, mapa } = construirIntentos(filasPicking, pedidos);
   const tomas = indexarTomas(filasPicking, mapa);
 
   const porGrupo = new Map();
@@ -562,6 +618,7 @@ function procesar(filasPicking, filasPedidos, casosExistentes) {
   tocados.forEach((c) => { if (c.estado !== 'Cerrado' && !c.resultado) abiertos.set(c.id, c); });
 
   abiertos.forEach((caso) => {
+    if (caso.tipoFalla === 'parcial') return;      // no aplica: ver clasificar()
     if (caso.retoma) return;                       // ya tenía evidencia
     const retoma = buscarRetoma(caso, tomas);
     if (!retoma) return;
@@ -599,6 +656,7 @@ function procesar(filasPicking, filasPedidos, casosExistentes) {
     reclasificados,
     faltantes,
     incompletos,
+    parciales,
     cerradosAuto: casos.filter((c) => c.cierreAutomatico).length,
   };
 }
@@ -737,7 +795,7 @@ async function procesarArchivos() {
 
 function mostrarResumen(r, tomasLimpias, faltantes = [], incompletos = 0) {
   const datos = [
-    ['Tareas BIDF', numeroLindo(r.bidf)],
+    ['Tareas con excepción', numeroLindo(r.bidf)],
     ['Casos nuevos', numeroLindo(r.nuevos)],
     ['Reintentos sumados', numeroLindo(r.reintentos)],
     ['Cerrados solos', numeroLindo(r.cerradosAuto)],
@@ -818,12 +876,16 @@ function unidades() {
       desde: '',
       nil: 0,
       repick: 0,
+      parcial: 0,
+      faltante: 0,
     };
     u.casos.push(c);
     u.documentos.add(c.documento);
     u.cantidad += aNumero(c.cantidad);
     if (!u.desde || (c.fecha && c.fecha < u.desde)) u.desde = c.fecha;
-    if (c.clasificacion === 'Nil Pick') u.nil++; else u.repick++;
+    if (c.clasificacion === 'Nil Pick') u.nil++;
+    else if (c.clasificacion === 'Diferencia parcial') { u.parcial++; u.faltante += aNumero(c.faltante); }
+    else u.repick++;
     if (!u.descripcion) u.descripcion = c.descripcion;
     mapa.set(clave, u);
   });
@@ -843,8 +905,13 @@ function unidades() {
     u.unidadesAjuste = u.casos.reduce((a, c) => (c.ajustado ? aNumero(c.unidadesAjuste) : a), 0);
 
     u.estado = u.abiertos === 0 ? 'Cerrado' : (u.resultado ? 'Contado' : 'A contar');
-    u.motivo = u.nil && u.repick ? 'Nil Pick y Repicking'
-      : (u.nil ? 'Nil Pick' : 'Repicking de otra gaveta');
+    const partes = [];
+    if (u.nil) partes.push('Nil Pick');
+    if (u.repick) partes.push('Repicking de otra gaveta');
+    if (u.parcial) partes.push('Diferencia parcial');
+    u.motivo = partes.join(' + ');
+    u.clasePrincipal = u.parcial && !u.nil && !u.repick ? 'tag--parcial'
+      : (u.nil ? 'tag--nil' : 'tag--repick');
     return u;
   }).sort((a, b) => {
     const orden = { 'A contar': 0, Contado: 1, Cerrado: 2 };
@@ -894,7 +961,10 @@ function pintarCiclicos() {
         <td>${esc(u.producto)}</td>
         <td class="desc">${esc(u.descripcion)}</td>
         <td class="num">${u.casos.length}</td>
-        <td><span class="tag ${u.motivo === 'Nil Pick' ? 'tag--nil' : 'tag--repick'}">${esc(u.motivo)}</span></td>
+        <td>
+          <span class="tag ${u.clasePrincipal}">${esc(u.motivo)}</span>
+          ${u.faltante ? `<div class="menudo">faltan ${numeroLindo(u.faltante)} un. según SAP</div>` : ''}
+        </td>
         <td>${fechaLinda(u.desde)}</td>
         <td class="num">${numeroLindo(u.cantidad)}</td>
         <td class="num">${hayNumero(u.contado) ? numeroLindo(u.contado) : '—'}</td>
@@ -944,6 +1014,9 @@ function plantillaUnidad(u) {
     ['Primer fallo', fechaLinda(u.desde)],
     ['Motivo', esc(u.motivo)],
   ];
+  if (u.faltante) {
+    ficha.push(['Faltante medido por SAP', `${numeroLindo(u.faltante)} un.`]);
+  }
 
   const casos = u.casos
     .slice()
@@ -953,7 +1026,7 @@ function plantillaUnidad(u) {
         <strong>${esc(c.documento)}</strong>${c.documentoErp ? ` · ERP ${esc(c.documentoErp)}` : ''}
         · item ${esc(c.item || '—')}
         · ${numeroLindo(c.cantidad)} un.
-        · <span class="tag ${c.clasificacion === 'Nil Pick' ? 'tag--nil' : 'tag--repick'}">${esc(c.clasificacion)}</span>
+        · <span class="tag ${claseTag(c.clasificacion)}">${esc(c.clasificacion)}</span>
         <span class="tag tag--estado">${esc(c.estado)}</span>
         <div class="menudo">${esc(c.motivo)}</div>
         <div class="menudo">${c.intentos.map((i) => `${fechaLinda(i.fecha)} ${i.hora} · tarea ${esc(i.tarea)} · ${esc(i.usuario)}`).join(' — ')}</div>
@@ -1005,7 +1078,7 @@ function plantillaUnidad(u) {
       <div class="paso__grilla">
         <div class="campo">
           <label class="campo__etiqueta" for="inAjuste">Unidades ajustadas</label>
-          <input type="number" step="any" id="inAjuste" value="${hayNumero(u.unidadesAjuste) && u.ajustado ? u.unidadesAjuste : ''}" placeholder="${hayNumero(u.diferencia) && u.diferencia !== '' ? u.diferencia : 'Diferencia aplicada'}">
+          <input type="number" step="any" id="inAjuste" value="${hayNumero(u.unidadesAjuste) && u.ajustado ? u.unidadesAjuste : ''}" placeholder="${hayNumero(u.diferencia) && u.diferencia !== '' ? u.diferencia : (u.faltante ? -u.faltante : 'Diferencia aplicada')}">
         </div>
       </div>
       <div class="paso__acciones">
@@ -1053,9 +1126,9 @@ function conectarModal(u) {
 
   $('#btnAjustar').addEventListener('click', async () => {
     const campo = $('#inAjuste').value;
-    const unidades = campo === ''
-      ? (hayNumero(u.diferencia) && u.diferencia !== '' ? Number(u.diferencia) : 0)
-      : Number(campo);
+    const unidades = campo !== '' ? Number(campo)
+      : (hayNumero(u.diferencia) && u.diferencia !== '' ? Number(u.diferencia)
+        : (u.faltante ? -u.faltante : 0));
 
     await guardarUnidad(u, {
       ajustado: true,
@@ -1201,7 +1274,7 @@ function pintarCasos() {
       <td>${esc(c.ubicacion)}</td>
       <td>${esc(c.usuario)}</td>
       <td>
-        <span class="tag ${c.clasificacion === 'Nil Pick' ? 'tag--nil' : 'tag--repick'}">${esc(c.clasificacion)}</span>
+        <span class="tag ${claseTag(c.clasificacion)}">${esc(c.clasificacion)}</span>
         ${c.tipoRepicking ? `<div class="menudo">${esc(c.tipoRepicking)}</div>` : ''}
       </td>
       <td><span class="tag ${c.estado === 'Cerrado' ? 'tag--ok' : (c.estado === 'Contado' ? 'tag--azul' : 'tag--estado')}">${esc(c.estado)}</span>${c.cierreAutomatico ? '<div class="menudo">cerró solo</div>' : ''}</td>
@@ -1235,13 +1308,15 @@ function porMes() {
     if (!c.fecha) return;
     const clave = c.fecha.slice(0, 7);
     const m = meses.get(clave) || {
-      clave, nil: 0, repick: 0, total: 0, tareas: 0,
+      clave, nil: 0, repick: 0, parcial: 0, faltante: 0, total: 0, tareas: 0,
       enSitio: 0, otraGaveta: 0,
       gavetas: new Set(), contadas: new Set(), ajustadas: new Set(), encontradas: new Set(),
       unidades: 0,
     };
 
-    if (c.clasificacion === 'Nil Pick') m.nil++; else m.repick++;
+    if (c.clasificacion === 'Nil Pick') m.nil++;
+    else if (c.clasificacion === 'Diferencia parcial') { m.parcial++; m.faltante += aNumero(c.faltante); }
+    else m.repick++;
     if (c.tipoRepicking === 'En sitio') m.enSitio++;
     if (c.tipoRepicking === 'Desde otra ubicación') m.otraGaveta++;
     m.total++;
@@ -1271,6 +1346,8 @@ function kpisDelMes(m, unidad) {
     total: factor ? m.tareas : m.total,
     nil: m.nil,
     repick: m.repick,
+    parcial: m.parcial,
+    faltante: m.faltante,
     enSitio: m.enSitio,
     otraGaveta: m.otraGaveta,
     tareas: m.tareas,
@@ -1327,7 +1404,10 @@ function pintarKpi() {
     tarjeta('Repicking', numeroLindo(k.repick),
       `${numeroLindo(k.enSitio)} en la misma gaveta · ${numeroLindo(k.otraGaveta)} de otra`
       + variacion(k.repick, kp ? kp.repick : null), 'kpi--repick'),
-    tarjeta(unidad === 'tareas' ? 'Tareas BIDF' : 'Casos BIDF', numeroLindo(k.total),
+    tarjeta('Diferencia parcial', numeroLindo(k.parcial),
+      `${numeroLindo(k.faltante)} unidades faltantes`
+      + variacion(k.parcial, kp ? kp.parcial : null), 'kpi--parcial'),
+    tarjeta(unidad === 'tareas' ? 'Tareas con excepción' : 'Casos con excepción', numeroLindo(k.total),
       unidad === 'tareas' ? `${numeroLindo(k.casos)} casos` : `${numeroLindo(k.tareas)} tareas en SAP`),
     tarjeta('Gavetas a cíclico', numeroLindo(k.gavetas),
       `${numeroLindo(k.pendientes)} sin contar todavía`),
@@ -1345,6 +1425,8 @@ function pintarKpi() {
       <td><strong>${mesLindo(x.clave)}</strong></td>
       <td class="num">${numeroLindo(x.nil)}</td>
       <td class="num">${numeroLindo(x.repick)}</td>
+      <td class="num">${numeroLindo(x.parcial)}</td>
+      <td class="num">${numeroLindo(x.faltante)}</td>
       <td class="num"><strong>${numeroLindo(x.total)}</strong></td>
       <td class="num">${numeroLindo(x.tareas)}</td>
       <td class="num">${numeroLindo(x.gavetas.size)}</td>
@@ -1380,20 +1462,21 @@ const DIMENSIONES = [
 function ranking(lista, dim, unidad, tope) {
   const cuenta = new Map();
 
-  const sumar = (clave, nil, cant) => {
-    const r = cuenta.get(clave) || { clave, total: 0, nil: 0, repick: 0 };
+  const sumar = (clave, clasificacion, cant) => {
+    const r = cuenta.get(clave) || { clave, total: 0, nil: 0, repick: 0, parcial: 0 };
     r.total += cant;
-    if (nil) r.nil += cant; else r.repick += cant;
+    if (clasificacion === 'Nil Pick') r.nil += cant;
+    else if (clasificacion === 'Diferencia parcial') r.parcial += cant;
+    else r.repick += cant;
     cuenta.set(clave, r);
   };
 
   lista.forEach((c) => {
-    const nil = c.clasificacion === 'Nil Pick';
     if (unidad === 'tareas' && dim.porIntento) {
-      c.intentos.forEach((i) => sumar(limpiar(i[dim.campo]) || '(sin dato)', nil, 1));
+      c.intentos.forEach((i) => sumar(limpiar(i[dim.campo]) || '(sin dato)', c.clasificacion, 1));
     } else {
       const clave = limpiar(c[dim.campo]) || '(sin dato)';
-      sumar(clave, nil, unidad === 'tareas' ? (c.intentosCant || c.intentos.length) : 1);
+      sumar(clave, c.clasificacion, unidad === 'tareas' ? (c.intentosCant || c.intentos.length) : 1);
     }
   });
 
@@ -1457,11 +1540,12 @@ function pintarRankings() {
           <td class="num"><strong>${numeroLindo(f.total)}</strong><div class="menudo">${porcentaje.toFixed(0)}%</div></td>
           <td class="num">${numeroLindo(f.nil)}</td>
           <td class="num">${numeroLindo(f.repick)}</td>
+          <td class="num">${numeroLindo(f.parcial)}</td>
         </tr>`;
     }).join('');
 
     const pie = r.resto > 0
-      ? `<tr class="rank__resto"><td>Otros ${numeroLindo(r.resto)}</td><td class="num">${numeroLindo(r.restoTotal)}</td><td colspan="2"></td></tr>`
+      ? `<tr class="rank__resto"><td>Otros ${numeroLindo(r.resto)}</td><td class="num">${numeroLindo(r.restoTotal)}</td><td colspan="3"></td></tr>`
       : '';
 
     return `
@@ -1476,6 +1560,7 @@ function pintarRankings() {
               <th class="num">Total</th>
               <th class="num">Nil</th>
               <th class="num">Repick</th>
+              <th class="num">Parc.</th>
             </tr>
           </thead>
           <tbody>${filas}${pie}</tbody>
@@ -1493,6 +1578,7 @@ function dibujarGrafico(meses, unidad) {
     datasets: [
       { label: 'Nil Picks', data: meses.map((m) => m.nil), backgroundColor: '#B26A00' },
       { label: 'Repicking', data: meses.map((m) => m.repick), backgroundColor: '#1F7A4C' },
+      { label: 'Diferencia parcial', data: meses.map((m) => m.parcial), backgroundColor: '#6C4BA6' },
     ],
   };
 
@@ -1557,6 +1643,9 @@ function filasCasos(lista) {
     'Producto': c.producto,
     'Descripción': c.descripcion,
     'Cantidad tarea': c.cantidad,
+    'Cantidad sacada': c.tipoFalla === 'parcial' ? c.sacado : '',
+    'Faltante medido por SAP': c.tipoFalla === 'parcial' ? c.faltante : '',
+    'Código de excepción': c.codigoExcepcion || '',
     'Ubicación': c.ubicacion,
     'Usuario': c.usuario,
     'Clasificación': c.clasificacion,
@@ -1590,8 +1679,10 @@ function filasMeses() {
     'Repicking': m.repick,
     'Repicking misma gaveta': m.enSitio,
     'Repicking otra gaveta': m.otraGaveta,
-    'Total BIDF (casos)': m.total,
-    'Tareas BIDF': m.tareas,
+    'Diferencia parcial': m.parcial,
+    'Unidades faltantes': m.faltante,
+    'Total casos': m.total,
+    'Tareas con excepción': m.tareas,
     'Gavetas a cíclico': m.gavetas.size,
     'Contadas': m.contadas.size,
     'Ajustadas': m.ajustadas.size,
@@ -1613,6 +1704,7 @@ function hojasRankings() {
       'Total': f.total,
       'Nil Picks': f.nil,
       'Repicking': f.repick,
+      'Diferencia parcial': f.parcial,
       '% del total': r.total ? Number(((f.total / r.total) * 100).toFixed(1)) : 0,
     }));
   });
@@ -1643,6 +1735,7 @@ function filasCiclicos() {
     'Documentos': [...u.documentos].join(' / '),
     'Primer fallo': u.desde,
     'Cantidad de las tareas': u.cantidad,
+    'Faltante medido por SAP': u.faltante || '',
     'Estado': u.estado,
     'Resultado': u.resultado || '',
     'Stock sistema': hayNumero(u.stockSistema) ? u.stockSistema : '',

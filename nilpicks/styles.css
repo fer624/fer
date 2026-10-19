@@ -24,6 +24,8 @@
   --repick-fondo: #E4F3EB;
   --alerta: #B3261E;
   --alerta-fondo: #FBE9E7;
+  --parcial: #6C4BA6;      /* Diferencia parcial (BIDP) */
+  --parcial-fondo: #EFEAF7;
 
   --radio: 6px;
   --sombra: 0 1px 2px rgba(11, 37, 69, .10), 0 4px 12px rgba(11, 37, 69, .06);
@@ -327,6 +329,7 @@ a { color: var(--azul); }
 .kpi--nil { border-left-color: var(--nil); }
 .kpi--repick { border-left-color: var(--repick); }
 .kpi--alerta { border-left-color: var(--alerta); }
+.kpi--parcial { border-left-color: var(--parcial); }
 
 .kpi__icono {
   width: 34px; height: 34px; flex: none;
@@ -339,6 +342,7 @@ a { color: var(--azul); }
 .kpi--nil .kpi__icono { background: var(--nil-fondo); color: var(--nil); }
 .kpi--repick .kpi__icono { background: var(--repick-fondo); color: var(--repick); }
 .kpi--alerta .kpi__icono { background: var(--alerta-fondo); color: var(--alerta); }
+.kpi--parcial .kpi__icono { background: var(--parcial-fondo); color: var(--parcial); }
 
 .kpi__valor { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .kpi__clave { font-size: 12.5px; color: var(--texto-suave); }
@@ -469,6 +473,7 @@ a { color: var(--azul); }
 .tag--azul { background: var(--azul-claro); color: var(--azul-oscuro); border-color: #BBD4EE; }
 .tag--ok { background: var(--repick-fondo); color: var(--repick); border-color: #A8D6BD; }
 .tag--alerta { background: var(--alerta-fondo); color: var(--alerta); border-color: #E3BCB8; }
+.tag--parcial { background: var(--parcial-fondo); color: var(--parcial); border-color: #CFC2E6; }
 
 /* ------------------------------- Modal --------------------------------- */
 
