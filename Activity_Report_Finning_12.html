@@ -86,7 +86,10 @@ button{cursor:pointer}
 textarea[data-k]{background:#fff0b8;border-color:#e3b53c}
 
 .ob{display:inline-block;background:#dce6f4;color:#0f2744;font-family:var(--num);font-weight:700;font-style:normal;border-radius:3px;padding:0 1.6mm;line-height:1.5;box-shadow:inset 0 0 0 1px #9db6d8}
-.tile .m .ob{font-size:11.5px}
+.tile .m .ob{font-size:11px;white-space:nowrap;padding:0 1.2mm}
+.tile .m{gap:1mm}
+.tile .m>span{white-space:nowrap}
+.tiles.t7 .tile .m{font-size:10px}
 .p1b .mini .ob,.tile .v .ob{font-size:10px;vertical-align:middle}
 .kpi .h .ob{font-size:12px;color:#0f2744}
 table.hm td.obc{background:#dce6f4!important;color:#0f2744!important;font-weight:700}
@@ -447,7 +450,7 @@ table.hmh td:first-child{text-align:left;background:none!important;color:#16202e
 .p1a .bal{margin-top:2mm}
 .bkr .big{font-family:var(--num);font-size:28px;font-weight:600;line-height:1}
 .bkr .big small{font-size:12px;color:#5b6574;font-weight:400}
-.p1b{display:grid;grid-template-columns:.85fr 1.8fr .95fr;gap:3mm;flex:1;min-height:0}
+.p1b{display:grid;grid-template-columns:.8fr 2.1fr .9fr;gap:3mm;flex:1;min-height:0}
 .sub2{font-size:10.5px;color:#5b6574;font-weight:600;margin-top:1mm}
 .p1b .fr{height:7.5mm}
 table.pt td,table.pt th{padding:1.1mm .6mm;font-size:11px}
@@ -498,7 +501,7 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
 
 .tiles.t7 .tile svg{height:8.5mm}
 .tiles.t7 .tile .v{font-size:23px}
-.p1b table.pt td,.p1b table.pt th{padding:.75mm .35mm}
+.p1b table.pt td,.p1b table.pt th{padding:.75mm .25mm}
 .p1b table.pt th small{display:block;font-weight:400;font-size:9px;color:#8a94a3}
 .p1b table.pt th.cur small{color:var(--navy)}
 .p1b table.pt td.cur{box-shadow:inset 0 0 0 2px var(--navy)}
@@ -1432,12 +1435,13 @@ function pageN1(){
   const PR=['ctot','prep','ctrl','sal','bkTot','desco','zixd','guard'];
   // detalle día a día de la semana (el cliente necesita ver cada día, no solo el consolidado)
   const wd=weekDays(mon);
-  let pt=`<table class="hm pt"><tr><th style="text-align:left"></th><th>Cap./Obj</th>${wd.map((f,i)=>`<th class="${f===F?'cur':''}">${DIA[i]}<small>${pd(f).getDate()}</small></th>`).join('')}<th>Acum.</th><th>Prom.</th></tr>`;
+  let pt=`<table class="hm pt"><tr><th style="text-align:left"></th><th>Cap./Obj</th><th>S-2</th><th>S-1</th>${wd.map((f,i)=>`<th class="${f===F?'cur':''}">${DIA[i]}<small>${pd(f).getDate()}</small></th>`).join('')}<th>Semana</th><th>Acum.</th></tr>`;
   PR.forEach(k=>{const me=MET[k],o=me.o?me.o():null;const a=me.agg==='sum'?wSum(mon,k):null,pr=wAvg(mon,k);
+    const pcell=(x,w)=>`<td class="avg" data-tip="${esc('Promedio diario semana '+isoWeek(w)+': <b>'+(x!=null?fmt(x,1):'sin datos')+'</b>')}">${x!=null?fmt(x,0):'·'}</td>`;
     const cells=wd.map(f=>{const v=f<=F?mv(f,k):null;const cur=f===F;
       return`<td class="${v!=null?me.st(v):'e'}${cur?' cur':''}" ${v!=null?`data-tip="${tipFor(f,k,v)}"`:''}>${v!=null?fmt(v):'·'}</td>`}).join('');
-    pt+=`<tr><td class="rl" data-met="${k}">${ic(me.ic)}${me.l}</td><td class="e obc">${o!=null?fmt(o):'—'}</td>${cells}<td class="avg">${a!=null?fmt(a):'—'}</td><td class="avg" data-tip="${esc('Promedio diario de la semana '+isoWeek(F)+': <b>'+(pr!=null?fmt(pr,1):'sin datos')+'</b>')}">${pr!=null?fmt(pr,0):'·'}</td></tr>`});
-  pt+='</table><div style="font-size:9.5px;color:#8a94a3;margin-top:1mm">Cada columna es un día de la semana; el día del informe va resaltado. Acum.: suma de la semana. Prom.: promedio diario de los días operados.</div>';
+    pt+=`<tr><td class="rl" data-met="${k}">${ic(me.ic)}${me.l}</td><td class="e obc">${o!=null?fmt(o):'—'}</td>${pcell(wAvg(w2,k),w2)}${pcell(wAvg(w1,k),w1)}${cells}${pcell(pr,mon)}<td class="avg">${a!=null?fmt(a):'—'}</td></tr>`});
+  pt+='</table><div style="font-size:9.5px;color:#8a94a3;margin-top:1mm">S-2, S-1 y Semana: promedio diario de los días operados. LUN a DOM: valor de cada día (el del informe va resaltado). Acum.: suma de la semana.</div>';
   // inbound + recursos
   const x=d.bkinx||{},SL=c.stockLbl||{};
   const lst=c.personal.filter(p=>p[0]&&!p[0].startsWith('('));const nOk=c.mhe.filter(e=>['OK','MT'].includes(mheOf(d,e[0]))).length;
@@ -1667,7 +1671,7 @@ function renderGuia(){
    it('Actividad por hora y mapa horario','',`<p>El gráfico apila las tareas de todos los operarios por hora de confirmación y muestra el total sobre cada barra. El mapa horario cuenta las tareas por operario y por hora, con totales por fila y por columna. Cuanto más oscuro el casillero, más tareas.</p>`)+
    it('Qué se excluye','',`<p>Solo cuentan los usuarios de la lista de personal y los incluidos en Configuración (hoy también DGUILLEN). Las tareas de los demás usuarios (por ejemplo FCUITINO o JACOSTA) no suman en ningún total y se informan aparte en "Otros usuarios". Se excluye también el stock tipo 5F y las filas de otra fecha. Así, la hoja 2 y la hoja 3 siempre coinciden.</p>`));
   h+=sec('Semana día a día','Tabla de la hoja 1 (la que ve el cliente).',
-   it('Lun a Dom, Acum. y Prom.','',`<p>Cada columna es un día de la semana, con su semáforo contra el objetivo. El día del informe va resaltado con un recuadro. Los días futuros o sin datos aparecen con un punto.</p><p><b>Acum.</b>: suma de la semana (para backlog no aplica). <b>Prom.</b>: promedio diario de los días operados.</p><p class="ex">Las comparaciones con las dos semanas anteriores (S-2 y S-1) siguen en la hoja 2.</p>`));
+   it('S-2, S-1, Lun a Dom, Semana y Acum.','',`<p><b>S-2 y S-1</b>: promedio diario de las dos semanas anteriores. <b>LUN a DOM</b>: valor de cada día con su semáforo contra el objetivo; el día del informe va resaltado con un recuadro y los días futuros o sin datos aparecen con un punto. <b>Semana</b>: promedio diario de la semana en curso. <b>Acum.</b>: suma de la semana (para backlog no aplica).</p>`));
   $('#guia').innerHTML=h;
 }
 
