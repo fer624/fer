@@ -1495,7 +1495,7 @@ function pageN1(){
       <div class="rt" title="Operarios presentes">${ic('users')}<span class="rv"><b>${m.bcTot!=null?m.bcTot:'—'}</b><small>/${m.bcPers??'—'}</small></span><span class="rl2">presentes</span></div>
       <div class="rt ${mAll.some(k=>k==='FS')?'fs':mAll.some(k=>k==='MT')?'mt':'ok'}" title="Equipos operativos (Ok + anomalía leve)">${ic('forklift')}<span class="rv"><b>${nOk}</b><small>/${c.mhe.length}</small></span><span class="rl2">operativos</span></div>
     </div>
-    <div class="rsem">${c.mhe.map(e=>{const k=mheOf(d,e[0]);const id=String(e[0]).replace(/^[A-Z]+?(?=\d)/,'').replace(/LI/,'').replace(/^0+(?=\d)/,'');return`<span title="${esc(e[0])}${' · '+(MHE_ST[k]||'')}"><span class="fk" style="color:${MHE_SEM[k]||MHE_SEM.NU}">${ic('forklift')}</span><em>${esc(e[1])}</em>${id?`<small>${esc(id)}</small>`:''}</span>`}).join('')}</div>
+    <div class="rsem" style="grid-template-rows:repeat(${Math.ceil(c.mhe.length/2)},auto);grid-auto-flow:column">${c.mhe.map((e,i)=>{const k=mheOf(d,e[0]);const id='Máq. '+(i+1);return`<span title="${esc(e[0])}${' · '+(MHE_ST[k]||'')}"><span class="fk" style="color:${MHE_SEM[k]||MHE_SEM.NU}">${ic('forklift')}</span><em>${esc(e[1])}</em>${id?`<small>${esc(id)}</small>`:''}</span>`}).join('')}</div>
     <div class="rleg"><b>Referencia:</b><span><i style="background:${MHE_SEM.OK}"></i>Ok</span><span><i style="background:${MHE_SEM.MT}"></i>Anomalía leve</span><span><i style="background:${MHE_SEM.FS}"></i>Fuera de servicio</span></div>
   </div>`;
   h+=`<div class="p1b">${crea}<div class="box"><h3><span>${ic('chart')}Promedios semanales</span> <small>semana ${isoWeek(F)}</small></h3>${pt}</div>${inb}</div>`;
