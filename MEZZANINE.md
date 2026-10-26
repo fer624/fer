@@ -1,4 +1,4 @@
-# CD Repuestos — almacenes 0001, 0010 y 0020 en el gemelo digital
+# CD Repuestos — la base de ubicaciones completa en el gemelo digital
 
 Documenta la capa `A0001` de `gemelo-digital-cd.html` (botón **Mezzanine** del HUD).
 Reemplaza al modelo inventado de las versiones V23–V24.
@@ -170,6 +170,48 @@ lista en `R10.naves`.
 **Cuidado con el orden de construcción.** La capa de racks tiene que correr
 antes de la red de seguridad que cuelga los cuerpos huérfanos; si corre después,
 los 150 cuerpos se crean dos veces y las ubicaciones se duplican.
+
+## 2e. Los 16 almacenes
+
+La maqueta carga la Base Ubis V2 entera: **33.311 ubicaciones en 16 tipos de
+almacén**, 912 cuerpos, 73 % de ocupación al 2026-10-07.
+
+| Zona | Ubicaciones | Qué hay |
+|---|---|---|
+| PB mezzanine | 16.669 | gabinetes 0001 + estanterías 0020 |
+| Altillo | 7.138 | gabinetes y estanterías del 0001 y 0020 |
+| Nave de racks | 5.089 | 0010, 0011, 0100, 0101, 0210 |
+| Fuera del mezzanine | 1.604 | 0001 pasillo 04 y cuerpos sueltos |
+| Sin ubicar | 2.811 | 0025, 0122, 0015, 0016, 0032, 0033, 0220, 0222 |
+
+### La regla del corredor compartido
+
+El número de pasillo es un **corredor físico compartido por varios almacenes**.
+El pasillo 10 lo usan el 0010, el 0210 y el 0032; el 12 lo usan el 0010, el 0100
+y el 0101. Por eso la nave de racks se arma por corredor (12 en total, 01 a 09
+en Nave 1 y 10 a 12 en Nave 2) y dentro de cada uno se encadenan los almacenes
+que lo ocupan, impares de un lado y pares del otro.
+
+### Lo que no se ubicó
+
+El 0025 (2.646 ubicaciones, estanterías tipo E0xx) usa pasillos 1 a 4 con hasta
+42 cuerpos cada uno, contra los 16 del 0010. No hay evidencia de que sean los
+mismos corredores, así que **no le inventé un lugar**: va con el resto de los
+almacenes chicos a una franja aparte, etiquetada "Sin ubicar en el plano",
+visible y contabilizada. Son 2.811 ubicaciones, el 8 % del total.
+
+### Tres trampas que ya costaron un bug cada una
+
+1. **El orden de construcción.** Las capas que colocan cuerpos tienen que correr
+   antes de la red de seguridad que cuelga los huérfanos; si no, los cuerpos se
+   crean dos veces y las ubicaciones se duplican.
+2. **El índice de la foto de stock** está en el orden del maestro, no del plano.
+   Cada cuerpo guarda su offset canónico. Si se desalinea, la ocupación se lee
+   de otra ubicación y el síntoma es un pasillo con un porcentaje absurdo.
+3. **No todos los cuerpos son números.** Hay códigos como `0220-MANGUERAS-CDR` y
+   `0222-01-ACEITES`; normalizarlos con `+col` da `NaN` y dos cuerpos distintos
+   colapsan en la misma clave. La clave es numérica cuando se puede y textual
+   cuando no.
 
 ## 3. Qué muestra
 
