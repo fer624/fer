@@ -1,4 +1,4 @@
-# Mezzanine — almacenes 0001 y 0020 en el gemelo digital
+# CD Repuestos — almacenes 0001, 0010 y 0020 en el gemelo digital
 
 Documenta la capa `A0001` de `gemelo-digital-cd.html` (botón **Mezzanine** del HUD).
 Reemplaza al modelo inventado de las versiones V23–V24.
@@ -137,6 +137,39 @@ El orden de la foto de stock es el del maestro, no el del plano, así que cada
 cuerpo guarda su offset canónico dentro de los arrays embebidos. Si eso se
 desalinea, la ocupación se lee de otra ubicación y el síntoma es un pasillo con
 un porcentaje absurdo.
+
+## 2d. Racks de pallets — almacén 0010
+
+El 0010 usa otra convención: numera los cuerpos **1 a 16 corridos**, alternando
+impar y par entre los dos lados del pasillo (en el 0001 y el 0020 los números
+corren de 1 a 63). Son 9 pasillos repartidos en las dos naves:
+
+| Nave | Pasillos | Cuerpos | Ubicaciones | Ocupación |
+|---|---|---|---|---|
+| Nave 1 | 01–06 | 96 | 2.298 | 71 % |
+| Nave 2 | 10–12 | 54 | 1.540 | 66 % |
+| | | **150** | **3.838** | **69 %** |
+
+Los pasillos 01 a 03 son el área FILT (filtros) y el resto GENE. Los niveles van
+de 5 a 11 según el pasillo, y la altura de nivel se calcula para que el rack más
+alto no pase de 10,5 m dentro del galpón.
+
+La geometría sale entera del maestro: cuerpos, niveles y posiciones por nivel.
+Cada ubicación es un pallet, y el bulto que lleva encima crece con el llenado
+volumétrico. La disposición —dos filas por pasillo, filas de pasillos contiguos
+espalda contra espalda— es la del plano. Las cotas (paso de 2,20 m, fondo de
+1,10 m, pasillo de 3,30 m) son de rack estándar, no del plano: se ajustan en la
+constante `R10`.
+
+**El reparto por nave es una hipótesis**: el maestro no dice en qué nave está
+cada pasillo. Lo armé con los pasillos 01–06 en Nave 1 y 10–12 en Nave 2, que es
+lo que sugiere el salto en la numeración (el 07, 08 y 09 son del almacén 0011) y
+que los pasillos 10–12 tengan más niveles. Corregirlo es mover un pasillo de
+lista en `R10.naves`.
+
+**Cuidado con el orden de construcción.** La capa de racks tiene que correr
+antes de la red de seguridad que cuelga los cuerpos huérfanos; si corre después,
+los 150 cuerpos se crean dos veces y las ubicaciones se duplican.
 
 ## 3. Qué muestra
 
