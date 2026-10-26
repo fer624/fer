@@ -1,4 +1,4 @@
-# Almacén 0001 — gaveteros en el gemelo digital
+# Mezzanine — almacenes 0001 y 0020 en el gemelo digital
 
 Documenta la capa `A0001` de `gemelo-digital-cd.html` (botón **Mezzanine** del HUD).
 Reemplaza al modelo inventado de las versiones V23–V24.
@@ -95,6 +95,48 @@ Lo que tiene maestro en SAP se pinta con el dato real; lo que no, se dibuja en
 gris y el panel lo informa aparte. Así la maqueta muestra de un vistazo **dónde
 hay capacidad instalada que el sistema no conoce**: 283 cuerpos de estantería,
 15 gabinetes del altillo y los 16 racks de pallets.
+
+## 2c. Los dos almacenes del mezzanine
+
+La Base Ubis V2 trae los 15 tipos de almacén del CD (33.311 ubicaciones). En el
+mezzanine conviven dos, y la maqueta los carga a los dos:
+
+| Almacén | Qué es | Cuerpos | Ubicaciones |
+|---|---|---|---|
+| 0001 | Gabinetes de cajones | 169 | 19.562 |
+| 0020 | Estanterías | 249 | 5.837 |
+
+El mapeo fila del plano ↔ maestro está **verificado número de cuerpo por número
+de cuerpo**, no inferido. La regla es la misma en los dos almacenes: el pasillo
+de SAP es el corredor, impares de un lado y pares del otro.
+
+| Fila | Sección | Maestro |
+|---|---|---|
+| r17 / r20 | D0 / D1 | 0020 pasillo 01 impares / pares |
+| r21 / r26 | D2 / D3 | 0020 pasillo 02 impares / pares |
+| r27 / r30 | D4 / D5 | 0020 pasillo 03 impares / pares |
+| r31 / r34 | D6 / D7 | 0020 pasillo 04 impares / pares |
+| r35 / r39 | D8 / D9 | 0020 pasillo 05 impares / pares |
+| r40 | D10 | 0020 pasillo 06 impares |
+| r44 / r45 | D11 / D12 | 0001 pasillo 01 pares / 02 impares |
+| r50 / r51 | D13 / D14 | 0001 pasillo 02 pares / 03 impares |
+| r96 | H1 | 0001 pasillo 05 impares |
+| r95 | H2 | 0001 pasillo 06 pares (cuerpos 2–30) **+ 0020 pasillo 07 pares (36–64)** |
+| r83, r86, r87, r90, r91 | H3–H7 | sin maestro identificado |
+
+Dos cosas que salieron de ahí:
+
+1. **Los 15 "gabinetes sin alta" del altillo no faltaban.** Están en el almacén
+   0020 pasillo 07. La fila H2 se reparte entre dos almacenes, y las capacidades
+   coinciden 14 de 14 con el plano.
+2. **El corredor "Pas 6 Estan" del 0020 y el "pasillo 01" del 0001 son el mismo
+   pasillo físico**, numerado distinto en cada almacén. Por eso el pasillo 01 del
+   0001 tiene gabinetes de un solo lado: enfrente tiene la estantería D10.
+
+El orden de la foto de stock es el del maestro, no el del plano, así que cada
+cuerpo guarda su offset canónico dentro de los arrays embebidos. Si eso se
+desalinea, la ocupación se lee de otra ubicación y el síntoma es un pasillo con
+un porcentaje absurdo.
 
 ## 3. Qué muestra
 
