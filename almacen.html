@@ -176,34 +176,52 @@ main{flex:1; min-height:0; padding:14px 20px 18px; overflow:auto}
 
 .caja{
   background:var(--carta); border:1px solid var(--linea); border-radius:var(--radio);
-  box-shadow:var(--sombra); padding:13px 15px; min-width:0; min-height:0;
+  box-shadow:var(--sombra); padding:10px 13px; min-width:0; min-height:0;
   display:flex; flex-direction:column; position:relative; overflow:hidden;
 }
 .caja.liso{padding:0}
 .caja > h3{
-  font-size:10.5px; font-weight:750; text-transform:uppercase; letter-spacing:.07em;
-  color:var(--tinta-3); margin-bottom:2px; display:flex; align-items:center; gap:7px; flex:none;
+  font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--tinta-3); margin-bottom:1px; display:flex; align-items:baseline; gap:7px; flex:none;
 }
 .caja > h3 .pista{font-weight:600; text-transform:none; letter-spacing:0; color:var(--tinta-3); font-size:11px}
 .caja .lienzo{flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center}
 
-/* tarjeta chica de KPI */
-.kpi .val{font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1.05; margin-top:auto}
-.kpi .val.mini{font-size:20px}
-.kpi .pie{font-size:11.5px; color:var(--tinta-2); margin-top:3px}
-.kpi .chispa{height:16px; margin-top:5px}
+/* tarjeta chica de KPI: el numero manda, el resto se corre a un costado */
+.kpi{justify-content:space-between; gap:2px}
+.kpi .val{
+  font-size:clamp(28px, 2.6vw, 40px); font-weight:720; letter-spacing:-.03em; line-height:1;
+  font-variant-numeric:tabular-nums; margin-top:auto;
+}
+.kpi .val.mini{font-size:clamp(22px, 2vw, 31px)}
+.kpi .pie{font-size:11.5px; color:var(--tinta-2); margin-top:3px; line-height:1.3}
+.kpi .pie.tenue, .kpi .tenue{color:var(--tinta-3)}
+.kpi .fila{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-top:auto}
+
+/* variacion contra el corte anterior: la flecha dice el sentido, sin semaforo */
+.delta{
+  display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:650;
+  color:var(--tinta-2); background:var(--carta-2); border:1px solid var(--linea);
+  border-radius:99px; padding:1px 9px; white-space:nowrap; font-variant-numeric:tabular-nums;
+}
+.delta .fl{font-size:8.5px; color:var(--tinta-3)}
+.delta.plano{background:none; border-color:transparent; padding:0}
 
 /* el numero grande */
 .hero{justify-content:space-between; align-items:stretch; gap:6px}
 .hero .medio{display:flex; flex-direction:column; align-items:flex-start; justify-content:center; flex:1; min-height:0}
-.hero .rot{font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; color:var(--tinta-3)}
+.hero .rot{font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; color:var(--tinta-3)}
 .hero .big{
-  font-size:clamp(44px, 7.2vw, 86px); font-weight:730; letter-spacing:-.035em; line-height:.98;
+  font-size:clamp(50px, 8vw, 96px); font-weight:730; letter-spacing:-.04em; line-height:.95;
   font-variant-numeric:tabular-nums;
 }
-.hero .sub{font-size:13px; color:var(--tinta-2); margin-top:1px}
+.hero .sub{font-size:13px; color:var(--tinta-2); margin-top:2px}
+.hero .tira{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:9px}
+.hero .chispero{width:100%; margin-top:auto; padding-top:12px}
+.hero .chispero .rotulo{font-size:10.5px; color:var(--tinta-3); margin-top:3px}
+.hero .chispero:empty{display:none}
 .hero .estado{
-  display:inline-flex; align-items:center; gap:6px; margin-top:10px;
+  display:inline-flex; align-items:center; gap:6px;
   font-size:12px; font-weight:650; color:var(--tinta-2);
   border:1px solid var(--linea-2); border-radius:99px; padding:3px 11px;
 }
@@ -212,12 +230,13 @@ main{flex:1; min-height:0; padding:14px 20px 18px; overflow:auto}
 
 /* barras de mono / multi / total */
 .mmt{display:flex; flex-direction:column; gap:9px; width:100%}
-.mmt .f{display:grid; grid-template-columns:62px 1fr 92px; align-items:center; gap:10px}
+.mmt{gap:8px}
+.mmt .f{display:grid; grid-template-columns:58px 1fr 96px; align-items:center; gap:10px}
 .mmt .f .et{font-size:12px; font-weight:650; color:var(--tinta-2)}
 .mmt .f .pista{height:14px; background:var(--carta-3); border-radius:4px; position:relative; overflow:hidden}
 .mmt .f .pista i{position:absolute; inset:0 auto 0 0; border-radius:4px}
 .mmt .f .num{font-size:12.5px; text-align:right; color:var(--tinta-2); font-variant-numeric:tabular-nums}
-.mmt .f .num b{color:var(--tinta); font-size:13.5px}
+.mmt .f .num b{color:var(--tinta); font-size:15px; font-weight:700}
 .mmt .f.tot{border-top:1px solid var(--linea); padding-top:9px; margin-top:1px}
 .mmt .nota{font-size:11px; color:var(--tinta-3); margin-top:2px}
 
@@ -501,11 +520,14 @@ dialog::backdrop{background:rgba(5,16,57,.52); backdrop-filter:blur(2px)}
       <div class="caja kpi" id="kvItems"></div>
       <div class="caja kpi" id="kvConc"></div>
     </div>
-    <div class="rejilla r2" style="margin-bottom:11px">
-      <div class="caja" style="min-height:260px"><h3>Valor por tipo de almacén</h3>
+    <div class="rejilla r3" style="margin-bottom:11px">
+      <div class="caja" style="min-height:280px"><h3>Valor por tipo de almacén</h3>
         <div class="lienzo" id="gValTipo"></div></div>
-      <div class="caja" style="min-height:260px"><h3>Valor por área de almacenamiento</h3>
+      <div class="caja" style="min-height:280px"><h3>Valor por área de almacenamiento</h3>
         <div class="lienzo" id="gValArea"></div></div>
+      <div class="caja" style="min-height:280px">
+        <h3>Curva de concentración <span class="pista">cuánta plata hay en cuántas posiciones</span></h3>
+        <div class="lienzo" id="gPareto"></div></div>
     </div>
     <div class="rejilla r2">
       <div class="caja"><h3>Materiales que concentran el valor</h3>
@@ -1712,8 +1734,33 @@ const G = (() => {
     enlazar(cont, puntos, op);
   }
 
+  /* ---------- mini curva, sin ejes ---------- */
+  // Va adentro de una tarjeta y solo muestra la forma: si viene subiendo o
+  // bajando. Los numeros exactos viven en la pestaña Tendencia.
+  function chispa(cont, puntos, op = {}) {
+    if (puntos.length < 2) { cont.innerHTML = ''; return; }
+    const W = 320, H = 46, m = 5;
+    const vals = puntos.map(p => p.v);
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const rango = (hi - lo) || 1;
+    const X = i => m + (i / (puntos.length - 1)) * (W - m * 2);
+    const Y = v => H - m - ((v - lo) / rango) * (H - m * 2);
+    const linea = puntos.map((p, i) => `${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
+    const area = `${X(0).toFixed(1)},${H} ${linea} ${X(puntos.length - 1).toFixed(1)},${H}`;
+    const ult = puntos.length - 1;
+    cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+      style="width:100%;height:${H}px;display:block" role="img"
+      aria-label="${Fmt.esc(op.aria || 'Evolución reciente')}">
+      <polygon points="${area}" fill="${op.color || 'var(--c1)'}" opacity=".13"/>
+      <polyline points="${linea}" fill="none" stroke="${op.color || 'var(--c1)'}"
+        stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      <circle cx="${X(ult).toFixed(1)}" cy="${Y(vals[ult]).toFixed(1)}" r="3.2"
+        fill="${op.color || 'var(--c1)'}" class="aro"/>
+    </svg>`;
+  }
+
   return { mostrar, esconder, fijarAncho, escala, senda, enlazar, vaciar, ancho, alto,
-           ocupacion, magnitud, mapaCalor, linea, pasoRampa, RAMPA };
+           ocupacion, magnitud, mapaCalor, linea, chispa, pasoRampa, RAMPA };
 })();
 
 /* ===========================================================================
@@ -1848,6 +1895,49 @@ const alternar = (campo, valor) => {
 };
 
 /* ===========================================================================
+   O · VARIACION CONTRA EL CORTE ANTERIOR
+   Una foto sola no dice nada: lo que se pregunta siempre es si subio o bajo.
+   Se compara contra el corte guardado mas reciente anterior a este.
+   Dos recaudos: si cambio el maestro, el denominador es otro y la diferencia
+   no significa nada; y si hay filtros puestos tampoco, porque el historial
+   guarda el deposito entero.
+   =========================================================================== */
+function corteAnterior() {
+  if (!M || !D.hist.length) return null;
+  const previos = D.hist.filter(c => c.fecha < M.fecha);
+  if (!previos.length) return null;
+  const c = previos[previos.length - 1];
+  return { ...c, mismaBase: c.maeN === D.mae.size };
+}
+
+// Devuelve el cuadradito con la flecha y la diferencia, o vacio si no se puede
+// comparar. Sin semaforo: la flecha dice el sentido, el color se queda quieto.
+function chipDelta(ahora, antes, fmt, op = {}) {
+  if (antes == null || !Number.isFinite(ahora) || !Number.isFinite(antes)) return '';
+  const d = ahora - antes;
+  const signo = d > 0 ? '▲' : d < 0 ? '▼' : '=';
+  const txt = d === 0 ? 'sin cambios' : (d > 0 ? '+' : '−') + fmt(Math.abs(d));
+  return `<span class="delta${op.plano ? ' plano' : ''}" title="${Fmt.esc(op.titulo || '')}">`
+    + `<span class="fl">${signo}</span>${txt}${op.sufijo || ''}</span>`;
+}
+
+// El renglon de comparacion que va al pie de las tarjetas.
+function pieComparado(prev, contenido) {
+  if (!prev) {
+    return `<div class="pie tenue">Guarde otro corte para ver la variación.</div>`;
+  }
+  if (!prev.mismaBase) {
+    return `<div class="pie tenue">El corte del ${Fmt.fecha(prev.fecha)} se calculó sobre
+      ${Fmt.ent(prev.maeN)} posiciones: no se puede comparar.</div>`;
+  }
+  if (hayFiltro()) {
+    return `<div class="pie tenue">Saque los filtros para comparar contra el corte anterior.</div>`;
+  }
+  return `<div class="pie">${contenido} <span class="tenue">vs ${Fmt.fecha(prev.fecha)}</span></div>`;
+}
+const comparable = prev => !!(prev && prev.mismaBase && !hayFiltro());
+
+/* ===========================================================================
    H · OCUPACION · el mosaico
    Responde una sola pregunta: cuan lleno esta el deposito. La saturacion
    manda y por eso ocupa la tarjeta grande; el resto se acomoda alrededor.
@@ -1860,6 +1950,9 @@ function pintarOcupacion(v) {
   pintarChips();
 
   const sat = nivelSaturacion(v.mono_.pct);
+  const prev = corteAnterior();
+  const cmp = comparable(prev);
+  const pctPrevMono = cmp && prev.mono.n ? prev.mono.ocu / prev.mono.n * 100 : null;
 
   /* --- la tarjeta grande --- */
   $('#cjHero').innerHTML = `
@@ -1867,7 +1960,13 @@ function pintarOcupacion(v) {
     <div class="medio">
       <span class="big">${Fmt.pct(v.mono_.pct)}</span>
       <span class="sub">${Fmt.ent(v.mono_.ocu)} de ${Fmt.ent(v.mono_.n)} posiciones ocupadas</span>
-      <span class="estado"><i></i>${Fmt.esc(sat.rot)} · umbral ${UMBRAL}%</span>
+      <div class="tira">
+        <span class="estado"><i></i>${Fmt.esc(sat.rot)} · umbral ${UMBRAL}%</span>
+        ${cmp ? chipDelta(v.mono_.pct, pctPrevMono, x => Fmt.dec(x, 1),
+          { sufijo: ' pts', titulo: 'contra el corte del ' + Fmt.fecha(prev.fecha) }) : ''}
+        ${cmp ? `<span style="font-size:11.5px;color:var(--tinta-3)">vs ${Fmt.fecha(prev.fecha)}</span>` : ''}
+      </div>
+      <div class="chispero" id="chispaHero"></div>
     </div>
     <div class="cinta">
       <div style="height:11px;background:var(--carta-3);border-radius:5px;position:relative;overflow:hidden">
@@ -1881,22 +1980,39 @@ function pintarOcupacion(v) {
       </div>
     </div>`;
 
+  // mini curva de los ultimos cortes guardados, adentro de la tarjeta grande
+  const ultimos = D.hist.filter(c => c.fecha <= M.fecha && c.maeN === D.mae.size).slice(-12)
+    .map(c => ({ v: c.mono.n ? c.mono.ocu / c.mono.n * 100 : 0 }));
+  const chispero = $('#chispaHero');
+  if (!hayFiltro() && ultimos.length >= 2) {
+    chispero.previousElementSibling.insertAdjacentHTML('afterend', '');
+    chispero.innerHTML = '';
+    G.chispa(chispero, ultimos, { aria: 'Saturación monoproducto en los últimos cortes' });
+    chispero.insertAdjacentHTML('beforeend',
+      `<div class="rotulo">Saturación en los últimos ${Fmt.ent(ultimos.length)} cortes guardados</div>`);
+  } else {
+    chispero.innerHTML = '';
+  }
+
   /* --- las dos chicas --- */
   $('#cjOcu').innerHTML = `<h3>Ocupadas</h3>
-    <div class="val">${Fmt.ent(v.tot.ocu)}</div>
-    <div class="pie">${Fmt.plural(v.tot.lin, 'línea', 'líneas')}</div>`;
+    <div class="fila"><span class="val">${Fmt.ent(v.tot.ocu)}</span>
+      ${cmp ? chipDelta(v.tot.ocu, prev.tot.ocu, Fmt.ent) : ''}</div>
+    ${pieComparado(prev, Fmt.plural(v.tot.lin, 'línea', 'líneas'))}`;
   $('#cjVac').innerHTML = `<h3>Vacías</h3>
-    <div class="val">${Fmt.ent(v.tot.vac)}</div>
-    <div class="pie">lugar disponible</div>`;
+    <div class="fila"><span class="val">${Fmt.ent(v.tot.vac)}</span>
+      ${cmp ? chipDelta(v.tot.vac, prev.tot.n - prev.tot.ocu, Fmt.ent) : ''}</div>
+    ${pieComparado(prev, 'lugar disponible')}`;
 
   /* --- la plata --- */
   $('#cjPlata').innerHTML = M.conValor
     ? `<h3>Valor en posiciones <span class="pista">${Fmt.plural(v.tot.items, 'ítem distinto', 'ítems distintos')}</span></h3>
-       <div class="val mini">${Fmt.usd(v.tot.val)}</div>
-       <div class="pie">${Fmt.usdX(v.tot.val)} · ${Fmt.usdX(v.tot.ocu ? v.tot.val / v.tot.ocu : 0)} por posición ocupada</div>`
+       <div class="fila"><span class="val mini">${Fmt.usdX(v.tot.val)}</span>
+         ${cmp && prev.val ? chipDelta(v.tot.val, prev.val, Fmt.usd) : ''}</div>
+       ${pieComparado(prev, `${Fmt.usdX(v.tot.ocu ? v.tot.val / v.tot.ocu : 0)} por posición ocupada`)}`
     : `<h3>Valor en posiciones</h3>
        <div class="val mini" style="color:var(--tinta-3)">sin precios</div>
-       <div class="pie">Cargue el maestro valorizado en Configuración para ver los montos.</div>`;
+       <div class="pie tenue">Cargue el maestro valorizado en Configuración para ver los montos.</div>`;
 
   /* --- mono, multi y total --- */
   const fila = (et, r, color, nota) => `
@@ -2009,17 +2125,21 @@ function pintarValorizado(v) {
   const diez = Math.max(1, Math.round(ocupadas.length * .1));
   const enDiez = ocupadas.slice(0, diez).reduce((s, x) => s + x.val, 0);
 
+  const prev = corteAnterior();
+  const cmp = comparable(prev);
   $('#kvTotal').innerHTML = `<h3>Valor en posiciones</h3>
-    <div class="val mini">${Fmt.usd(total)}</div>
-    <div class="pie">${Fmt.usdX(total)}</div>`;
+    <div class="fila"><span class="val mini">${Fmt.usdX(total)}</span>
+      ${cmp && prev.val ? chipDelta(total, prev.val, Fmt.usd) : ''}</div>
+    ${pieComparado(prev, Fmt.usd(total))}`;
   $('#kvMedia').innerHTML = `<h3>Promedio por posición</h3>
-    <div class="val mini">${Fmt.usd(v.tot.ocu ? total / v.tot.ocu : 0)}</div>
+    <div class="fila"><span class="val mini">${Fmt.usdX(v.tot.ocu ? total / v.tot.ocu : 0)}</span></div>
     <div class="pie">sobre ${Fmt.plural(v.tot.ocu, 'posición ocupada', 'posiciones ocupadas')}</div>`;
   $('#kvItems').innerHTML = `<h3>Ítems distintos</h3>
-    <div class="val">${Fmt.ent(v.tot.items)}</div>
-    <div class="pie">en ${Fmt.plural(v.lineas.length, 'línea', 'líneas')}</div>`;
+    <div class="fila"><span class="val">${Fmt.ent(v.tot.items)}</span>
+      ${cmp && prev.items ? chipDelta(v.tot.items, prev.items, Fmt.ent) : ''}</div>
+    ${pieComparado(prev, `en ${Fmt.plural(v.lineas.length, 'línea', 'líneas')}`)}`;
   $('#kvConc').innerHTML = `<h3>Concentración</h3>
-    <div class="val">${Fmt.pct(total ? enDiez / total * 100 : 0, 0)}</div>
+    <div class="fila"><span class="val">${Fmt.pct(total ? enDiez / total * 100 : 0, 0)}</span></div>
     <div class="pie">del valor está en las ${Fmt.ent(diez)} posiciones más caras,
       el 10% de las ocupadas</div>`;
 
@@ -2047,6 +2167,33 @@ function pintarValorizado(v) {
     alClic: k => alternar('area', k), aria: 'Valor por área de almacenamiento',
     vacio: 'Sin valores con este filtro.' });
 
+  // Curva de concentracion: las posiciones ordenadas de mayor a menor valor
+  // contra el porcentaje de plata que acumulan. La diagonal seria el reparto
+  // parejo; cuanto mas se despega la curva, mas concentrado esta el inventario.
+  const pasos = [];
+  if (ocupadas.length) {
+    let acum = 0, j = 0;
+    for (let k = 1; k <= 20; k++) {
+      const hasta = Math.round(ocupadas.length * k / 20);
+      while (j < hasta) { acum += ocupadas[j].val; j++; }
+      pasos.push({
+        rot: k % 4 === 0 ? (k * 5) + '%' : '',
+        rotLargo: `El ${k * 5}% de las posiciones más caras`,
+        pctPos: k * 5,
+        acumulado: total ? acum / total * 100 : 0,
+        parejo: k * 5,
+        posiciones: hasta,
+        valor: acum
+      });
+    }
+  }
+  G.linea($('#gPareto'), pasos, [
+    { nombre: 'Acumulado', campo: 'acumulado', color: 'var(--c4)', fmt: x => Fmt.pct(x) },
+    { nombre: 'Reparto parejo', campo: 'parejo', color: 'var(--eje)', fmt: x => Fmt.pct(x) }
+  ], { fmt: x => Fmt.dec(x, 0) + '%', max: 100, mI: 44, rotularFin: false,
+       aria: 'Curva de concentración del valor',
+       vacio: 'Sin posiciones con valor.' });
+
   // materiales: el mismo material puede estar en varias posiciones
   const mats = new Map();
   for (const L of v.lineas) {
@@ -2063,6 +2210,7 @@ function pintarValorizado(v) {
     { t: 'Cantidad', n: true, v: f => f.ctd, h: f => Fmt.ent(f.ctd) },
     { t: 'Posiciones', n: true, v: f => f.ubis.size, h: f => Fmt.ent(f.ubis.size) },
     { t: 'Valor', n: true, v: f => f.val, h: f => `<b>${Fmt.usdX(f.val)}</b>` },
+    { t: '% del total', n: true, v: f => f.val, h: f => Fmt.pct(total ? f.val / total * 100 : 0, 1) },
     { t: '', v: null, h: f => barrita(f.val / maxMat * 100) }
   ], topMat, { orden: 4, dir: -1, vacio: 'Sin materiales con valor.' });
 
@@ -2073,6 +2221,7 @@ function pintarValorizado(v) {
     { t: 'Tipo', v: f => f.tipo },
     { t: 'Ítems', n: true, v: f => f.mats, h: f => Fmt.ent(f.mats) },
     { t: 'Valor', n: true, v: f => f.val, h: f => `<b>${Fmt.usdX(f.val)}</b>` },
+    { t: '% del total', n: true, v: f => f.val, h: f => Fmt.pct(total ? f.val / total * 100 : 0, 1) },
     { t: '', v: null, h: f => barrita(f.val / maxUbi * 100) }
   ], topUbi, { orden: 3, dir: -1, vacio: 'Sin posiciones con valor.' });
 }
@@ -2176,7 +2325,9 @@ function pintarReporte() {
   const sat = nivelSaturacion(v.mono_.pct);
 
   const tipos = agrupar(v.mono, 'tipo').filter(d => d.n >= 10).sort((a, b) => b.pct - a.pct).slice(0, 7);
-  const pasillos = agrupar(v.mono, 'pas').filter(d => d.n >= 10).sort((a, b) => b.pct - a.pct).slice(0, 8);
+  const porValor = agrupar(v.ubis, 'tipo').filter(d => d.val > 0).sort((a, b) => b.val - a.val).slice(0, 7);
+  const valTot = porValor.reduce((s, d) => s + d.val, 0);
+  const maxVal = porValor.length ? porValor[0].val : 1;
 
   const barra = d => `<div class="f-f">
     <span class="e">${Fmt.esc(d.k)}</span>
@@ -2226,12 +2377,20 @@ function pintarReporte() {
           <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">
             En multiproducto entran varios materiales y lo que no entra queda fuera del rack:
             ese porcentaje no se lee como saturación.</div></div>
-        <div class="f-cj"><h4>Pasillos más cargados · monoproducto</h4>
-          ${pasillos.map(barra).join('') || '<div style="font-size:11px;color:var(--tinta-3)">Sin datos.</div>'}</div>
+        <div class="f-cj"><h4>Valor por tipo de almacén</h4>
+          ${M.conValor && porValor.length
+            ? porValor.map(d => `<div class="f-f">
+                <span class="e">${Fmt.esc(d.k)}</span>
+                <span class="p"><i style="width:${(d.val / maxVal * 100).toFixed(1)}%;background:var(--c1)"></i></span>
+                <span class="n" style="width:62px">${Fmt.usd(d.val).replace('USD ', '')}</span>
+                <span class="n" style="width:40px;color:var(--tinta-2)">${Fmt.pct(v.tot.val ? d.val / v.tot.val * 100 : 0, 0)}</span></div>`).join('')
+            : '<div style="font-size:11px;color:var(--tinta-3)">Sin maestro valorizado: no hay montos en este corte.</div>'}
+          ${M.conValor && porValor.length ? `<div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">
+            Sobre ${Fmt.usdX(v.tot.val)} en posiciones.</div>` : ''}</div>
       </div>
       <div class="f-cj" style="margin-top:11px">
         <h4>Mapa de ocupación: pasillo por nivel · monoproducto</h4>
-        ${mapaDeFilmina(v, nota ? 205 : 250)}
+        ${mapaDeFilmina(v, nota ? 190 : 235)}
       </div>
       ${nota ? `<div class="f-nota"><b>Comentario:</b> ${Fmt.esc(nota)}</div>` : ''}
       <div class="f-pie">
