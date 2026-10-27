@@ -2338,8 +2338,16 @@ function pintarReporte() {
     <span class="n">${Fmt.pct(d.pct, 0)}</span>
     <span class="n" style="width:54px;color:var(--tinta-2)">${Fmt.ent(d.vac)} lib</span></div>`;
 
-  const ficha = (rot, val, pie) => `<div class="c"><div class="r">${rot}</div>
-    <div class="v">${val}</div><div class="d">${pie}</div></div>`;
+  const prev = corteAnterior();
+  const cmp = !!(prev && prev.mismaBase);
+  const pctPrevMono = cmp && prev.mono.n ? prev.mono.ocu / prev.mono.n * 100 : null;
+
+  const ficha = (rot, val, pie, chip) => `<div class="c"><div class="r">${rot}</div>
+    <div class="v">${val}</div>
+    <div class="d">${chip ? chip + ' · ' : ''}${pie}</div></div>`;
+  // En la hoja el chip va sin recuadro: en papel el borde ensucia.
+  const chip = (ahora, antes, fmt, suf) =>
+    cmp ? chipDelta(ahora, antes, fmt, { plano: true, sufijo: suf || '' }) : '';
 
   $('#filmina').innerHTML = `
     <div class="f-cab">
@@ -2353,12 +2361,17 @@ function pintarReporte() {
     </div>
     <div class="f-cuerpo">
       <div class="f-k">
-        ${ficha('Saturación mono', Fmt.pct(v.mono_.pct), sat.rot + ' · ' + Fmt.ent(v.mono_.n) + ' posiciones')}
-        ${ficha('Ocupadas', Fmt.ent(v.tot.ocu), 'posiciones con stock')}
-        ${ficha('Vacías', Fmt.ent(v.tot.vac), 'lugar disponible')}
-        ${ficha('Ítems distintos', Fmt.ent(v.tot.items), Fmt.plural(v.lineas.length, 'línea', 'líneas'))}
+        ${ficha('Saturación mono', Fmt.pct(v.mono_.pct), sat.rot,
+          chip(v.mono_.pct, pctPrevMono, x => Fmt.dec(x, 1), ' pts'))}
+        ${ficha('Ocupadas', Fmt.ent(v.tot.ocu), 'posiciones con stock',
+          cmp ? chip(v.tot.ocu, prev.tot.ocu, Fmt.ent) : '')}
+        ${ficha('Vacías', Fmt.ent(v.tot.vac), 'lugar disponible',
+          cmp ? chip(v.tot.vac, prev.tot.n - prev.tot.ocu, Fmt.ent) : '')}
+        ${ficha('Ítems distintos', Fmt.ent(v.tot.items), Fmt.plural(v.lineas.length, 'línea', 'líneas'),
+          cmp && prev.items ? chip(v.tot.items, prev.items, Fmt.ent) : '')}
         ${ficha('Valor en posiciones', M.conValor ? Fmt.usd(v.tot.val) : '—',
-          M.conValor ? Fmt.usdX(v.tot.val) : 'sin maestro valorizado')}
+          M.conValor ? Fmt.usdX(v.tot.val) : 'sin maestro valorizado',
+          cmp && prev.val && M.conValor ? chip(v.tot.val, prev.val, Fmt.usd) : '')}
       </div>
       <div class="f-cols">
         <div class="f-cj"><h4>Saturación por tipo · monoproducto</h4>
@@ -2389,8 +2402,8 @@ function pintarReporte() {
             Sobre ${Fmt.usdX(v.tot.val)} en posiciones.</div>` : ''}</div>
       </div>
       <div class="f-cj" style="margin-top:11px">
-        <h4>Mapa de ocupación: pasillo por nivel · monoproducto</h4>
-        ${mapaDeFilmina(v, nota ? 190 : 235)}
+        <h4>Evolución de la saturación monoproducto${cmp ? ` · contra el corte del ${Fmt.fecha(prev.fecha)}` : ''}</h4>
+        ${curvaDeFilmina(serieDeFilmina(), nota ? 215 : 248)}
       </div>
       ${nota ? `<div class="f-nota"><b>Comentario:</b> ${Fmt.esc(nota)}</div>` : ''}
       <div class="f-pie">
@@ -2399,6 +2412,77 @@ function pintarReporte() {
           ${M.archivo ? 'Fuente: ' + Fmt.esc(M.archivo) + '.' : ''}</span>
       </div>
     </div>`;
+}
+
+// Los cortes guardados que se pueden comparar entre si: los calculados sobre
+// el mismo maestro. Mezclar bases distintas dibuja un escalon que no existe.
+function serieDeFilmina() {
+  if (!M || !D.mae) return [];
+  return D.hist
+    .filter(c => c.fecha <= M.fecha && c.maeN === D.mae.size && c.mono.n)
+    .slice(-14)
+    .map(c => ({ rot: Fmt.fecha(c.fecha).slice(0, 5), fecha: c.fecha, v: c.mono.ocu / c.mono.n * 100 }));
+}
+
+// Curva para la hoja impresa. El eje va ajustado al rango de los datos y no de
+// 0 a 100, porque entre 70 y 73 por ciento una curva pegada al techo no deja
+// ver nada. Por eso el eje se rotula y se avisa que esta ampliado.
+function curvaDeFilmina(puntos, alto) {
+  if (puntos.length < 2) {
+    return `<div style="font-size:11px;color:var(--tinta-3);padding:14px 0">
+      Hace falta más de un corte guardado para dibujar la evolución.
+      Los cortes se guardan desde la pestaña Configuración.</div>`;
+  }
+  const W = 1024, H = Math.max(110, alto), mI = 46, mD = 54, mT = 12, mB = 22;
+  const vals = puntos.map(p => p.v);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  // El eje se apoya en numeros redondos: 65, 70, 75 y no 65, 67,2, 69,4.
+  const paso = [0.5, 1, 2, 2.5, 5, 10, 20].find(p => (max - min) / p <= 4) || 25;
+  let lo = Math.floor((min - paso * .4) / paso) * paso;
+  let hi = Math.ceil((max + paso * .4) / paso) * paso;
+  if (hi - lo < paso * 2) hi = lo + paso * 2;
+  const dentroUmbral = UMBRAL >= lo && UMBRAL <= hi;
+  const aB = W - mI - mD, aH = H - mT - mB;
+  const X = i => mI + (i / (puntos.length - 1)) * aB;
+  const Y = v => mT + aH - ((v - lo) / (hi - lo)) * aH;
+  let g = '';
+  const dec = paso < 1 ? 1 : 0;
+  for (let val = lo; val <= hi + 1e-9; val += paso) {
+    const y = Y(val).toFixed(1);
+    g += `<line x1="${mI}" y1="${y}" x2="${mI + aB}" y2="${y}" stroke="var(--grilla)" stroke-width="1"/>`;
+    g += `<text x="${mI - 7}" y="${+y + 3}" text-anchor="end" style="font-size:9px;fill:var(--tinta-3)">`
+      + `${Fmt.dec(val, dec)}%</text>`;
+  }
+  if (dentroUmbral) {
+    const y = Y(UMBRAL).toFixed(1);
+    g += `<line x1="${mI}" y1="${y}" x2="${mI + aB}" y2="${y}" stroke="var(--tinta-2)" `
+      + `stroke-width="1" stroke-dasharray="4 3"/>`;
+    g += `<text x="${mI + aB + 5}" y="${+y + 3}" style="font-size:8.5px;fill:var(--tinta-2)">umbral ${UMBRAL}%</text>`;
+  }
+  const linea = puntos.map((p, i) => `${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
+  g += `<polygon points="${X(0).toFixed(1)},${mT + aH} ${linea} ${X(puntos.length - 1).toFixed(1)},${mT + aH}"
+    fill="var(--c1)" opacity=".12"/>`;
+  g += `<polyline points="${linea}" fill="none" stroke="var(--c1)" stroke-width="2"
+    stroke-linejoin="round" stroke-linecap="round"/>`;
+  // Un rotulo cada dos o tres fechas, para que no se pisen.
+  const salto = Math.ceil(puntos.length / 8);
+  puntos.forEach((p, i) => {
+    const ultimo = i === puntos.length - 1;
+    g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${ultimo ? 4 : 2.6}"
+      fill="var(--c1)" stroke="var(--carta)" stroke-width="1.5"/>`;
+    if (i % salto === 0 || ultimo) {
+      g += `<text x="${X(i).toFixed(1)}" y="${mT + aH + 14}" text-anchor="middle"
+        style="font-size:9px;fill:var(--tinta-3)">${Fmt.esc(p.rot)}</text>`;
+    }
+  });
+  const ult = puntos.length - 1;
+  g += `<text x="${(X(ult) + 7).toFixed(1)}" y="${(Y(puntos[ult].v) + 3).toFixed(1)}"
+    style="font-size:11px;font-weight:700;fill:var(--c1)">${Fmt.pct(puntos[ult].v)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
+    style="width:100%;height:auto;max-height:${Math.round(H)}px;display:block">${g}</svg>
+    <div style="margin-top:5px;font-size:9.5px;color:var(--tinta-3)">
+      ${Fmt.plural(puntos.length, 'corte guardado', 'cortes guardados')} sobre el mismo maestro ·
+      eje ampliado al rango de los datos, no de 0 a 100%</div>`;
 }
 
 // Mapa compacto para la hoja impresa: mismos pasos de color que la pantalla.
