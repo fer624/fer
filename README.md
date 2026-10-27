@@ -1,115 +1,72 @@
 # fer
 
-## ocupacion.html — Ocupación Almacén CDR
+## almacen.html — Ocupación del almacén · CDR
 
 Tablero de un solo archivo HTML que funciona **sin internet**. Se abre con doble clic en Chrome,
 Edge o Firefox actualizados. No lleva librerías: lee los `.xlsx` de SAP con el descompresor que ya
 trae el navegador. Colores corporativos de CEVA Logistics. Site: Finning CAT.
 
-### Cómo se usa
+Habla de **una sola cosa: la ocupación de las ubicaciones físicas**. Lo que no está en el maestro
+de ubicaciones no existe, así que tránsito, virtuales y los almacenes que no son del site se caen
+solos, sin listas de excepciones escritas a mano.
 
-1. **Maestro de ubicaciones** (`Base_Ubis`): define la capacidad. Se carga una vez y queda guardado.
-2. **Fotostock**: trae solo las ubicaciones ocupadas. Es el que se actualiza en cada corte.
-   La fecha se detecta del nombre (`FotoStock_2809` → 28/09) y se puede corregir.
-3. **Maestro valorizado** (`Base_Item_Valorizados`): aporta precio y familia. Queda guardado.
-4. **Diccionario de ubicaciones** (`Info_ubicaciones`): traduce los códigos y define qué es tránsito.
-   Queda guardado.
+### Los tres archivos
 
-Para actualizar alcanza con cargar el fotostock nuevo. Se pueden seleccionar varios juntos para
-cargar historial de semanas anteriores.
+1. **Maestro de ubicaciones** — define la capacidad. Se carga cuando cambia y queda guardado.
+   De él salen el total de posiciones, el pasillo, el nivel, el área y, por la columna
+   `Tipo de Ubicación`, si cada posición es **monoproducto** o **multiproducto**.
+2. **Fotostock** — el corte. Trae sólo las ocupadas; las vacías salen de restar contra el maestro.
+   Se pueden elegir varios juntos para cargar semanas anteriores de un saque. La fecha se detecta
+   del nombre (`FotoStock_2710` → 27/10) y se puede corregir.
+3. **Maestro valorizado** — opcional, también queda guardado. Los fotostock nuevos no traen `V/U`
+   ni `Total`, así que **sin este archivo la app funciona igual pero sin un solo dólar**.
 
-### Pantalla principal
+Nada sale del navegador. **Descargar respaldo** genera un archivo para mudarlo a otra computadora.
 
-Responde una sola pregunta: **cuán lleno está el almacén**. Separa en dos bloques:
+### Las cinco pantallas
 
-- **Almacenamiento físico**: ocupación con semáforo, ocupadas, vacías, total de posiciones,
-  ítems distintos y líneas. Gráficos por tipo de almacén, pasillo, área y nivel, más un mapa de
-  calor de pasillo por nivel.
-- **Ubicaciones virtuales y de tránsito**: cuántas hay, cuántas tienen stock e ítems distintos.
-  No se les calcula ocupación porque no tienen capacidad.
-
-Es **interactiva**: filtros de tipo, área, pasillo, nivel y estado en la barra superior, y clic
-sobre cualquier barra o celda para filtrar todo el tablero. Los filtros activos se ven como chips y
-se quitan de a uno o todos juntos. No hay barras de desplazamiento: todo entra en pantalla.
-
-Los gráficos van en azul marino, sin semáforo de colores. El umbral se marca con una línea de
-referencia al 90%, y el estado aparece como palabra sobria en la tabla.
-
-El resto del análisis está detrás, en pestañas: Análisis, Tránsito, Valorizado, Consolidación,
-Tendencia, Calidad, Detalle y Reporte.
-
-### Análisis: la lista de conteo previa al inventario general
-
-Pensada para el wall to wall, donde una diferencia obliga a mandar el caso al analyzer. En vez de
-salir a contar todo a ciegas, arma la lista de lo que hay que verificar sí o sí.
-
-Por **cada almacén** ordena sus líneas de mayor a menor valor y marca como **clase A** las que hacen
-falta para llegar al **80% del valor de ese almacén**. El corte es por almacén y no global, para que
-un almacén chico pero caro no se quede sin lista por culpa de uno grande.
-
-- **Valor de la línea** = precio × cantidad en esa ubicación, que es la plata que se juega en ese
-  conteo. El precio unitario va como columna (`USD/UM`) y sale de la propia línea, así siempre
-  cierra con la columna Valor de al lado.
-- El **resumen por almacén** muestra cuántas líneas hay que contar, qué porcentaje del trabajo son y
-  qué porcentaje del valor cubren. Se hace clic en un almacén para ver sólo sus líneas.
-- La lista respeta los **filtros de la barra superior**: se puede sacar por pasillo o por área para
-  contar por partes.
-- **Exportar a Excel** baja todo lo que esté a la vista, con una columna `Contado` en blanco.
-  **Imprimir lista** saca la planilla en hojas apaisadas con el encabezado repetido, el corte, el
-  alcance y un renglón para firmar. Avisa antes si son muchas hojas.
-
-Las líneas **sin precio** no se pueden ordenar y quedan afuera de la lista: si las hay, la pantalla
-lo avisa arriba.
-
-### La tabla de tipos manda
-
-Dentro del archivo hay una tabla (`TIPOS`) con los 26 tipos de almacén propios. Define tres cosas de
-una sola vez, y es el lugar donde tocar si cambia algo:
-
-- **Qué es nuestro**: el tipo que no figura ahí no se procesa. Así salen `0041`, `0120` y `0233`.
-- **Mono o multi**: `0001`, `0010`, `0015`, `0016`, `0020`, `0025` y `0100` son monoproducto; el
-  resto, multiproducto.
-- **La clase**: `F` física (capacidad, incluido el Back Order), `T` tránsito (está en el depósito
-  ocupando lugar pero no en una posición) y `V` virtual (contable: mermas, daños, garantías, ajustes).
-
-El **tipo manda sobre la ubicación**. Si el diccionario marca una ubicación suelta como virtual pero
-su tipo es físico, vale el tipo: son posiciones de ocasión especial donde la mercadería queda fuera
-del rack.
+- **Ocupación** — el mosaico. La saturación monoproducto ocupa la tarjeta grande porque es la que
+  manda; alrededor van ocupadas, vacías, el valor, el bloque de mono/multi/total, la ocupación por
+  nivel y por tipo de almacén, y el mapa de pasillo por nivel. Entra entera en pantalla, sin barra
+  de desplazamiento. Todo es filtrable: los selectores de arriba y el clic sobre cualquier barra o
+  celda. La tabla de ubicaciones se abre con un botón y se exporta a Excel.
+- **Valorizado** — dónde está la plata dentro de las posiciones: por tipo, por área, los materiales
+  que concentran el valor y las posiciones más caras.
+- **Tendencia** — la evolución de cada corte guardado, por semana o por mes.
+- **Reporte** — una filmina A4 apaisada para imprimir o guardar como PDF.
+- **Configuración** — carga de archivos, respaldo y los controles de calidad del corte.
 
 ### Criterios de cálculo
 
 - **Ocupada**: está en el maestro y aparece en el fotostock. **Vacía**: está en el maestro y no
-  aparece. Se cuentan posiciones distintas, nunca líneas, porque hay ubicaciones multiproducto.
-- **La saturación se mide sólo en monoproducto.** En multiproducto entran varios materiales y lo que
-  no entra queda fuera del rack, así que no hay tope contra el cual medir. Se cuentan y se informan,
-  pero sin semáforo. Las tres filas —mono, multi y total— cierran y las tres llevan porcentaje; sólo
-  la de monoproducto se lee como saturación.
-- **Ubicaciones de terceros**: la tabla de tipos ya saca los almacenes ajenos. Para ubicaciones
-  sueltas dentro de un tipo propio hay una lista de excepciones (`AJENAS`) y un filtro de texto
-  editable en Datos.
-- **Precio**, por orden: columna `Total` del fotostock, `V/U` por cantidad, o `Precio interno
-  periódico` del maestro valorizado por cantidad. `V/U` y `Total` no son estándar de SAP, así que es
-  normal que un export no las traiga.
-- **Códigos de material**: se usan tal cual vienen. En esta base `1006666` y `1006666.000` son
-  materiales distintos.
-- **Rótulos del site**: el tipo 0122 es un rack cantilever para cuchillas, y cuatro de sus
-  ubicaciones son sobredimensionados que no entran en ningún rack. Están en `NOTAS` dentro del
-  código, hasta que se incorporen a `Info_ubicaciones`.
-- **Fecha del corte**: la define el usuario. `Fecha EM` es fecha de entrada de mercadería y sirve
-  solo para antigüedad.
+  aparece. Se cuentan posiciones distintas, nunca líneas, porque en multiproducto entran varias.
+- **La saturación se mide sólo sobre monoproducto.** En multiproducto entran varios materiales y
+  lo que no entra queda fuera del rack, así que no hay tope contra el cual medir. Las tres filas
+  —mono, multi y total— cierran y las tres llevan porcentaje; sólo la de mono se lee como
+  saturación. El umbral de referencia es el 90%.
+- **Precio**, por orden: columna `Total` del fotostock, `V/U` por cantidad, o el maestro valorizado.
+  Un material puede traer **varias filas** en el maestro valorizado —REMAN, FULL y PARTIAL de un
+  repuesto reconstruido, o una por número de serie— con precios que se van al triple entre sí.
+  Quedarse con cualquiera de ellas es tirar una moneda, así que se usa el **valor contable**: lo
+  que el propio maestro declara de valor dividido por las unidades que declara de stock.
+- **Códigos de material**: se usan tal cual vienen. `1006666` y `1006666.000` son distintos.
+- **Pasillo y nivel**: SAP a veces escribe el nivel 4 como `4` y a veces como `04`. Se emparejan
+  rellenando con cero y la app avisa cuántos hubo, para que se corrija en el origen.
+- **Si cambia el maestro cambia el denominador**: la tendencia marca con una línea vertical la
+  fecha en que pasó y la tabla dice cuántas posiciones usó cada corte. Un escalón ahí no es
+  gestión, es cambio de base.
 
-### Dónde quedan los datos
+### Control cruzado
 
-El historial y las bases se guardan en el navegador de esa computadora. Nada se envía a ningún
-servidor. **Descargar respaldo** genera un archivo para mudarlo a otra máquina.
+El maestro trae su propia marca de ubicación vacía. La app la compara contra el fotostock y avisa
+si se separan: con los dos archivos del mismo corte tienen que coincidir casi al 100%.
 
-### Reporte
+---
 
-La pestaña **Reporte** arma una filmina de una hoja apaisada que sigue los mismos criterios que la
-pantalla: el titular es la saturación monoproducto, hay un bloque con mono, multi y total que cierra,
-saturación por tipo, pasillos más cargados y el **mapa de saturación de pasillo por nivel** a todo
-el ancho. Las barras van en azul marino con una marca al 90%, sin semáforo.
-**Exportar PDF** abre el diálogo de impresión: elegir *Guardar como PDF*, horizontal, A4.
+> Nota: este repositorio publica a GitHub Pages al integrar en `main`. Los archivos no contienen
+> datos de la empresa —nunca salen del navegador— pero la página quedaría accesible públicamente.
 
-> Nota: este repositorio publica a GitHub Pages al integrar en `main`. El archivo no contiene datos
-> de la empresa (nunca salen del navegador), pero la página quedaría accesible públicamente.
+### ocupacion.html
+
+La versión anterior, que además de ocupación traía tránsito, virtuales, consolidación y la lista de
+conteo para el wall to wall. Queda en el repositorio hasta que se decida darla de baja.

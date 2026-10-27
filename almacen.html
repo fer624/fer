@@ -1,0 +1,2596 @@
+<!doctype html>
+<html lang="es" data-tema="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ocupación CDR · Finning CAT</title>
+<style>
+/* ===========================================================================
+   1 · FICHAS DE COLOR
+   La paleta sale del azul marino de CEVA. Los cuatro acentos estan validados
+   para daltonismo en claro y en oscuro: ninguna serie se distingue solo por
+   color, siempre hay rotulo al lado.
+   =========================================================================== */
+:root{
+  color-scheme: light dark;
+
+  --marino:#051039;
+  --rojo:#e01b1b;
+
+  /* superficies */
+  --fondo:#f4f6fa;
+  --carta:#ffffff;
+  --carta-2:#f0f3f9;
+  --carta-3:#e4e9f3;
+  --linea:#d6dde9;
+  --linea-2:#c0cadb;
+
+  /* tinta */
+  --tinta:#0b1430;
+  --tinta-2:#4a5570;
+  --tinta-3:#737e97;
+
+  /* serie categorica (validada: lightness, croma, CVD, contraste) */
+  --c1:#577bd6; --c2:#d08022; --c3:#009289; --c4:#8f5dc1;
+
+  /* rampa secuencial de un solo tono, clara a oscura */
+  --r1:#e8edf8; --r2:#d3dcf0; --r3:#bcc9e7; --r4:#a4b5dd; --r5:#8ba1d3;
+  --r6:#718cc8; --r7:#5a77bb; --r8:#4a63a1; --r9:#3a4e85; --r10:#2b3b69;
+  --r11:#1e2a4e; --r12:#131c36;
+
+  --grilla:#e6eaf2;
+  --eje:#aab4c7;
+  --mapa-alto:#ffffff; --mapa-bajo:#0b1430;
+
+  --radio:14px;
+  --radio-2:10px;
+  --sombra:0 1px 2px rgba(5,16,57,.06), 0 4px 14px rgba(5,16,57,.05);
+  --sombra-2:0 2px 6px rgba(5,16,57,.10), 0 12px 32px rgba(5,16,57,.10);
+  --tipo:'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+:root:where([data-tema="oscuro"]),
+:root:where(:not([data-tema="claro"])){ }
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-tema="claro"]){
+    --fondo:#101422;
+    --carta:#171c2e;
+    --carta-2:#1e2438;
+    --carta-3:#272e46;
+    --linea:#2f3750;
+    --linea-2:#3d4763;
+    --tinta:#eef1f8;
+    --tinta-2:#a8b2c8;
+    --tinta-3:#7e8aa4;
+    --c1:#678be4; --c2:#cc8029; --c3:#00a097; --c4:#9d6dcf;
+    --r1:#1b2440; --r2:#223055; --r3:#2a3b6a; --r4:#334780; --r5:#3d5496;
+    --r6:#4862ab; --r7:#5572bf; --r8:#6483cd; --r9:#7694d8; --r10:#8aa5e1;
+    --r11:#a0b7e9; --r12:#bacbf1;
+    --grilla:#262d44; --eje:#49536e;
+    --mapa-alto:#0b1430; --mapa-bajo:#eef1f8;
+    --sombra:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+    --sombra-2:0 2px 6px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.45);
+  }
+}
+:root[data-tema="oscuro"]{
+  --fondo:#101422;
+  --carta:#171c2e;
+  --carta-2:#1e2438;
+  --carta-3:#272e46;
+  --linea:#2f3750;
+  --linea-2:#3d4763;
+  --tinta:#eef1f8;
+  --tinta-2:#a8b2c8;
+  --tinta-3:#7e8aa4;
+  --c1:#678be4; --c2:#cc8029; --c3:#00a097; --c4:#9d6dcf;
+  --r1:#1b2440; --r2:#223055; --r3:#2a3b6a; --r4:#334780; --r5:#3d5496;
+  --r6:#4862ab; --r7:#5572bf; --r8:#6483cd; --r9:#7694d8; --r10:#8aa5e1;
+  --r11:#a0b7e9; --r12:#bacbf1;
+  --grilla:#262d44; --eje:#49536e;
+  --mapa-alto:#0b1430; --mapa-bajo:#eef1f8;
+  --sombra:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  --sombra-2:0 2px 6px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.45);
+}
+
+/* ===========================================================================
+   2 · BASE
+   =========================================================================== */
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--tipo); background:var(--fondo); color:var(--tinta);
+  font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column;
+}
+h1,h2,h3,h4{line-height:1.2; font-weight:650}
+button{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--c1); outline-offset:2px; border-radius:4px}
+
+.nums{font-variant-numeric:tabular-nums}
+
+/* ---------- barra superior ---------- */
+.cab{
+  background:var(--marino); color:#fff; padding:0 20px;
+  display:flex; align-items:center; gap:18px; flex:none; height:58px;
+}
+.cab .logo{height:26px; width:auto; display:block}
+.cab .sep{width:1px; height:26px; background:rgba(255,255,255,.22)}
+.cab h1{font-size:16px; letter-spacing:-.01em; white-space:nowrap}
+.cab .site{
+  font-size:11px; font-weight:750; letter-spacing:.08em; text-transform:uppercase;
+  background:var(--rojo); color:#fff; padding:3px 9px; border-radius:99px; white-space:nowrap;
+}
+.cab .der{margin-left:auto; display:flex; align-items:center; gap:14px}
+.cab .corte{font-size:12.5px; color:#c2cce4; white-space:nowrap}
+.cab .corte b{color:#fff}
+.icono{
+  width:32px; height:32px; border-radius:9px; border:1px solid rgba(255,255,255,.25);
+  background:transparent; color:#fff; cursor:pointer; display:grid; place-items:center;
+  font-size:15px; flex:none;
+}
+.icono:hover{background:rgba(255,255,255,.12)}
+
+/* ---------- pestañas ---------- */
+.tabs{
+  background:var(--carta); border-bottom:1px solid var(--linea); padding:0 20px;
+  display:flex; gap:2px; flex:none; overflow-x:auto;
+}
+.tabs button{
+  background:none; border:0; padding:11px 15px 9px; cursor:pointer; white-space:nowrap;
+  font-size:13.5px; font-weight:600; color:var(--tinta-3); border-bottom:2.5px solid transparent;
+}
+.tabs button:hover{color:var(--tinta)}
+.tabs button[aria-selected="true"]{color:var(--tinta); border-bottom-color:var(--rojo)}
+
+/* ---------- lienzo ---------- */
+main{flex:1; min-height:0; padding:14px 20px 18px; overflow:auto}
+.hoja{display:none}
+/* La hoja es una columna: la barra de filtros mide lo suyo y el mosaico se
+   queda con todo el resto, que es lo que lo hace entrar sin barra lateral. */
+.hoja.ver{display:flex; flex-direction:column; height:100%; min-height:0}
+
+/* ===========================================================================
+   3 · EL MOSAICO
+   La pantalla principal es una grilla de 12 columnas y 6 filas que ocupa
+   exactamente el alto disponible. Cada tarjeta declara cuanto mide, asi la
+   saturacion pesa visualmente lo que pesa en la decision.
+   =========================================================================== */
+.mosaico{
+  display:grid; gap:11px; flex:1; min-height:0;
+  grid-template-columns:repeat(12, 1fr);
+  grid-template-rows:repeat(6, minmax(0,1fr));
+}
+.m-hero{grid-column:1/span 4;  grid-row:1/span 3}
+.m-k1  {grid-column:5/span 2;  grid-row:1}
+.m-k2  {grid-column:7/span 2;  grid-row:1}
+.m-k3  {grid-column:9/span 4;  grid-row:1}
+.m-mmt {grid-column:5/span 4;  grid-row:2/span 2}
+.m-niv {grid-column:9/span 4;  grid-row:2/span 2}
+.m-tipo{grid-column:1/span 4;  grid-row:4/span 3}
+.m-mapa{grid-column:5/span 8;  grid-row:4/span 3}
+/* Debajo de 1100px el mosaico se desarma y pasa a una sola columna alta. */
+@media (max-width:1100px){
+  .mosaico{grid-template-columns:repeat(4,1fr); grid-template-rows:none; flex:none}
+  .mosaico > *{grid-column:1/-1 !important; grid-row:auto !important; min-height:150px}
+}
+
+.caja{
+  background:var(--carta); border:1px solid var(--linea); border-radius:var(--radio);
+  box-shadow:var(--sombra); padding:13px 15px; min-width:0; min-height:0;
+  display:flex; flex-direction:column; position:relative; overflow:hidden;
+}
+.caja.liso{padding:0}
+.caja > h3{
+  font-size:10.5px; font-weight:750; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--tinta-3); margin-bottom:2px; display:flex; align-items:center; gap:7px; flex:none;
+}
+.caja > h3 .pista{font-weight:600; text-transform:none; letter-spacing:0; color:var(--tinta-3); font-size:11px}
+.caja .lienzo{flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center}
+
+/* tarjeta chica de KPI */
+.kpi .val{font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1.05; margin-top:auto}
+.kpi .val.mini{font-size:20px}
+.kpi .pie{font-size:11.5px; color:var(--tinta-2); margin-top:3px}
+.kpi .chispa{height:16px; margin-top:5px}
+
+/* el numero grande */
+.hero{justify-content:space-between; align-items:stretch; gap:6px}
+.hero .medio{display:flex; flex-direction:column; align-items:flex-start; justify-content:center; flex:1; min-height:0}
+.hero .rot{font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; color:var(--tinta-3)}
+.hero .big{
+  font-size:clamp(44px, 7.2vw, 86px); font-weight:730; letter-spacing:-.035em; line-height:.98;
+  font-variant-numeric:tabular-nums;
+}
+.hero .sub{font-size:13px; color:var(--tinta-2); margin-top:1px}
+.hero .estado{
+  display:inline-flex; align-items:center; gap:6px; margin-top:10px;
+  font-size:12px; font-weight:650; color:var(--tinta-2);
+  border:1px solid var(--linea-2); border-radius:99px; padding:3px 11px;
+}
+.hero .estado i{width:7px; height:7px; border-radius:50%; background:var(--c1); flex:none}
+.hero .cinta{width:100%; flex:none}
+
+/* barras de mono / multi / total */
+.mmt{display:flex; flex-direction:column; gap:9px; width:100%}
+.mmt .f{display:grid; grid-template-columns:62px 1fr 92px; align-items:center; gap:10px}
+.mmt .f .et{font-size:12px; font-weight:650; color:var(--tinta-2)}
+.mmt .f .pista{height:14px; background:var(--carta-3); border-radius:4px; position:relative; overflow:hidden}
+.mmt .f .pista i{position:absolute; inset:0 auto 0 0; border-radius:4px}
+.mmt .f .num{font-size:12.5px; text-align:right; color:var(--tinta-2); font-variant-numeric:tabular-nums}
+.mmt .f .num b{color:var(--tinta); font-size:13.5px}
+.mmt .f.tot{border-top:1px solid var(--linea); padding-top:9px; margin-top:1px}
+.mmt .nota{font-size:11px; color:var(--tinta-3); margin-top:2px}
+
+/* ===========================================================================
+   4 · GRAFICOS
+   Marcas finas, punta redondeada de 4px del lado del dato, grilla discreta,
+   un solo eje. El color identifica la entidad, nunca el puesto en el ranking.
+   =========================================================================== */
+/* max-height mas preserveAspectRatio: cuando la tarjeta es mas baja que lo que
+   pide la relacion de aspecto, el dibujo se achica en vez de desbordar. */
+svg.g{display:block; width:100%; height:auto; max-height:100%; overflow:visible}
+svg.g .gl{stroke:var(--grilla); stroke-width:1; shape-rendering:crispEdges}
+svg.g .bs{stroke:var(--eje); stroke-width:1; shape-rendering:crispEdges}
+svg.g .tk{fill:var(--tinta-3); font-size:10px}
+svg.g .lb{fill:var(--tinta-2); font-size:11px}
+svg.g .vd{fill:var(--tinta); font-size:11px; font-weight:650; font-variant-numeric:tabular-nums}
+svg.g .mk{cursor:pointer; transition:opacity .12s}
+svg.g .mk.apagado{opacity:.26}
+svg.g .cel{cursor:pointer}
+/* El numero adentro de la celda: en tema claro los pasos altos son oscuros y
+   el texto va blanco; en tema oscuro los pasos altos son claros y el texto va
+   oscuro. Por eso no alcanza con un color fijo y van dos fichas. */
+svg.g .cel-num{pointer-events:none; font-weight:650; font-variant-numeric:tabular-nums}
+svg.g .cel-num.alto{fill:var(--mapa-alto)}
+svg.g .cel-num.bajo{fill:var(--mapa-bajo)}
+.cel-num.alto{fill:var(--mapa-alto)}
+.cel-num.bajo{fill:var(--mapa-bajo)}
+svg.g .aro{stroke:var(--carta); stroke-width:2}
+
+.globo{
+  position:fixed; z-index:90; pointer-events:none; opacity:0; transform:translateY(3px);
+  transition:opacity .11s, transform .11s;
+  background:var(--carta); color:var(--tinta); border:1px solid var(--linea-2);
+  border-radius:var(--radio-2); box-shadow:var(--sombra-2); padding:9px 11px;
+  font-size:12px; max-width:290px;
+}
+.globo.ver{opacity:1; transform:none}
+.globo b{display:block; margin-bottom:4px; font-size:12.5px}
+.globo table{border-collapse:collapse; font-size:11.5px}
+.globo td{padding:1px 0}
+.globo td:last-child{text-align:right; padding-left:14px; font-weight:650; font-variant-numeric:tabular-nums}
+
+/* leyenda: siempre que haya dos series o mas */
+.leyenda{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:11.5px; color:var(--tinta-2); margin-top:7px}
+.leyenda span{display:inline-flex; align-items:center; gap:6px}
+.leyenda i{width:9px; height:9px; border-radius:3px; flex:none}
+
+.vacio{
+  display:grid; place-items:center; height:100%; min-height:90px; padding:14px;
+  color:var(--tinta-3); font-size:12.5px; text-align:center;
+}
+
+/* ===========================================================================
+   5 · TABLAS, FORMULARIOS Y AVISOS
+   =========================================================================== */
+.rejilla{display:grid; gap:11px}
+.r2{grid-template-columns:repeat(2,1fr)}
+.r3{grid-template-columns:repeat(3,1fr)}
+.r4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:1180px){ .r3,.r4{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:760px){ .rejilla{grid-template-columns:1fr !important} }
+
+.marco{overflow:auto; max-height:min(58vh,560px); border:1px solid var(--linea); border-radius:var(--radio-2)}
+.marco.suelto{max-height:none; overflow:visible}
+table{border-collapse:collapse; width:100%; font-size:13px}
+thead th{
+  position:sticky; top:0; z-index:2; background:var(--carta-2); text-align:left; white-space:nowrap;
+  padding:8px 11px; font-size:10.5px; font-weight:750; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--tinta-2); border-bottom:1px solid var(--linea); cursor:pointer; user-select:none;
+}
+thead th.quieto{cursor:default}
+thead th .fl{color:var(--c1); font-size:9px}
+tbody td{padding:7px 11px; border-bottom:1px solid var(--grilla)}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.clic{cursor:pointer}
+tbody tr.clic:hover td{background:var(--carta-2)}
+tbody tr.elegida td{background:color-mix(in oklab, var(--c1) 14%, var(--carta))}
+td.n,th.n{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+tfoot td{
+  padding:8px 11px; font-weight:700; background:var(--carta-2);
+  border-top:1px solid var(--eje); font-variant-numeric:tabular-nums;
+}
+.corte-tabla{font-size:11.5px; color:var(--tinta-3); margin-top:7px}
+
+.pastilla{
+  display:inline-block; font-size:11px; padding:1px 8px; border-radius:99px;
+  border:1px solid var(--linea-2); color:var(--tinta-2); white-space:nowrap;
+}
+
+/* barra interior de tabla: magnitud sin salir de la celda */
+.barrita{display:block; height:5px; border-radius:3px; background:var(--carta-3); position:relative; min-width:46px}
+.barrita i{position:absolute; inset:0 auto 0 0; border-radius:3px; background:var(--c1)}
+
+/* ---------- controles ---------- */
+.btn{
+  border:1px solid var(--linea-2); background:var(--carta); color:var(--tinta);
+  border-radius:9px; padding:7px 13px; font-size:13px; font-weight:600; cursor:pointer;
+}
+.btn:hover{background:var(--carta-2)}
+.btn.fuerte{background:var(--marino); border-color:var(--marino); color:#fff}
+.btn.fuerte:hover{filter:brightness(1.18)}
+.btn.chico{padding:5px 10px; font-size:12px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+
+label.et{display:block; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--tinta-3); margin-bottom:4px}
+input[type=text],input[type=date],select{
+  font:inherit; font-size:13px; color:var(--tinta); background:var(--carta);
+  border:1px solid var(--linea-2); border-radius:9px; padding:6px 10px; width:100%;
+}
+input[type=file]{font-size:12.5px; width:100%}
+
+.filtros{
+  display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;
+  background:var(--carta); border:1px solid var(--linea); border-radius:var(--radio);
+  padding:10px 13px; margin-bottom:11px; box-shadow:var(--sombra);
+}
+.filtros[hidden]{display:none}
+.filtros .gr{min-width:118px}
+.chips{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.chip{
+  display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+  background:color-mix(in oklab, var(--c1) 14%, var(--carta)); color:var(--tinta);
+  border:1px solid color-mix(in oklab, var(--c1) 40%, transparent);
+  border-radius:99px; padding:3px 6px 3px 11px;
+}
+.chip button{border:0; background:none; cursor:pointer; color:var(--tinta-2); line-height:1; padding:0 3px; font-size:14px}
+
+.aviso{
+  display:flex; gap:11px; border-radius:var(--radio-2); padding:11px 13px; font-size:13px;
+  border:1px solid var(--linea-2); background:var(--carta); margin-bottom:11px; align-items:flex-start;
+}
+.aviso .ic{
+  width:19px; height:19px; border-radius:50%; flex:none; display:grid; place-items:center;
+  font-size:11px; font-weight:800; background:var(--carta-3); color:var(--tinta-2); margin-top:1px;
+}
+.aviso.ojo{border-color:color-mix(in oklab, var(--c2) 45%, transparent)}
+.aviso.ojo .ic{background:color-mix(in oklab, var(--c2) 22%, var(--carta)); color:var(--c2)}
+.aviso.mal{border-color:color-mix(in oklab, var(--rojo) 45%, transparent)}
+.aviso.mal .ic{background:color-mix(in oklab, var(--rojo) 16%, var(--carta)); color:var(--rojo)}
+
+.estado-carga{font-size:12.5px; margin-top:7px; color:var(--tinta-2); line-height:1.4}
+.estado-carga.ok{color:var(--c3)}
+.estado-carga.mal{color:var(--rojo)}
+
+.pie-fino{font-size:11.5px; color:var(--tinta-3); margin-top:9px}
+.titulo-hoja{display:flex; align-items:baseline; gap:12px; margin-bottom:11px; flex-wrap:wrap}
+.titulo-hoja h2{font-size:17px}
+.titulo-hoja p{font-size:12.5px; color:var(--tinta-3)}
+.titulo-hoja .der{margin-left:auto; display:flex; gap:8px; align-items:center}
+
+/* ---------- ventana de la tabla ---------- */
+dialog{
+  border:0; padding:0; border-radius:var(--radio); background:var(--carta); color:var(--tinta);
+  box-shadow:var(--sombra-2); width:min(1180px, 94vw); max-height:88vh; overflow:auto;
+}
+dialog::backdrop{background:rgba(5,16,57,.52); backdrop-filter:blur(2px)}
+
+/* ===========================================================================
+   6 · LA FILMINA
+   Una hoja A4 apaisada con lo que hay que mirar de un golpe.
+   =========================================================================== */
+.filmina{background:var(--carta); border:1px solid var(--linea); border-radius:var(--radio); overflow:hidden; box-shadow:var(--sombra)}
+.f-cab{background:var(--marino); color:#fff; padding:12px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.f-cab img{height:26px}
+.f-cab h2{font-size:16px; color:#fff}
+.f-cab .s{font-size:11.5px; color:#c2cce4}
+.f-cab .meta{margin-left:auto; text-align:right; font-size:11.5px; color:#c2cce4; line-height:1.35}
+.f-cab .meta b{color:#fff}
+.f-cuerpo{padding:14px 18px 16px}
+.f-k{display:grid; gap:9px; grid-template-columns:repeat(5,1fr)}
+.f-k .c{border:1px solid var(--linea); border-radius:var(--radio-2); padding:9px 11px; background:var(--carta-2)}
+.f-k .c .r{font-size:9.5px; font-weight:750; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-2); line-height:1.25}
+.f-k .c .v{font-size:22px; font-weight:720; margin-top:3px; white-space:nowrap; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.f-k .c .d{font-size:10.5px; color:var(--tinta-2); margin-top:2px}
+.f-cols{display:grid; gap:11px; grid-template-columns:1.25fr 1fr 1fr; margin-top:12px}
+.f-cj{border:1px solid var(--linea); border-radius:var(--radio-2); padding:10px 12px}
+.f-cj h4{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-2); margin-bottom:8px}
+.f-f{display:flex; align-items:center; gap:8px; font-size:11.5px; padding:2px 0}
+.f-f .e{flex:none; width:58px; font-weight:700; font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.f-f .p{flex:1; height:12px; background:var(--carta-3); border-radius:3px; position:relative; overflow:hidden}
+.f-f .p i{position:absolute; inset:0 auto 0 0; border-radius:0 3px 3px 0}
+.f-f .n{flex:none; width:46px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums}
+.f-nota{margin-top:10px; padding:8px 11px; border-left:3px solid var(--c1); background:var(--carta-2);
+  border-radius:0 var(--radio-2) var(--radio-2) 0; font-size:12px}
+.f-pie{border-top:1px solid var(--linea); margin-top:12px; padding-top:8px; display:flex; gap:14px;
+  justify-content:space-between; font-size:10px; color:var(--tinta-3)}
+
+/* ===========================================================================
+   7 · IMPRESION
+   =========================================================================== */
+@media print{
+  @page{ size:A4 landscape; margin:8mm; }
+  html,body{background:#fff !important; font-size:9pt; display:block}
+  :root{
+    --fondo:#fff; --carta:#fff; --carta-2:#f1f4fa; --carta-3:#e5eaf4; --tinta:#0b1430;
+    --tinta-2:#48536d; --tinta-3:#6d7890; --linea:#c6cedd; --linea-2:#aeb8cb;
+    --grilla:#dfe4ee; --eje:#9ba5ba; --sombra:none; --sombra-2:none;
+  }
+  .cab,.tabs,.filtros,.globo,.sin-print{display:none !important}
+  main{padding:0; overflow:visible; height:auto}
+  .hoja{display:none !important; height:auto}
+  #hReporte{display:block !important}
+  .filmina{border:0; border-radius:0; box-shadow:none; break-inside:avoid}
+  .f-cab{padding:8px 12px}
+  .f-cab h2{font-size:14pt}
+  .f-cuerpo{padding:9px 12px 8px}
+  .f-k{gap:6px}
+  .f-k .c{padding:7px 9px}
+  .f-k .c .v{font-size:16pt}
+  .f-cols{gap:7px; margin-top:7px}
+  .f-cj{padding:7px 9px}
+  .f-f{font-size:8.4pt}
+  .f-nota{font-size:8pt; margin-top:6px; padding:5px 8px;
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden}
+  .f-pie{font-size:6.8pt; margin-top:6px; padding-top:5px}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<header class="cab">
+  <img class="logo" id="logoCab" alt="CEVA Logistics">
+  <div class="sep"></div>
+  <h1>Ocupación del almacén</h1>
+  <span class="site">Site: Finning CAT</span>
+  <div class="der">
+    <span class="corte" id="rotCorte">sin datos</span>
+    <button class="icono" id="btnTema" title="Modo claro u oscuro" aria-label="Cambiar tema">&#9681;</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Secciones">
+  <button role="tab" data-h="hOcup"   aria-selected="true">Ocupación</button>
+  <button role="tab" data-h="hValor"  aria-selected="false">Valorizado</button>
+  <button role="tab" data-h="hTend"   aria-selected="false">Tendencia</button>
+  <button role="tab" data-h="hReporte" aria-selected="false">Reporte</button>
+  <button role="tab" data-h="hConfig" aria-selected="false">Configuración</button>
+</nav>
+
+<main>
+
+<!-- ======================= OCUPACIÓN ======================= -->
+<section class="hoja ver" id="hOcup" role="tabpanel">
+  <div id="ocupFalta"></div>
+  <div class="filtros sin-print" id="barraFiltros" hidden>
+    <div class="gr"><label class="et" for="fTipo">Tipo</label><select id="fTipo"></select></div>
+    <div class="gr"><label class="et" for="fArea">Área</label><select id="fArea"></select></div>
+    <div class="gr"><label class="et" for="fPas">Pasillo</label><select id="fPas"></select></div>
+    <div class="gr"><label class="et" for="fNiv">Nivel</label><select id="fNiv"></select></div>
+    <div class="gr"><label class="et" for="fEst">Estado</label><select id="fEst">
+      <option value="">Todas</option><option value="ocu">Ocupadas</option><option value="vac">Vacías</option>
+    </select></div>
+    <div class="chips" id="chips"></div>
+    <button class="btn chico" id="btnTabla" style="margin-left:auto">Ver tabla de ubicaciones</button>
+  </div>
+
+  <div class="mosaico" id="mosaico" hidden>
+    <div class="caja m-hero hero" id="cjHero"></div>
+    <div class="caja m-k1 kpi" id="cjOcu"></div>
+    <div class="caja m-k2 kpi" id="cjVac"></div>
+    <div class="caja m-k3 kpi" id="cjPlata"></div>
+    <div class="caja m-mmt"><h3>Mono, multi y total</h3><div class="lienzo" id="cjMmt"></div></div>
+    <div class="caja m-niv"><h3>Ocupación por nivel <span class="pista">del piso hacia arriba</span></h3>
+      <div class="lienzo" id="gNivel"></div></div>
+    <div class="caja m-tipo"><h3>Ocupación por tipo de almacén</h3><div class="lienzo" id="gTipo"></div></div>
+    <div class="caja m-mapa"><h3>Mapa del depósito <span class="pista">pasillo × nivel · sólo monoproducto</span></h3>
+      <div class="lienzo" id="gMapa"></div></div>
+  </div>
+</section>
+
+<!-- ======================= VALORIZADO ======================= -->
+<section class="hoja" id="hValor" role="tabpanel">
+  <div id="valFalta"></div>
+  <div id="valCuerpo" hidden>
+    <div id="valAviso"></div>
+    <div class="rejilla r4" style="margin-bottom:11px">
+      <div class="caja kpi" id="kvTotal"></div>
+      <div class="caja kpi" id="kvMedia"></div>
+      <div class="caja kpi" id="kvItems"></div>
+      <div class="caja kpi" id="kvConc"></div>
+    </div>
+    <div class="rejilla r2" style="margin-bottom:11px">
+      <div class="caja" style="min-height:260px"><h3>Valor por tipo de almacén</h3>
+        <div class="lienzo" id="gValTipo"></div></div>
+      <div class="caja" style="min-height:260px"><h3>Valor por área de almacenamiento</h3>
+        <div class="lienzo" id="gValArea"></div></div>
+    </div>
+    <div class="rejilla r2">
+      <div class="caja"><h3>Materiales que concentran el valor</h3>
+        <div class="lienzo" id="tTopMat"></div></div>
+      <div class="caja"><h3>Posiciones más caras</h3>
+        <div class="lienzo" id="tTopUbi"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= TENDENCIA ======================= -->
+<section class="hoja" id="hTend" role="tabpanel">
+  <div class="titulo-hoja">
+    <h2>Tendencia</h2>
+    <p>Cada corte guardado deja una marca. Se guarda sólo el resumen, no el detalle.</p>
+    <div class="der">
+      <select id="fGrano" style="width:auto"><option value="sem">Por semana</option><option value="mes">Por mes</option></select>
+      <button class="btn chico" id="btnCsvTend">Exportar</button>
+    </div>
+  </div>
+  <div id="tendAviso"></div>
+  <div class="rejilla r2" style="margin-bottom:11px">
+    <div class="caja" style="min-height:270px"><h3>Ocupación monoproducto</h3>
+      <div class="lienzo" id="gTendOcu"></div></div>
+    <div class="caja" style="min-height:270px"><h3>Valor en posiciones</h3>
+      <div class="lienzo" id="gTendVal"></div></div>
+  </div>
+  <div class="caja"><h3>Cortes guardados</h3><div class="lienzo" id="tCortes"></div></div>
+</section>
+
+<!-- ======================= REPORTE ======================= -->
+<section class="hoja" id="hReporte" role="tabpanel">
+  <div id="repFalta"></div>
+  <div id="repCuerpo" hidden>
+    <div class="titulo-hoja sin-print">
+      <h2>Reporte</h2>
+      <p>Una hoja A4 apaisada con la situación del depósito.</p>
+      <div class="der"><button class="btn fuerte" id="btnPdf">Exportar PDF</button></div>
+    </div>
+    <div class="rejilla r3 sin-print" style="margin-bottom:11px">
+      <div><label class="et" for="repEmp">Encabezado</label><input type="text" id="repEmp" placeholder="Depósito Central"></div>
+      <div><label class="et" for="repAut">Preparado por</label><input type="text" id="repAut" placeholder="Nombre y apellido"></div>
+      <div><label class="et" for="repNota">Comentario</label><input type="text" id="repNota" placeholder="Opcional, sale al pie"></div>
+    </div>
+    <div class="filmina" id="filmina"></div>
+  </div>
+</section>
+
+<!-- ======================= CONFIGURACIÓN ======================= -->
+<section class="hoja" id="hConfig" role="tabpanel">
+  <div class="titulo-hoja">
+    <h2>Configuración</h2>
+    <p>Los archivos quedan guardados en este navegador. Nada se envía a ningún servidor.</p>
+  </div>
+  <div id="cfgAvisos"></div>
+  <div class="rejilla r3" style="margin-bottom:11px">
+    <div class="caja">
+      <h3>1 · Maestro de ubicaciones</h3>
+      <p class="pie-fino" style="margin:0 0 9px">Define la capacidad. Se carga cuando cambia.</p>
+      <input type="file" id="aMae" accept=".xlsx,.XLSX">
+      <div class="estado-carga" id="eMae">Sin cargar.</div>
+    </div>
+    <div class="caja">
+      <h3>2 · Fotostock</h3>
+      <p class="pie-fino" style="margin:0 0 9px">El corte. Se puede elegir varios juntos.</p>
+      <input type="file" id="aFoto" accept=".xlsx,.XLSX" multiple>
+      <div class="estado-carga" id="eFoto">Sin cargar.</div>
+    </div>
+    <div class="caja">
+      <h3>3 · Maestro valorizado <span class="pista">opcional</span></h3>
+      <p class="pie-fino" style="margin:0 0 9px">Sin él la app anda, pero sin dólares.</p>
+      <input type="file" id="aVal" accept=".xlsx,.XLSX">
+      <div class="estado-carga" id="eVal">Sin cargar.</div>
+    </div>
+  </div>
+  <div class="rejilla r2" style="margin-bottom:11px">
+    <div class="caja">
+      <h3>Fecha del corte</h3>
+      <p class="pie-fino" style="margin:0 0 9px">Se detecta del nombre del archivo. Corríjala si hace falta.</p>
+      <div style="display:flex; gap:9px; align-items:flex-end">
+        <div style="flex:1"><label class="et" for="inFecha">Fecha</label><input type="date" id="inFecha"></div>
+        <button class="btn fuerte" id="btnGuardar">Guardar corte</button>
+      </div>
+      <div class="estado-carga" id="eGuardar"></div>
+    </div>
+    <div class="caja">
+      <h3>Respaldo y limpieza</h3>
+      <p class="pie-fino" style="margin:0 0 9px">Para mudar todo a otra computadora.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="btn chico" id="btnBajarResp">Descargar respaldo</button>
+        <label class="btn chico" style="cursor:pointer">Restaurar<input type="file" id="aResp" accept=".json" hidden></label>
+        <button class="btn chico" id="btnBorrarHist">Borrar historial</button>
+        <button class="btn chico" id="btnBorrarTodo">Borrar todo</button>
+      </div>
+      <div class="estado-carga" id="eResp"></div>
+    </div>
+  </div>
+  <div class="caja"><h3>Control de calidad del corte</h3><div class="lienzo" id="tCalidad"></div></div>
+</section>
+
+</main>
+
+<dialog id="dlgTabla">
+  <div class="titulo-hoja" style="padding:14px 16px 0; margin:0">
+    <h2>Ubicaciones</h2><p id="subTabla"></p>
+    <div class="der">
+      <button class="btn chico" id="btnCsvUbis">Exportar</button>
+      <button class="btn chico" id="btnCerrarTabla">Cerrar</button>
+    </div>
+  </div>
+  <div style="padding:12px 16px 16px"><div id="tUbis"></div></div>
+</dialog>
+
+<div class="globo" id="globo" role="status" aria-live="polite"></div>
+
+<script>
+// Logo de CEVA embebido: la marca tiene que verse aunque el archivo se abra
+// sin internet. Es la version en reverse (texto blanco, triangulo rojo), que es
+// la que va sobre la banda azul marino.
+const LOGO_CLARO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPoAAABgBAMAAADGP3IrAAAAMFBMVEX////+AAD///8AAGf///////8AATb/AAD/AAD/AAAAAP+qAAB/AAAAAAD/////AAAE9l84AAAAEHRSTlMmDqMCXtAEol3PAQMCAP3+1eZxRAAACxxJREFUeNrtmn+MHGUZxz87t7nrjXPkqqdgQ46NDbmTErOFE9NS7NQapfFaKIlbMKSMUKg9ObpcKmhtyEWkKGiz8Wiba6xMiEDSENKEi1ix6WjwEGl1iFbT1pr9A5E2wl1vh1muvb3zj/fd2fm1w/a2/5jw/tHOzcz7Pu/zfJ8f3/fZSZ0GwDCpP1yVJofTP/arj/9LvVO3gvdTQjo93dE5r1QvSkNF/33ljA1wdQZgSaGOxPI6AOUQgP7K88PA0IASJ93d+kLM9A/E/0b5fGjLzhIbeOwnAFOVOtJvP+Q9dnhx+3MGnH/qh0djpN/7Qpy5LkjNN1qRR0uyplvpBnAn4nExFpoAd02aoJ9/5/zOYWD6hBZ4SQF4/IUk0B6JCEdbbaJ26ACp5fGzRjsBsExwnG/R2gnQ9ls9onuMcj7dhYHDqPTaAe2inppa5FnGaeuBK94BmCpqYd2vs5Ic/mjc3fZPgfkfcRkbLuo3AZhRgf6vAgMAtOphyxvXJtl9Ln5rR1zcpwHY5cbC/mkABg0AA5gZBliwQw9Kd/cmqW7siL+vLTfUmTxAal/cc7NYg31sGOgSJko7QdyNN4t1UsQFoNRdZ1srDyYBL2F3zqnQN94LTL3dS8TrFaZvTTK8Uu/BSy7mywDEbn5W/NsGaDcDtInYSOl+0yvuLwpJ0nckbMv9i9jHnujTATFv7T1V2OHoMEBrYEFFXZqYoYv1HrQsRwKv1J9XpAo7c44EPoD7TQvrFRjnAjKfxY6rvIi/KhteQs5zzqngtPYCnL9iPAp82lwvLm74Z2T9055ejj8fpa+xAHTDNIXdMvXcZVYF+pUiQKt2XkSw7ksg6ZJY97rDsTmj90ytqnjjfWHVTtxXBfCRQjMg4mjtwRrs0H/3MLBgR7G2W0Xg4BzeaURCHYw1AKwaz/nuT6fzAFkTdVZ6biTaM2HYIY/A5y2fIEUssMrdHoHfrDpP+ezAAd/9tr2TANPAoC4yTxh2YVBnHKBV3px0RMV+fMwnfQSAs/FlUuxobjy4M9sCeKKW0TIhu6k+2PWb5c0u6zdiNb/PX1asOmfMEJlu5cHQ7aVFyRvcuSvjGIZMnys7TdDvlpafKgrg6cZzYUVPzGixqvmUFLil3XjYTXCcYe9lsxO/F3py749X3U17paLOEMCry+vDPu65i9v1IwC2jYWkn05SvZwNB4MO8JAvp+lGXLTjh505+J2o8egfWkUAWgCohFXPFgHaAPaIiG8JvDKwQiT5AUCr7Utjmajx/bVtFi+anLv3WAC2b/dPBYH3RXsN9gV6vxYGXrn4o4H6+Zovqko+Qi3dEQm76YcdwHlCAO8xjPSHS9P6QjfO+K43LwRo1/2HIT/sl9Vsmy9YbQJ46yKkE8srsWwAU/hxu48kqEtrSd4HO5OwbJcBLNA1a96Wl1YUNnW3RqilIWE3ArADaNqkCPAmcA9MlAxj1kctJex2GPausQjw85Y+JBPU4CSAVvRM7ErY3UC0C1e3jgSBn7f0shRXpZae16ky2lVAy/trI7DMFBGvNyfdyUhxVWrphqI9Y4Dj+KXP1YCvGir1OSuuikkeMbuonvRaWRN1sHrgDfzttPX4pnxwUqNvwdsAU5mjDUdcbHnxjhCD5yxAq1JLCbviqsFoB6UfKxTx87S8WzBD5DkThH1NBHZBciTw8kwxP+nlLbVrWWi8M4Xug70zMCtfA35HM7rfWIgcmqoLlUyA8rsm8FqUlsiI3+TMW/qm2w77lpU9DEktJSGZGwX0VcF5k3gR32Y16nVO+DzTYQcabEaVYZi1JD/0OKANBed1jVFN9SmR6hvx+QjzCXb3THG6GKnUeA9lw4zAjlH0gG/dUQBIZxLEVlIALeslKQwRbc//JbUsqcDILoByJg+81hNcrg3AKeRrXQSh+2eTVG8/aSezDXQLSC23wU0XAObuA3SRWcKFWUT8Zh+XfqLOujNxnDHaXclIhgHyPD6kAtpD4RYQAMt8XQTFiiPkobO4mSzdfMujlvLgV46JdlD6ddC0Qq2LoJSTWn4d+VAFiU98z3jUcqQToGzFRrs40TmFWvtIOSasFt8+MexGckKNWlZhH4+JdpHswPq1AN4CFLH03i2x62YzANr2XLL4zZMSeAn7/bGwV4dsH30NUIRjqQ/HvpgXKWnvgQ8BvsowJOyVWNhFskPTRPvoQR0UYQ52Z2PXFRVEXV1IBl4wjJfd0STYZbLDqfUNva6Ro0d446Fq0w/6og05f6ultKsAlHtf87WGb45Gu+gRyzbS9AmNdPUwrR2N6VmppXyhDqUPnNkHxZni8m9YAPf/FOh/qK6pau0jxXw1mcI0VPVMocKfrETYRapF6/caxmlZnust29sY1fGrULbsmCTva5o45jDAW5A6bdRrFzoXqAGfbPlAM9mdUKnSx+D4YJFmBYBX2PNyUiLZojdGMn2v1Y/2BVoAeFBQ30g0/T8aA95HXgXsCQ5TBb5fV6q/H9Qbb+QvEngZ7cOx2StAEAxSp6G8qC7uYPzxTAO4+9rJAvbWd+ImPSKCQwI/VVSALZcnaLWnIeXVDs+AawYA7bvxCo35gW9FAfa8oSet+8uGTL+zKuDvJlAH9kwIeAVQO55L0M891dWI8u1S+S+eBBxrOL5iB5mhIQpse+sX4uRK2naqK9+I8nkAdy0AX4l/qa1qIFHjt8lfgdVStMbp+z0C/ajZAM/uucZi0yt2naokfP5WEfEOBwvg/QLu7ktSb7qtEeTVUt+KY+MX9Vt9ylMhwl9Uv8KRpwdixNf26ejJ7S/5PHWaSzdyqnlxEy6p9Pk2vj6S/pH0j6T/30jPeaXLDaREN5f4es64FNnGMH2NnOA3WUlfaBkmxvyl/7hNFqZS30x1kcX6MRtwRx4GKOWP2TBdACrbqxOMkb52uzpt3pYvHZFHsNLGs++tFpdXv/fi8Sy4qYm8AaWNLx7PwrUTExMT51xKR14CGNl49ngW4Dtn/71l3rqXurcOA9i3nxGfHsmThzuhuqlFKztNlhZh5UHxo61zTi11T1Xk51fuNLx/pddRbmIsvgNoXw0MLA8SuAzBzxLygDtiArMuxgpgRdPSlUI5t4GfAaMZbsjl1wxUjWM5uU07wb1BL+e+JN1P3Y2T0798EjLk9HfTzUpfUbzxcEm3rrLdiuUc4uqPyeaem+b7o4ufhBMsrYx6jr6Qb4+Wl2Ux17ujpY5mdS/ovFvYX0Q3UNg2zSl/Z3H6NODmdO7wMkKxXMgJn8cdpFnd7XPOuOreS7ETKG8u2S0n5ZMZHltiA6oKz3tMev2ce0BkAfVOs+lcZ6K0iIypXg/ZT379lmy1f5rXjkeoaik7A6robz67+tLleROwaB/9ua/toe2O6TYJ/zO7aP9D9pJXmbK3nR/o/h8Jw+PBDbSvbl76bAVmwcBGZ8zHpDue0SMt3lbSrjgjqU9u4KkmpLu5HBQyLfvgejK4FYqc8jcbBp9jcbirac+2yI8cO57MN+Pz6gHAfrO9iLoGy3YVXqrgO5A9umcm5hSrLbH3Zm0o3WTYzUgvb+Z127ydvZ+ZPesYqCUuu81aV6ugCwd//9+/hn1zKV9dvG41sPsTpWwz0vfBXcaep1FvaUe5DwYXms/mRz2vG+kufw819IG2O86+1Gi513bP/DlfmGrW69QTBqMFtpwUQTTqZ03thYjXqYrOKJUcFZMCa5v2+exO4L5CFnhAB7baAEWY1eFuO3KC/xuwajsdG8Apzr++bwNet4GebvlROaWhonLGhtK2120or5P3e1bsB6YfmNmPeP2QeHdJ4X+I0izD52VH5gAAAABJRU5ErkJggg==';
+</script>
+<script>
+"use strict";
+
+/* ===========================================================================
+   A · FORMATO
+   Todo en castellano rioplatense: punto para miles, coma para decimales.
+   =========================================================================== */
+const Fmt = {
+  ent: n => (Number.isFinite(n) ? Math.round(n) : 0).toLocaleString('es-AR'),
+  dec: (n, d = 1) => (Number.isFinite(n) ? n : 0).toLocaleString('es-AR',
+    { minimumFractionDigits: d, maximumFractionDigits: d }),
+  pct: (n, d = 1) => Fmt.dec(n, d) + '%',
+  usd(n) {
+    const v = Number.isFinite(n) ? n : 0, a = Math.abs(v);
+    if (a >= 1e6) return 'USD ' + Fmt.dec(v / 1e6, 2) + ' M';
+    if (a >= 1e3) return 'USD ' + Fmt.dec(v / 1e3, 1) + ' k';
+    return 'USD ' + Fmt.dec(v, 0);
+  },
+  usdX: n => 'USD ' + (Number.isFinite(n) ? n : 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }),
+  plural: (n, uno, varios) => Fmt.ent(n) + ' ' + (Math.round(n) === 1 ? uno : varios),
+  esc: s => String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
+  num(s) {
+    if (typeof s === 'number') return s;
+    const t = String(s ?? '').trim();
+    if (!t) return NaN;
+    // SAP escribe 1.234,56 y tambien 1,234.56 segun como lo exporten.
+    const coma = t.lastIndexOf(','), punto = t.lastIndexOf('.');
+    let limpio = t.replace(/\s|USD|\$/gi, '');
+    if (coma > punto) limpio = limpio.replace(/\./g, '').replace(',', '.');
+    else limpio = limpio.replace(/,/g, '');
+    const v = parseFloat(limpio);
+    return Number.isFinite(v) ? v : NaN;
+  },
+  hoy: () => new Date().toISOString().slice(0, 10),
+  fecha(f) {
+    if (!f) return '—';
+    const [a, m, d] = String(f).split('-');
+    return `${d}/${m}/${a}`;
+  },
+  fechaLarga(f) {
+    if (!f) return '—';
+    const n = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+      'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const [a, m, d] = String(f).split('-');
+    return `${+d} de ${n[+m - 1]} de ${a}`;
+  },
+  semana(f) {
+    // Semana ISO: el jueves de esa semana define el año.
+    const d = new Date(f + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const ene1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const n = Math.ceil(((d - ene1) / 86400000 + 1) / 7);
+    return `${d.getUTCFullYear()} S${String(n).padStart(2, '0')}`;
+  },
+  mes: f => String(f).slice(0, 7),
+  rotMes(ym) {
+    const n = ['', 'ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const [a, m] = String(ym).split('-');
+    return n[+m] + ' ' + a.slice(2);
+  },
+  bajar(nombre, texto, tipo = 'text/csv;charset=utf-8') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([texto], { type: tipo }));
+    a.download = nombre;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  },
+  // Punto y coma y marca BOM: asi Excel en castellano lo abre en columnas.
+  csv(cab, filas) {
+    const q = v => {
+      const s = String(v ?? '');
+      return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    return '﻿' + [cab.map(q).join(';'), ...filas.map(f => f.map(q).join(';'))].join('\r\n');
+  }
+};
+
+// Orden natural: que "10" vaya despues de "9" y no antes.
+const ordNat = (a, b) => String(a).localeCompare(String(b), 'es', { numeric: true, sensitivity: 'base' });
+
+// Pasillos y niveles: primero los numericos en orden, y lo que no es numero
+// —PISO, (sin nivel)— al final, que es donde se lee sin estorbar.
+const esNum = s => /^\d+$/.test(String(s));
+const ordClave = (a, b) => {
+  const na = esNum(a), nb = esNum(b);
+  if (na && nb) return +a - +b;
+  if (na) return -1;
+  if (nb) return 1;
+  return ordNat(a, b);
+};
+const ordClaveDesc = (a, b) => {
+  const na = esNum(a), nb = esNum(b);
+  if (na && nb) return +b - +a;
+  if (na) return -1;
+  if (nb) return 1;
+  return ordNat(a, b);
+};
+
+/* ===========================================================================
+   B · LECTOR DE .xlsx
+   Un .xlsx es un ZIP con XML adentro. Se abre el ZIP a mano y se descomprime
+   con DecompressionStream, que ya viene en el navegador: por eso este archivo
+   no necesita ninguna libreria ni conexion a internet.
+   Se recorre la planilla de corrido, sin armar un arbol XML, porque un
+   fotostock de 30.000 filas tumba al DOMParser.
+   =========================================================================== */
+const Libro = (() => {
+  const utf8 = new TextDecoder('utf-8');
+  const FIRMA_FIN = 0x06054b50, FIRMA_LOC64 = 0x07064b50, FIRMA_DIR = 0x02014b50;
+
+  /* ---------------------------- el ZIP ---------------------------- */
+  function finDelDirectorio(v) {
+    // El registro final esta al final del archivo, detras de un comentario
+    // de hasta 64 kB. Se busca para atras.
+    const tope = Math.max(0, v.byteLength - 22 - 0xFFFF);
+    for (let p = v.byteLength - 22; p >= tope; p--) {
+      if (v.getUint32(p, true) === FIRMA_FIN) return p;
+    }
+    throw new Error('No parece un .xlsx: no se encontró el fin del archivo comprimido.');
+  }
+
+  function ubicarDirectorio(v) {
+    const fin = finDelDirectorio(v);
+    let cuantos = v.getUint16(fin + 10, true);
+    let donde = v.getUint32(fin + 16, true);
+    if (donde === 0xFFFFFFFF || cuantos === 0xFFFF) {
+      // ZIP64: el dato real vive en otro registro al que apunta un localizador.
+      const loc = fin - 20;
+      if (loc < 0 || v.getUint32(loc, true) !== FIRMA_LOC64) {
+        throw new Error('El archivo usa ZIP64 pero le falta el localizador.');
+      }
+      const z64 = Number(v.getBigUint64(loc + 8, true));
+      cuantos = Number(v.getBigUint64(z64 + 32, true));
+      donde = Number(v.getBigUint64(z64 + 48, true));
+    }
+    return { cuantos, donde };
+  }
+
+  function leerExtra64(v, ini, largo, faltan) {
+    // Los campos que no entran en 32 bits se guardan en un bloque extra 0x0001,
+    // en el mismo orden en que faltaron.
+    let p = ini;
+    while (p < ini + largo - 3) {
+      const id = v.getUint16(p, true), tam = v.getUint16(p + 2, true);
+      if (id === 0x0001) {
+        let q = p + 4;
+        const salida = {};
+        for (const campo of faltan) { salida[campo] = Number(v.getBigUint64(q, true)); q += 8; }
+        return salida;
+      }
+      p += 4 + tam;
+    }
+    return {};
+  }
+
+  function catalogo(buf) {
+    const v = new DataView(buf), bytes = new Uint8Array(buf);
+    const { cuantos, donde } = ubicarDirectorio(v);
+    const mapa = new Map();
+    let p = donde;
+    for (let i = 0; i < cuantos && p + 46 <= bytes.length; i++) {
+      if (v.getUint32(p, true) !== FIRMA_DIR) break;
+      const metodo = v.getUint16(p + 10, true);
+      let comp = v.getUint32(p + 20, true);
+      let crudo = v.getUint32(p + 24, true);
+      const lNom = v.getUint16(p + 28, true);
+      const lExtra = v.getUint16(p + 30, true);
+      const lCom = v.getUint16(p + 32, true);
+      let local = v.getUint32(p + 42, true);
+      const nombre = utf8.decode(bytes.subarray(p + 46, p + 46 + lNom));
+      const faltan = [];
+      if (crudo === 0xFFFFFFFF) faltan.push('crudo');
+      if (comp === 0xFFFFFFFF) faltan.push('comp');
+      if (local === 0xFFFFFFFF) faltan.push('local');
+      if (faltan.length) {
+        const x = leerExtra64(v, p + 46 + lNom, lExtra, faltan);
+        if (x.crudo !== undefined) crudo = x.crudo;
+        if (x.comp !== undefined) comp = x.comp;
+        if (x.local !== undefined) local = x.local;
+      }
+      mapa.set(nombre, { metodo, comp, crudo, local });
+      p += 46 + lNom + lExtra + lCom;
+    }
+    return mapa;
+  }
+
+  async function sacar(buf, e) {
+    const v = new DataView(buf), bytes = new Uint8Array(buf);
+    if (v.getUint32(e.local, true) !== 0x04034b50) throw new Error('Entrada dañada dentro del .xlsx.');
+    const ini = e.local + 30 + v.getUint16(e.local + 26, true) + v.getUint16(e.local + 28, true);
+    const crudo = bytes.subarray(ini, ini + e.comp);
+    if (e.metodo === 0) return crudo;                       // guardado sin comprimir
+    if (e.metodo !== 8) throw new Error('El .xlsx usa una compresión que el navegador no abre.');
+    const flujo = new Blob([crudo]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(flujo).arrayBuffer());
+  }
+
+  /* ---------------------------- el XML ---------------------------- */
+  const ENTIDADES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+  function desescapar(s) {
+    if (s.indexOf('&') < 0) return s;
+    return s.replace(/&(#x?[0-9a-fA-F]+|\w+);/g, (todo, cuerpo) => {
+      if (cuerpo[0] === '#') {
+        const n = cuerpo[1] === 'x' || cuerpo[1] === 'X'
+          ? parseInt(cuerpo.slice(2), 16) : parseInt(cuerpo.slice(1), 10);
+        return Number.isFinite(n) ? String.fromCodePoint(n) : todo;
+      }
+      return ENTIDADES[cuerpo] ?? todo;
+    });
+  }
+
+  // Devuelve el texto de todos los <t> que haya entre dos posiciones.
+  function juntarTextos(xml, desde, hasta) {
+    let out = '', p = desde;
+    for (;;) {
+      let a = xml.indexOf('<t', p);
+      if (a < 0 || a >= hasta) break;
+      const c = xml.charCodeAt(a + 2);                       // <t>, <t ...> y no <tabla>
+      if (c !== 62 && c !== 32 && c !== 47) { p = a + 2; continue; }
+      const cierra = xml.indexOf('>', a);
+      if (cierra < 0 || xml[cierra - 1] === '/') { p = cierra + 1; continue; }
+      const b = xml.indexOf('</t>', cierra);
+      if (b < 0 || b > hasta) break;
+      out += desescapar(xml.slice(cierra + 1, b));
+      p = b + 4;
+    }
+    return out;
+  }
+
+  function textosCompartidos(xml) {
+    const lista = [];
+    let p = 0;
+    for (;;) {
+      const a = xml.indexOf('<si', p);
+      if (a < 0) break;
+      let b = xml.indexOf('</si>', a);
+      if (b < 0) { b = xml.length; }
+      lista.push(juntarTextos(xml, a, b));
+      p = b + 5;
+    }
+    return lista;
+  }
+
+  // "BK" -> 62. La columna sale de la referencia, no del orden: una celda
+  // vacia no se escribe y correria todo lo que viene atras.
+  function columnaDe(ref) {
+    let n = 0;
+    for (let i = 0; i < ref.length; i++) {
+      const c = ref.charCodeAt(i);
+      if (c < 65 || c > 90) break;
+      n = n * 26 + (c - 64);
+    }
+    return n - 1;
+  }
+
+  // Recorre <row> por <row> y entrega cada fila como un arreglo ralo.
+  // El filtro llega en una caja porque recien se conoce despues de leer la
+  // cabecera, o sea despues de que este generador ya arranco.
+  function* recorrer(xml, sst, filtro) {
+    let p = 0;
+    for (;;) {
+      const ini = xml.indexOf('<row', p);
+      if (ini < 0) break;
+      const abre = xml.indexOf('>', ini);
+      if (abre < 0) break;
+      if (xml[abre - 1] === '/') { p = abre + 1; yield []; continue; }
+      const fin = xml.indexOf('</row>', abre);
+      const tope = fin < 0 ? xml.length : fin;
+      const fila = [];
+      let q = abre + 1;
+      while (q < tope) {
+        const ca = xml.indexOf('<c', q);
+        if (ca < 0 || ca >= tope) break;
+        const sig = xml.charCodeAt(ca + 2);
+        if (sig !== 62 && sig !== 32) { q = ca + 2; continue; }
+        const cierraAbre = xml.indexOf('>', ca);
+        const etiqueta = xml.slice(ca, cierraAbre);
+        const solo = xml[cierraAbre - 1] === '/';
+        const mRef = /\sr="([A-Z]+)/.exec(etiqueta);
+        const col = mRef ? columnaDe(mRef[1]) : fila.length;
+        const cf = solo ? cierraAbre + 1 : xml.indexOf('</c>', cierraAbre);
+        const cuerpoFin = cf < 0 ? tope : cf;
+        const cols = filtro.cols;
+        if (!solo && (!cols || cols.has(col))) {
+          const mT = /\st="(\w+)"/.exec(etiqueta);
+          const tipo = mT ? mT[1] : '';
+          let valor = '';
+          if (tipo === 'inlineStr') {
+            valor = juntarTextos(xml, cierraAbre, cuerpoFin);
+          } else {
+            const va = xml.indexOf('<v', cierraAbre);
+            if (va >= 0 && va < cuerpoFin) {
+              const vc = xml.indexOf('>', va);
+              const vb = xml.indexOf('</v>', vc);
+              const bruto = desescapar(xml.slice(vc + 1, vb < 0 ? cuerpoFin : vb));
+              valor = tipo === 's' ? (sst[+bruto] ?? '') : bruto;
+            }
+          }
+          fila[col] = valor;
+        }
+        q = solo ? cierraAbre + 1 : cuerpoFin + 4;
+      }
+      yield fila;
+      p = fin < 0 ? xml.length : fin + 6;
+    }
+  }
+
+  function nombreDeHoja(mapa) {
+    if (mapa.has('xl/worksheets/sheet1.xml')) return 'xl/worksheets/sheet1.xml';
+    const hojas = [...mapa.keys()].filter(n => /^xl\/worksheets\/[^/]+\.xml$/.test(n)).sort(ordNat);
+    if (!hojas.length) throw new Error('El archivo no tiene ninguna hoja de cálculo adentro.');
+    return hojas[0];
+  }
+
+  /* --------------------------- la interfaz --------------------------- */
+  // alLeerCabecera recibe el encabezado y devuelve el conjunto de columnas que
+  // interesan; el resto ni se arma, que es de donde sale la velocidad.
+  async function leer(archivo, alLeerCabecera, porFila) {
+    const buf = await archivo.arrayBuffer();
+    const mapa = catalogo(buf);
+    const eSst = mapa.get('xl/sharedStrings.xml');
+    const sst = eSst ? textosCompartidos(utf8.decode(await sacar(buf, eSst))) : [];
+    const xml = utf8.decode(await sacar(buf, mapa.get(nombreDeHoja(mapa))));
+    const filtro = { cols: null };
+    let cabecera = null, n = 0;
+    for (const fila of recorrer(xml, sst, filtro)) {
+      if (!cabecera) {
+        if (!fila.length) continue;
+        cabecera = [];
+        for (let i = 0; i < fila.length; i++) cabecera[i] = String(fila[i] ?? '').trim();
+        filtro.cols = alLeerCabecera(cabecera);
+        continue;
+      }
+      porFila(fila); n++;
+    }
+    if (!cabecera) throw new Error('El archivo está vacío: no tiene ni encabezado.');
+    return { cabecera, filas: n };
+  }
+
+  // Fechas: SAP las manda como texto casi siempre, pero puede mandar el serial
+  // de Excel. El dia 60 no existe (bug historico de Lotus) y hay que saltearlo.
+  function fecha(x) {
+    const t = String(x ?? '').trim();
+    if (!t) return null;
+    let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/.exec(t);
+    if (m) {
+      let a = +m[3]; if (a < 100) a += a < 70 ? 2000 : 1900;
+      return `${a}-${String(+m[2]).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`;
+    }
+    if (/^\d+(\.\d+)?$/.test(t)) {
+      const s = parseFloat(t);
+      if (s > 20000 && s < 60000) {
+        const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(s) * 86400000);
+        return d.toISOString().slice(0, 10);
+      }
+    }
+    return null;
+  }
+
+  return { leer, fecha };
+})();
+
+/* ===========================================================================
+   C · LOS DATOS
+   Una sola regla de alcance: lo que no esta en el maestro de ubicaciones no
+   existe. Asi se caen solas las ubicaciones de transito, las virtuales y los
+   almacenes que no son del site, sin listas de excepciones escritas a mano.
+   Mono y multi los decide la columna del maestro, no una tabla interna.
+   =========================================================================== */
+const LLAVE = 'cdr.ocupacion.v1';
+
+const D = {
+  mae: null,      // Map ubicacion -> ficha de la posicion
+  val: null,      // Map material  -> {desc, fam, precio}
+  lineas: null,   // lineas del fotostock del corte
+  fecha: null,
+  nom: { mae: '', val: '', foto: '' },
+  hist: [],
+  pref: { tema: '', empresa: '', autor: '' }
+};
+let M = null;     // el corte armado y listo para mostrar
+
+/* ----------------------- busqueda de columnas ----------------------- */
+// SAP cambia los nombres entre exportaciones: "Material" paso a "Producto",
+// "Ctd." a veces viene como "Cantidad". Se acepta cualquiera de los alias.
+function buscarCol(cab, alias) {
+  for (const a of alias) {
+    const i = cab.indexOf(a);
+    if (i >= 0) return i;
+  }
+  const flojo = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cabF = cab.map(flojo);
+  for (const a of alias) {
+    const i = cabF.indexOf(flojo(a));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+const COLS_MAE = {
+  u:    ['Ubicación', 'Ubicacion'],
+  tipo: ['Tipo almacén', 'Tipo almacen'],
+  pas:  ['Pasillo'],
+  col:  ['Col.', 'Columna'],
+  niv:  ['Nivel'],
+  sub:  ['Subdivis.ubicación', 'Subdivisión ubic.'],
+  area: ['Área almacenamiento', 'Area almacenamiento'],
+  mm:   ['Tipo de Ubicación', 'Tipo de ubicación'],
+  vac:  ['Ind.ubicación vacía', 'Ind.ubicacion vacia'],
+  bloE: ['Bloq.entrada stock'],
+  bloS: ['Bloq.salida stock']
+};
+const COLS_FOTO = {
+  u:    ['Ubicación', 'Ubicacion'],
+  tipo: ['Tipo almacén', 'Tipo almacen'],
+  mat:  ['Producto', 'Material'],
+  desc: ['Descripción de producto', 'Texto breve material', 'Descripción'],
+  ctd:  ['Ctd.', 'Cantidad'],
+  um:   ['Unidad medida base'],
+  fem:  ['Fecha EM'],
+  ts:   ['Denominación de tipo de stocks'],
+  vu:   ['V/U'],
+  tot:  ['Total']
+};
+const COLS_VAL = {
+  mat:   ['Material', 'Producto'],
+  desc:  ['Texto breve material', 'Descripción de producto'],
+  fam:   ['Tipo material'],
+  precio:['Precio interno periódico', 'Precio interno periodico'],
+  stock: ['Stock total'],
+  valor: ['Valor total']
+};
+
+function indices(cab, defs, obligatorias) {
+  const ix = {};
+  for (const k in defs) ix[k] = buscarCol(cab, defs[k]);
+  for (const k of obligatorias) {
+    if (ix[k] < 0) {
+      throw new Error(`Al archivo le falta la columna "${defs[k][0]}". `
+        + `Revise que sea el reporte correcto de SAP.`);
+    }
+  }
+  return ix;
+}
+const usadas = ix => new Set(Object.values(ix).filter(i => i >= 0));
+
+/* --------------------------- el maestro --------------------------- */
+// SAP a veces escribe el nivel 4 como "4" y a veces como "04": son el mismo
+// nivel fisico pero el reporte los separa en dos filas. Se emparejan rellenando
+// con cero y se cuenta cuantos hubo, para poder avisarlo y que lo corrijan.
+const dosDigitos = s => (/^\d+$/.test(s) ? s.padStart(2, '0') : s);
+
+async function cargarMaestro(archivo) {
+  const mapa = new Map();
+  let ix = null, repetidas = 0, sinMm = 0, emparejados = 0;
+  await Libro.leer(archivo,
+    cab => { ix = indices(cab, COLS_MAE, ['u', 'tipo']); return usadas(ix); },
+    fila => {
+      const g = i => (i >= 0 ? String(fila[i] ?? '').trim() : '');
+      const u = g(ix.u);
+      if (!u) return;
+      if (mapa.has(u)) { repetidas++; return; }
+      let mm = g(ix.mm).toLowerCase();
+      mm = mm.startsWith('mono') ? 'mono' : mm.startsWith('multi') ? 'multi' : '';
+      if (!mm) { mm = 'multi'; sinMm++; }
+      const pas0 = g(ix.pas), niv0 = g(ix.niv);
+      const pas = dosDigitos(pas0), niv = dosDigitos(niv0);
+      if (pas !== pas0 || niv !== niv0) emparejados++;
+      mapa.set(u, {
+        u, tipo: g(ix.tipo), pas: pas || '(sin pasillo)', col: g(ix.col),
+        niv: niv || '(sin nivel)', sub: g(ix.sub),
+        area: g(ix.area) || '(sin área)', mm,
+        vacMae: g(ix.vac).toUpperCase() === 'X',
+        blo: !!(g(ix.bloE) || g(ix.bloS))
+      });
+    });
+  if (!mapa.size) throw new Error('El maestro no trajo ninguna ubicación.');
+  D.mae = mapa; D.nom.mae = archivo.name;
+  return { ubis: mapa.size, repetidas, sinMm, emparejados };
+}
+
+/* ------------------------ el maestro valorizado ------------------------ */
+// Un material puede traer varias filas: REMAN, FULL y PARTIAL de un repuesto
+// reconstruido, o una fila por numero de serie en las maquinas. Los precios
+// entre esas filas se van al triple, asi que quedarse con cualquiera de ellas
+// es tirar una moneda. El precio bueno es el contable: lo que el propio maestro
+// declara de valor dividido por las unidades que declara de stock. Si ninguna
+// fila tiene stock, se promedian los precios que haya.
+async function cargarValorizado(archivo) {
+  const acum = new Map();
+  let ix = null;
+  await Libro.leer(archivo,
+    cab => { ix = indices(cab, COLS_VAL, ['mat', 'precio']); return usadas(ix); },
+    fila => {
+      const g = i => (i >= 0 ? String(fila[i] ?? '').trim() : '');
+      const m = g(ix.mat);
+      if (!m) return;
+      let a = acum.get(m);
+      if (!a) { a = { desc: '', fam: '', stock: 0, valor: 0, precios: [] }; acum.set(m, a); }
+      if (!a.desc) a.desc = g(ix.desc);
+      if (!a.fam) a.fam = g(ix.fam);
+      const p = Fmt.num(g(ix.precio));
+      if (Number.isFinite(p) && p > 0) a.precios.push(p);
+      const s = Fmt.num(g(ix.stock)), v = Fmt.num(g(ix.valor));
+      if (Number.isFinite(s) && s > 0 && Number.isFinite(v) && v > 0) { a.stock += s; a.valor += v; }
+    });
+  if (!acum.size) throw new Error('El maestro valorizado no trajo ningún material.');
+  const mapa = new Map();
+  let conPrecio = 0, ponderados = 0, varias = 0;
+  for (const [m, a] of acum) {
+    let precio = 0;
+    if (a.stock > 0) { precio = a.valor / a.stock; if (a.precios.length > 1) ponderados++; }
+    else if (a.precios.length) precio = a.precios.reduce((s, x) => s + x, 0) / a.precios.length;
+    if (a.precios.length > 1) varias++;
+    if (precio > 0) conPrecio++;
+    mapa.set(m, { desc: a.desc, fam: a.fam || '(sin familia)', precio });
+  }
+  D.val = mapa; D.nom.val = archivo.name;
+  return { materiales: mapa.size, conPrecio, varias, ponderados };
+}
+
+/* --------------------------- el fotostock --------------------------- */
+// El codigo de material se usa tal cual viene, sin recortar ceros ni
+// decimales: 1006666 y 1006666.000 son materiales distintos y valen distinto.
+async function cargarFotostock(archivo) {
+  const lineas = [];
+  let ix = null;
+  await Libro.leer(archivo,
+    cab => { ix = indices(cab, COLS_FOTO, ['u', 'mat']); return usadas(ix); },
+    fila => {
+      const g = i => (i >= 0 ? String(fila[i] ?? '').trim() : '');
+      const u = g(ix.u);
+      if (!u) return;
+      const tot = Fmt.num(g(ix.tot)), vu = Fmt.num(g(ix.vu));
+      lineas.push({
+        u, tipo: g(ix.tipo), mat: g(ix.mat), desc: g(ix.desc),
+        ctd: Fmt.num(g(ix.ctd)) || 0, um: g(ix.um),
+        tot: Number.isFinite(tot) ? tot : null,
+        vu: Number.isFinite(vu) ? vu : null,
+        fem: Libro.fecha(g(ix.fem)),
+        ts: g(ix.ts) || '(sin tipo de stock)',
+        val: 0
+      });
+    });
+  if (!lineas.length) throw new Error('El fotostock no trajo ninguna línea con ubicación.');
+  D.lineas = lineas; D.nom.foto = archivo.name;
+  D.fecha = fechaDelNombre(archivo.name) || Fmt.hoy();
+  return { lineas: lineas.length, fecha: D.fecha, detectada: !!fechaDelNombre(archivo.name) };
+}
+
+// "FotoStock_2710" -> 27 de octubre. El año es el corriente salvo que la
+// fecha quede en el futuro, en cuyo caso es del año pasado.
+function fechaDelNombre(nombre) {
+  const m = /(?:^|[^0-9])(\d{2})(\d{2})(?:[^0-9]|$)/.exec(String(nombre).replace(/\.[^.]+$/, ''));
+  if (!m) return null;
+  const d = +m[1], mes = +m[2];
+  if (d < 1 || d > 31 || mes < 1 || mes > 12) return null;
+  const hoy = new Date();
+  let a = hoy.getFullYear();
+  const f = new Date(Date.UTC(a, mes - 1, d));
+  if (f > hoy) a--;
+  return `${a}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/* ===========================================================================
+   D · EL MODELO DEL CORTE
+   Se arma al vuelo juntando maestro, fotostock y precios. El precio se
+   resuelve aca y no al leer el archivo: asi, si el maestro valorizado se
+   carga despues, los valores aparecen sin tener que releer el fotostock.
+   =========================================================================== */
+function armarModelo() {
+  if (!D.mae || !D.lineas) { M = null; return; }
+
+  const ubis = [];
+  const porU = new Map();
+  for (const f of D.mae.values()) {
+    const x = { ...f, ocu: false, lin: 0, ctd: 0, val: 0, mats: null, fem: null };
+    ubis.push(x); porU.set(f.u, x);
+  }
+
+  const lineas = [];
+  const fuera = new Map();        // tipo -> {lin, ubis:Set}
+  const precio = { porTotal: 0, porVU: 0, porMaestro: 0, sin: 0, matsSin: new Set() };
+
+  for (const L0 of D.lineas) {
+    const pos = porU.get(L0.u);
+    if (!pos) {
+      let f = fuera.get(L0.tipo);
+      if (!f) { f = { tipo: L0.tipo, lin: 0, ubis: new Set() }; fuera.set(L0.tipo, f); }
+      f.lin++; f.ubis.add(L0.u);
+      continue;
+    }
+    const L = { ...L0 };
+    // Orden de precio: lo que traiga el propio fotostock y, si no, el maestro.
+    if (L.tot !== null) { L.val = L.tot; precio.porTotal++; }
+    else if (L.vu !== null) { L.val = L.vu * L.ctd; precio.porVU++; }
+    else {
+      const ficha = D.val && D.val.get(L.mat);
+      if (ficha && ficha.precio > 0) { L.val = ficha.precio * L.ctd; precio.porMaestro++; }
+      else { L.val = 0; precio.sin++; precio.matsSin.add(L.mat); }
+    }
+    L.pas = pos.pas; L.niv = pos.niv; L.area = pos.area; L.mm = pos.mm;
+    L.tipo = pos.tipo;            // manda el maestro, no lo que diga el fotostock
+
+    pos.ocu = true; pos.lin++; pos.ctd += L.ctd; pos.val += L.val;
+    (pos.mats || (pos.mats = new Set())).add(L.mat);
+    if (L.fem && (!pos.fem || L.fem < pos.fem)) pos.fem = L.fem;
+    lineas.push(L);
+  }
+
+  for (const x of ubis) x.mats = x.mats ? x.mats.size : 0;
+
+  // Control cruzado: el maestro trae su propio indicador de vacia.
+  let acuerdan = 0, discrepan = 0;
+  for (const x of ubis) { if (x.ocu === !x.vacMae) acuerdan++; else discrepan++; }
+
+  M = {
+    fecha: D.fecha, archivo: D.nom.foto, maestro: D.nom.mae,
+    ubis, lineas, fuera: [...fuera.values()].sort((a, b) => b.lin - a.lin),
+    precio, acuerdan, discrepan
+  };
+  M.conValor = !!(precio.porTotal || precio.porVU || precio.porMaestro);
+}
+
+/* --------------------------- filtros y vista --------------------------- */
+const F = { tipo: '', area: '', pas: '', niv: '', est: '' };
+const hayFiltro = () => !!(F.tipo || F.area || F.pas || F.niv || F.est);
+const limpiarFiltros = () => { F.tipo = F.area = F.pas = F.niv = F.est = ''; };
+
+function pasaUbi(x) {
+  if (F.tipo && x.tipo !== F.tipo) return false;
+  if (F.area && x.area !== F.area) return false;
+  if (F.pas && x.pas !== F.pas) return false;
+  if (F.niv && x.niv !== F.niv) return false;
+  if (F.est === 'ocu' && !x.ocu) return false;
+  if (F.est === 'vac' && x.ocu) return false;
+  return true;
+}
+
+function resumir(lista, lineas) {
+  const n = lista.length;
+  let ocu = 0, val = 0, lin = 0;
+  for (const x of lista) { if (x.ocu) ocu++; val += x.val; lin += x.lin; }
+  const mats = new Set();
+  if (lineas) for (const L of lineas) mats.add(L.mat);
+  return { n, ocu, vac: n - ocu, pct: n ? ocu / n * 100 : 0, val, lin, items: mats.size };
+}
+
+function vista() {
+  if (!M) return null;
+  const ubis = M.ubis.filter(pasaUbi);
+  const dentro = new Set(ubis.map(x => x.u));
+  const lineas = M.lineas.filter(L => dentro.has(L.u));
+  const mono = ubis.filter(x => x.mm === 'mono');
+  const multi = ubis.filter(x => x.mm === 'multi');
+  const linMono = lineas.filter(L => L.mm === 'mono');
+  const linMulti = lineas.filter(L => L.mm === 'multi');
+  return {
+    ubis, lineas, mono, multi,
+    mono_: resumir(mono, linMono),
+    multi_: resumir(multi, linMulti),
+    tot: resumir(ubis, lineas)
+  };
+}
+
+// Agrupa las posiciones de la vista por una dimension.
+function agrupar(lista, campo) {
+  const m = new Map();
+  for (const x of lista) {
+    let a = m.get(x[campo]);
+    if (!a) { a = { k: x[campo], n: 0, ocu: 0, val: 0, lin: 0, mono: 0 }; m.set(x[campo], a); }
+    a.n++; a.val += x.val; a.lin += x.lin;
+    if (x.ocu) a.ocu++;
+    if (x.mm === 'mono') a.mono++;
+  }
+  return [...m.values()].map(a => ({ ...a, vac: a.n - a.ocu, pct: a.n ? a.ocu / a.n * 100 : 0 }));
+}
+
+// La saturacion se lee solo sobre monoproducto. En multiproducto entran varios
+// materiales y lo que no entra queda fuera del rack: no hay tope contra el cual
+// medir, asi que el porcentaje se informa pero no se llama saturacion.
+function nivelSaturacion(pct) {
+  if (pct >= 95) return { paso: 4, rot: 'Sin lugar' };
+  if (pct >= 90) return { paso: 3, rot: 'Al límite' };
+  if (pct >= 75) return { paso: 2, rot: 'Cargada' };
+  return { paso: 1, rot: 'Holgada' };
+}
+const UMBRAL = 90;
+
+/* ===========================================================================
+   E · GUARDADO
+   Todo vive en este navegador. Del historial se guarda solo el resumen de
+   cada corte, nunca el detalle: un fotostock entero no entra en localStorage
+   y ademas no hace falta para dibujar una tendencia.
+   =========================================================================== */
+// Se calcula siempre sobre el deposito entero: quien llama se encarga de
+// sacar los filtros antes, porque un corte guardado a medias no sirve.
+function resumenDelCorte() {
+  const v = vista();
+  return {
+    fecha: M.fecha,
+    archivo: M.archivo,
+    maestro: M.maestro,
+    maeN: D.mae.size,
+    mono: { n: v.mono_.n, ocu: v.mono_.ocu },
+    multi: { n: v.multi_.n, ocu: v.multi_.ocu },
+    tot: { n: v.tot.n, ocu: v.tot.ocu },
+    val: v.tot.val,
+    items: v.tot.items,
+    lineas: v.lineas.length,
+    conValor: M.conValor
+  };
+}
+
+function guardarCorte() {
+  const guarda = { ...F };
+  limpiarFiltros();
+  const r = resumenDelCorte();
+  Object.assign(F, guarda);
+  const i = D.hist.findIndex(x => x.fecha === r.fecha);
+  if (i >= 0) D.hist[i] = r; else D.hist.push(r);
+  D.hist.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  escribirHist();
+  return { reemplazado: i >= 0, cortes: D.hist.length };
+}
+
+const guardarSeguro = (clave, obj) => {
+  try { localStorage.setItem(clave, JSON.stringify(obj)); return true; }
+  catch (e) { return false; }
+};
+const leerSeguro = clave => {
+  try { const t = localStorage.getItem(clave); return t ? JSON.parse(t) : null; }
+  catch (e) { return null; }
+};
+
+const escribirHist = () => guardarSeguro(LLAVE + '.hist', D.hist);
+const escribirPref = () => guardarSeguro(LLAVE + '.pref', D.pref);
+
+// Las bases se guardan aplanadas a arreglos: ocupan bastante menos que los
+// objetos y se vuelven a armar al abrir.
+function escribirBases() {
+  const paquete = {
+    nom: D.nom,
+    mae: D.mae ? [...D.mae.values()].map(f => [f.u, f.tipo, f.pas, f.col, f.niv, f.sub,
+      f.area, f.mm === 'mono' ? 1 : 0, f.vacMae ? 1 : 0, f.blo ? 1 : 0]) : null,
+    val: D.val ? [...D.val].map(([m, x]) => [m, x.desc, x.fam, x.precio]) : null
+  };
+  const ok = guardarSeguro(LLAVE + '.bases', paquete);
+  if (!ok) avisarEspacio();
+  return ok;
+}
+
+function restaurarBases() {
+  const p = leerSeguro(LLAVE + '.bases');
+  if (!p) return false;
+  if (p.nom) D.nom = { ...D.nom, ...p.nom };
+  if (p.mae) {
+    D.mae = new Map();
+    for (const [u, tipo, pas, col, niv, sub, area, mono, vac, blo] of p.mae) {
+      D.mae.set(u, { u, tipo, pas, col, niv, sub, area, mm: mono ? 'mono' : 'multi',
+        vacMae: !!vac, blo: !!blo });
+    }
+  }
+  if (p.val) {
+    D.val = new Map();
+    for (const [m, desc, fam, precio] of p.val) D.val.set(m, { desc, fam, precio });
+  }
+  return !!(p.mae || p.val);
+}
+
+function respaldo() {
+  return JSON.stringify({
+    version: 1, generado: new Date().toISOString(),
+    nom: D.nom, pref: D.pref, hist: D.hist,
+    mae: D.mae ? [...D.mae.values()] : null,
+    val: D.val ? [...D.val] : null
+  });
+}
+
+function restaurarRespaldo(texto) {
+  const p = JSON.parse(texto);
+  if (!p || typeof p !== 'object') throw new Error('El archivo no tiene el formato del respaldo.');
+  if (Array.isArray(p.hist)) D.hist = p.hist;
+  if (p.pref) D.pref = { ...D.pref, ...p.pref };
+  if (p.nom) D.nom = { ...D.nom, ...p.nom };
+  if (Array.isArray(p.mae)) { D.mae = new Map(); for (const f of p.mae) D.mae.set(f.u, f); }
+  if (Array.isArray(p.val)) { D.val = new Map(); for (const [m, x] of p.val) D.val.set(m, x); }
+  escribirHist(); escribirPref(); escribirBases();
+  return { ubis: D.mae ? D.mae.size : 0, materiales: D.val ? D.val.size : 0, cortes: D.hist.length };
+}
+
+function olvidarTodo() {
+  for (const s of ['.hist', '.pref', '.bases']) { try { localStorage.removeItem(LLAVE + s); } catch (e) {} }
+}
+
+/* ===========================================================================
+   F · GRAFICOS
+   Dibujados a mano en SVG. Reglas: marcas finas, punta redondeada de 4px del
+   lado del dato, separacion de 2px entre rellenos, grilla al hilo, un solo
+   eje, rotulo directo donde hace falta y globo al pasar el mouse. El color
+   identifica a la entidad y nunca al puesto en el ranking.
+   =========================================================================== */
+const G = (() => {
+  const globo = () => document.getElementById('globo');
+  function mostrar(ev, html) {
+    const g = globo();
+    g.innerHTML = html; g.classList.add('ver');
+    const r = g.getBoundingClientRect();
+    let x = ev.clientX + 15, y = ev.clientY - 12;
+    if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 15;
+    if (y + r.height > innerHeight - 8) y = innerHeight - r.height - 8;
+    g.style.left = Math.max(8, x) + 'px';
+    g.style.top = Math.max(8, y) + 'px';
+  }
+  const esconder = () => globo().classList.remove('ver');
+
+  // Al imprimir se dibuja a un ancho fijo: si no, el grafico se estira y la
+  // tipografia crece con el.
+  let anchoFijo = null;
+  const fijarAncho = a => { anchoFijo = a; };
+  const ancho = cont => anchoFijo || Math.max(220, Math.round(cont.clientWidth || 560));
+  const alto = (cont, min) => Math.max(min, Math.round(cont.clientHeight || min));
+
+  function enlazar(cont, datos, op) {
+    cont.querySelectorAll('[data-i]').forEach(el => {
+      const d = datos[+el.dataset.i];
+      if (!d) return;
+      if (d.globo) {
+        el.addEventListener('mousemove', ev => mostrar(ev, d.globo));
+        el.addEventListener('mouseleave', esconder);
+      }
+      if (op.alClic) el.addEventListener('click', () => { esconder(); op.alClic(d.k); });
+    });
+  }
+  const vaciar = (cont, txt) => { cont.innerHTML = `<div class="vacio">${Fmt.esc(txt)}</div>`; };
+
+  // Escala con tope redondo: 1, 2, 2.5 o 5 por potencia de diez.
+  function escala(max) {
+    if (!(max > 0)) return { max: 1, paso: .25 };
+    const e = Math.pow(10, Math.floor(Math.log10(max)));
+    for (const m of [1, 2, 2.5, 5, 10]) {
+      if (max <= m * e) return { max: m * e, paso: m * e / 4 };
+    }
+    return { max: 10 * e, paso: 2.5 * e };
+  }
+
+  // Barra con la punta del lado del dato redondeada y la base recta.
+  function senda(x, y, w, h, r) {
+    const q = Math.max(0, Math.min(r, w, h / 2));
+    if (w <= 0) return '';
+    return `M${x},${y} H${x + w - q} Q${x + w},${y} ${x + w},${y + q} `
+      + `V${y + h - q} Q${x + w},${y + h} ${x + w - q},${y + h} H${x} Z`;
+  }
+
+  /* ---------- barras horizontales de parte sobre total ---------- */
+  // El relleno son las ocupadas y la pista las vacias: es una parte de un
+  // total, no dos categorias, asi que va un solo tono mas una pista neutra.
+  function ocupacion(cont, datos, op = {}) {
+    if (!datos.length) return vaciar(cont, op.vacio || 'Sin datos con este filtro.');
+    const mI = op.mI || 128, mD = 108, mT = 6, sep = 3;
+    const W = ancho(cont);
+    const disp = alto(cont, 120) - mT - 6;
+    const paso = Math.max(19, Math.min(34, disp / datos.length));
+    const bh = Math.max(9, Math.min(16, paso - 9));
+    const aB = W - mI - mD;
+    const H = mT + datos.length * paso + 4;
+    let g = '';
+    // marca del umbral: la referencia del 90% sobre la que se lee saturacion
+    if (op.umbral) {
+      const x = mI + aB * UMBRAL / 100;
+      g += `<line class="gl" x1="${x.toFixed(1)}" y1="${mT - 2}" x2="${x.toFixed(1)}" `
+        + `y2="${mT + datos.length * paso}" stroke-dasharray="2 3"/>`;
+    }
+    datos.forEach((d, i) => {
+      const y = mT + i * paso + (paso - bh) / 2;
+      const w = Math.max(0, aB * Math.min(1, d.pct / 100));
+      const apag = op.sel && op.sel !== d.k ? ' apagado' : '';
+      g += `<text class="lb" x="${mI - 9}" y="${y + bh / 2 + 4}" text-anchor="end">${Fmt.esc(d.et || d.k)}</text>`;
+      g += `<rect x="${mI}" y="${y}" width="${aB}" height="${bh}" rx="4" fill="var(--carta-3)"/>`;
+      if (w > sep) {
+        g += `<path d="${senda(mI, y, w - sep, bh, 4)}" fill="${d.color || 'var(--c1)'}" class="mk${apag}" data-i="${i}"/>`;
+      }
+      g += `<text class="vd" x="${mI + aB + 9}" y="${y + bh / 2 + 4}">${Fmt.pct(d.pct, d.pct >= 10 ? 0 : 1)}</text>`;
+      g += `<text class="tk" x="${W - 2}" y="${y + bh / 2 + 4}" text-anchor="end">${Fmt.ent(d.ocu)}/${Fmt.ent(d.n)}</text>`;
+    });
+    g += `<line class="bs" x1="${mI}" y1="${mT}" x2="${mI}" y2="${mT + datos.length * paso}"/>`;
+    cont.innerHTML = `<svg class="g" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" `
+      + `role="img" aria-label="${Fmt.esc(op.aria || 'Ocupación')}">${g}</svg>`
+      + (op.leyenda || '');
+    enlazar(cont, datos, op);
+  }
+
+  /* ---------- barras horizontales de magnitud ---------- */
+  function magnitud(cont, datos, op = {}) {
+    if (!datos.length) return vaciar(cont, op.vacio || 'Sin datos con este filtro.');
+    const fmt = op.fmt || (v => Fmt.ent(v));
+    const mI = op.mI || 128, mD = 76, mT = 20, mB = 6;
+    const W = ancho(cont);
+    const disp = alto(cont, 130) - mT - mB;
+    const paso = Math.max(18, Math.min(32, disp / datos.length));
+    const bh = Math.max(9, Math.min(15, paso - 8));
+    const aB = W - mI - mD, H = mT + datos.length * paso + mB;
+    const es = escala(Math.max(...datos.map(d => d.v)));
+    const x = v => mI + (v / es.max) * aB;
+    let g = '';
+    for (let t = 0; t <= es.max + 1e-9; t += es.paso) {
+      const px = x(t).toFixed(1);
+      g += `<line class="gl" x1="${px}" y1="${mT}" x2="${px}" y2="${mT + datos.length * paso}"/>`;
+      g += `<text class="tk" x="${px}" y="${mT - 7}" text-anchor="middle">${fmt(t)}</text>`;
+    }
+    datos.forEach((d, i) => {
+      const y = mT + i * paso + (paso - bh) / 2;
+      const w = Math.max(0, x(d.v) - mI);
+      const apag = op.sel && op.sel !== d.k ? ' apagado' : '';
+      g += `<text class="lb" x="${mI - 9}" y="${y + bh / 2 + 4}" text-anchor="end">${Fmt.esc(d.et || d.k)}</text>`;
+      g += `<path d="${senda(mI, y, w, bh, 4)}" fill="${d.color || 'var(--c1)'}" class="mk${apag}" data-i="${i}"/>`;
+      g += `<text class="vd" x="${(mI + w + 8).toFixed(1)}" y="${y + bh / 2 + 4}">${fmt(d.v)}</text>`;
+    });
+    g += `<line class="bs" x1="${mI}" y1="${mT}" x2="${mI}" y2="${mT + datos.length * paso}"/>`;
+    cont.innerHTML = `<svg class="g" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" `
+      + `role="img" aria-label="${Fmt.esc(op.aria || 'Magnitud')}">${g}</svg>`
+      + (op.leyenda || '');
+    enlazar(cont, datos, op);
+  }
+  /* ---------- mapa de calor: pasillo por nivel ---------- */
+  const RAMPA = ['--r1','--r2','--r3','--r4','--r5','--r6','--r7','--r8','--r9','--r10','--r11','--r12'];
+  // Un solo tono de claro a oscuro. Nunca arcoiris: el dato es magnitud.
+  const pasoRampa = pct => Math.min(11, Math.max(0, Math.floor(pct / 100 * 12)));
+
+  function mapaCalor(cont, celdas, filas, cols, op = {}) {
+    if (!celdas.size || !filas.length || !cols.length) {
+      return vaciar(cont, op.vacio || 'No hay posiciones monoproducto con este filtro.');
+    }
+    const W = ancho(cont);
+    const mI = op.mI || 64, mT = 20, sep = 2;
+    const cw = Math.max(26, (W - mI - 4) / cols.length);
+    const dispo = alto(cont, 150) - mT - 26;
+    const ch = Math.max(14, Math.min(30, dispo / filas.length));
+    const H = mT + filas.length * ch + 4;
+    const chico = ch < 19 || cw < 36;
+    const datos = [];
+    let g = '';
+    cols.forEach((c, j) => {
+      g += `<text class="tk" x="${(mI + j * cw + cw / 2).toFixed(1)}" y="${mT - 6}" `
+        + `text-anchor="middle">${Fmt.esc(c)}</text>`;
+    });
+    filas.forEach((f, i) => {
+      g += `<text class="tk" x="${mI - 7}" y="${(mT + i * ch + ch / 2 + 3.5).toFixed(1)}" `
+        + `text-anchor="end">${Fmt.esc(f)}</text>`;
+      cols.forEach((c, j) => {
+        const d = celdas.get(f + '\u0000' + c);
+        const x = mI + j * cw, y = mT + i * ch;
+        if (!d) {
+          g += `<rect x="${(x + sep / 2).toFixed(1)}" y="${(y + sep / 2).toFixed(1)}" `
+            + `width="${(cw - sep).toFixed(1)}" height="${(ch - sep).toFixed(1)}" rx="3" `
+            + `fill="var(--carta-2)" opacity=".55"/>`;
+          return;
+        }
+        const p = pasoRampa(d.pct);
+        const idx = datos.length;
+        datos.push({
+          k: f, pct: d.pct,
+          globo: `<b>Pasillo ${Fmt.esc(f)} · nivel ${Fmt.esc(c)}</b><table>
+            <tr><td>Ocupación</td><td>${Fmt.pct(d.pct)}</td></tr>
+            <tr><td>Ocupadas</td><td>${Fmt.ent(d.ocu)} de ${Fmt.ent(d.n)}</td></tr>
+            <tr><td>Vacías</td><td>${Fmt.ent(d.n - d.ocu)}</td></tr>
+            ${d.val ? `<tr><td>Valor</td><td>${Fmt.usdX(d.val)}</td></tr>` : ''}</table>`
+        });
+        g += `<rect class="cel" data-i="${idx}" x="${(x + sep / 2).toFixed(1)}" `
+          + `y="${(y + sep / 2).toFixed(1)}" width="${(cw - sep).toFixed(1)}" `
+          + `height="${(ch - sep).toFixed(1)}" rx="3" fill="var(${RAMPA[p]})"/>`;
+        if (!chico) {
+          g += `<text class="cel-num ${p >= 7 ? 'alto' : 'bajo'}" `
+            + `x="${(x + cw / 2).toFixed(1)}" y="${(y + ch / 2 + 3.5).toFixed(1)}" `
+            + `text-anchor="middle" style="font-size:9.5px">${Fmt.dec(d.pct, 0)}</text>`;
+        }
+      });
+    });
+    const esc = RAMPA.map(r => `<i style="background:var(${r})"></i>`).join('');
+    cont.innerHTML = `<svg class="g" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" `
+      + `role="img" aria-label="${Fmt.esc(op.aria || 'Mapa de ocupación')}">${g}</svg>
+      <div class="leyenda" style="margin-top:9px">
+        <span>0%</span>
+        <span style="display:flex;height:9px;width:132px;border-radius:3px;overflow:hidden;
+          border:1px solid var(--linea)">${esc}</span>
+        <span>100% ocupado</span>
+        <span style="margin-left:auto;color:var(--tinta-3)">filas: pasillo · columnas: nivel</span>
+      </div>`;
+    enlazar(cont, datos, op);
+  }
+
+  /* ---------- linea de tendencia ---------- */
+  // Un solo eje siempre. Si hubiera dos medidas de escala distinta van dos
+  // graficos, nunca dos ejes en el mismo.
+  function linea(cont, puntos, series, op = {}) {
+    if (!puntos.length) return vaciar(cont, op.vacio || 'Todavía no hay cortes guardados.');
+    const fmt = op.fmt || (v => Fmt.ent(v));
+    const W = ancho(cont), mI = op.mI || 58, mD = 16, mT = 16, mB = 30;
+    const H = Math.max(alto(cont, 190), 170);
+    const aB = W - mI - mD, aH = H - mT - mB;
+    const todos = puntos.flatMap(p => series.map(s => p[s.campo])).filter(Number.isFinite);
+    const max = op.max != null ? op.max : Math.max(...todos, 0);
+    const min = op.min != null ? op.min : 0;
+    const es = op.max != null ? { max, paso: (max - min) / 4 } : escala(max);
+    const tope = op.max != null ? max : es.max;
+    const X = i => mI + (puntos.length === 1 ? aB / 2 : (i / (puntos.length - 1)) * aB);
+    const Y = v => mT + aH - ((v - min) / (tope - min || 1)) * aH;
+    let g = '';
+    for (let t = min; t <= tope + 1e-9; t += es.paso) {
+      const y = Y(t).toFixed(1);
+      g += `<line class="gl" x1="${mI}" y1="${y}" x2="${mI + aB}" y2="${y}"/>`;
+      g += `<text class="tk" x="${mI - 8}" y="${+y + 3.5}" text-anchor="end">${fmt(t)}</text>`;
+    }
+    // Rotulos del eje de tiempo elegidos de derecha a izquierda, para que el
+    // ultimo corte siempre tenga nombre y no se pisen entre si.
+    let ocupado = Infinity;
+    const rot = [];
+    for (let i = puntos.length - 1; i >= 0; i--) {
+      const x = X(i), an = String(puntos[i].rot).length * 5.6;
+      if (x + an / 2 < ocupado - 8) { rot.push(i); ocupado = x - an / 2; }
+    }
+    rot.forEach(i => {
+      g += `<text class="tk" x="${X(i).toFixed(1)}" y="${mT + aH + 16}" text-anchor="middle">`
+        + `${Fmt.esc(puntos[i].rot)}</text>`;
+    });
+    // Marca vertical donde cambia algo de fondo, como el maestro de ubicaciones:
+    // sin esto el escalon de la curva parece gestion y es cambio de denominador.
+    (op.marcas || []).forEach(m => {
+      const x = X(m.i).toFixed(1);
+      g += `<line x1="${x}" y1="${mT}" x2="${x}" y2="${mT + aH}" stroke="var(--eje)" `
+        + `stroke-width="1" stroke-dasharray="3 3"/>`;
+      g += `<text class="tk" x="${+x + 4}" y="${mT + 10}" style="fill:var(--tinta-3)">${Fmt.esc(m.texto)}</text>`;
+    });
+    series.forEach(s => {
+      const pts = puntos.map((p, i) => Number.isFinite(p[s.campo])
+        ? `${X(i).toFixed(1)},${Y(p[s.campo]).toFixed(1)}` : null).filter(Boolean);
+      if (pts.length > 1) {
+        g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" `
+          + `stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+      puntos.forEach((p, i) => {
+        if (!Number.isFinite(p[s.campo])) return;
+        g += `<circle class="aro" cx="${X(i).toFixed(1)}" cy="${Y(p[s.campo]).toFixed(1)}" `
+          + `r="${pts.length > 18 ? 3 : 4.5}" fill="${s.color}"/>`;
+      });
+    });
+    // Rotulo directo al final de cada serie. Si dos terminan pegadas se separan
+    // a la fuerza, que si no quedan una encima de la otra y no se lee ninguna.
+    if (op.rotularFin !== false) {
+      const ult = puntos.length - 1;
+      const fin = series
+        .filter(s => Number.isFinite(puntos[ult][s.campo]))
+        .map(s => ({ s, y: Y(puntos[ult][s.campo]) - 9 }))
+        .sort((a, b) => a.y - b.y);
+      for (let i = 1; i < fin.length; i++) {
+        if (fin[i].y - fin[i - 1].y < 13) fin[i].y = fin[i - 1].y + 13;
+      }
+      const corrido = fin.length ? Math.max(0, fin[fin.length - 1].y - (mT + aH - 4)) : 0;
+      fin.forEach(f => {
+        g += `<text class="vd" x="${X(ult) - 6}" y="${(f.y - corrido).toFixed(1)}" `
+          + `text-anchor="end" style="fill:${f.s.color}">${Fmt.esc(f.s.nombre)}</text>`;
+      });
+    }
+    // cruceta: una franja invisible por punto para el globo
+    const anchoFranja = aB / Math.max(1, puntos.length - 1);
+    puntos.forEach((p, i) => {
+      const cuerpo = series.map(s => `<tr><td>${Fmt.esc(s.nombre)}</td><td>`
+        + `${Number.isFinite(p[s.campo]) ? (s.fmt || fmt)(p[s.campo]) : '—'}</td></tr>`).join('');
+      g += `<rect data-i="${i}" x="${(X(i) - anchoFranja / 2).toFixed(1)}" y="${mT}" `
+        + `width="${anchoFranja.toFixed(1)}" height="${aH}" fill="transparent" style="cursor:crosshair"/>`;
+      p.globo = `<b>${Fmt.esc(p.rotLargo || p.rot)}</b><table>${cuerpo}</table>`;
+    });
+    g += `<line class="bs" x1="${mI}" y1="${mT + aH}" x2="${mI + aB}" y2="${mT + aH}"/>`;
+    const ley = series.length > 1
+      ? `<div class="leyenda">${series.map(s =>
+          `<span><i style="background:${s.color}"></i>${Fmt.esc(s.nombre)}</span>`).join('')}</div>`
+      : '';
+    cont.innerHTML = `<svg class="g" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" `
+      + `role="img" aria-label="${Fmt.esc(op.aria || 'Tendencia')}">${g}</svg>` + ley;
+    enlazar(cont, puntos, op);
+  }
+
+  return { mostrar, esconder, fijarAncho, escala, senda, enlazar, vaciar, ancho, alto,
+           ocupacion, magnitud, mapaCalor, linea, pasoRampa, RAMPA };
+})();
+
+/* ===========================================================================
+   G · PANTALLAS
+   =========================================================================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+const HOJAS = ['hOcup', 'hValor', 'hTend', 'hReporte', 'hConfig'];
+let hojaActiva = 'hOcup';
+
+function irA(id) {
+  hojaActiva = id;
+  HOJAS.forEach(h => $('#' + h).classList.toggle('ver', h === id));
+  $$('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.h === id)));
+  G.esconder();
+  pintar();
+}
+$$('.tabs button').forEach(b => b.addEventListener('click', () => irA(b.dataset.h)));
+
+function pintar() {
+  const v = M ? vista() : null;
+  $('#rotCorte').innerHTML = M
+    ? `corte <b>${Fmt.fecha(M.fecha)}</b> · ${Fmt.ent(D.mae.size)} posiciones`
+    : (D.mae ? 'falta el fotostock' : 'sin datos');
+  if (hojaActiva === 'hOcup') pintarOcupacion(v);
+  else if (hojaActiva === 'hValor') pintarValorizado(v);
+  else if (hojaActiva === 'hTend') pintarTendencia();
+  else if (hojaActiva === 'hReporte') pintarReporte();
+  else if (hojaActiva === 'hConfig') pintarConfig(v);
+}
+
+let tmrAncho;
+addEventListener('resize', () => { clearTimeout(tmrAncho); tmrAncho = setTimeout(pintar, 200); });
+
+function faltanDatos(idFalta, idCuerpo) {
+  const falta = !M;
+  if (idCuerpo) $('#' + idCuerpo).hidden = falta;
+  $('#' + idFalta).innerHTML = falta
+    ? `<div class="aviso"><span class="ic">i</span><div>
+        <b>Faltan datos.</b> Cargue el maestro de ubicaciones y un fotostock en
+        <b>Configuración</b>.
+        <div style="margin-top:9px"><button class="btn chico" onclick="irA('hConfig')">Ir a Configuración</button></div>
+      </div></div>`
+    : '';
+  return !falta;
+}
+
+/* ------------------------------- tablas ------------------------------- */
+function tabla(cont, cols, filas, op = {}) {
+  if (!filas.length) { cont.innerHTML = `<div class="vacio">${Fmt.esc(op.vacio || 'Sin filas.')}</div>`; return; }
+  const est = op.est || (cont._est = cont._est || { c: op.orden ?? -1, d: op.dir || -1 });
+  let orden = filas;
+  if (est.c >= 0 && cols[est.c] && cols[est.c].v) {
+    const f = cols[est.c].v;
+    orden = filas.slice().sort((a, b) => {
+      const x = f(a), y = f(b);
+      return ((typeof x === 'number' && typeof y === 'number')
+        ? x - y : String(x).localeCompare(String(y), 'es', { numeric: true })) * est.d;
+    });
+  }
+  const lim = op.limite || orden.length;
+  const vis = orden.slice(0, lim);
+  const th = cols.map((c, i) =>
+    `<th class="${c.n ? 'n ' : ''}${c.v ? '' : 'quieto'}" ${c.v ? `data-c="${i}"` : ''}>`
+    + `${Fmt.esc(c.t)}${est.c === i ? ` <span class="fl">${est.d > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('');
+  const tb = vis.map(f =>
+    `<tr class="${op.alClic ? 'clic' : ''}${op.sel && op.sel(f) ? ' elegida' : ''}" `
+    + `data-k="${Fmt.esc(op.clave ? op.clave(f) : '')}">`
+    + cols.map(c => `<td class="${c.n ? 'n' : ''}">${c.h ? c.h(f) : Fmt.esc(c.v ? c.v(f) : '')}</td>`).join('')
+    + '</tr>').join('');
+  const tf = op.pie
+    ? `<tfoot><tr>${op.pie.map(c => `<td class="${c.n ? 'n' : ''}">${c.t || ''}</td>`).join('')}</tr></tfoot>`
+    : '';
+  cont.innerHTML = `<div class="marco${op.suelto ? ' suelto' : ''}"><table>`
+    + `<thead><tr>${th}</tr></thead><tbody>${tb}</tbody>${tf}</table></div>`
+    + (orden.length > lim
+      ? `<p class="corte-tabla">Se muestran ${Fmt.ent(lim)} de ${Fmt.ent(orden.length)} filas. La exportación las trae todas.</p>`
+      : '');
+  cont.querySelectorAll('th[data-c]').forEach(th => th.addEventListener('click', () => {
+    const i = +th.dataset.c;
+    if (est.c === i) est.d *= -1; else { est.c = i; est.d = -1; }
+    tabla(cont, cols, filas, { ...op, est });
+  }));
+  if (op.alClic) cont.querySelectorAll('tbody tr').forEach(tr =>
+    tr.addEventListener('click', () => op.alClic(tr.dataset.k)));
+}
+
+const barrita = (pct, color) => `<span class="barrita" title="${Fmt.pct(pct)}">`
+  + `<i style="width:${Math.max(2, Math.min(100, pct)).toFixed(1)}%;background:${color || 'var(--c1)'}"></i></span>`;
+
+/* ------------------------------- filtros ------------------------------- */
+function llenarSelect(sel, valores, rot) {
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>'
+    + valores.map(v => `<option value="${Fmt.esc(v)}">${Fmt.esc(rot ? rot(v) : v)}</option>`).join('');
+  sel.value = valores.includes(actual) ? actual : '';
+}
+
+function sincronizarFiltros() {
+  if (!M) return;
+  const u = M.ubis;
+  llenarSelect($('#fTipo'), [...new Set(u.map(x => x.tipo))].sort(ordNat));
+  llenarSelect($('#fArea'), [...new Set(u.map(x => x.area))].sort(ordNat));
+  llenarSelect($('#fPas'), [...new Set(u.map(x => x.pas))].sort(ordNat));
+  llenarSelect($('#fNiv'), [...new Set(u.map(x => x.niv))].sort(ordNat));
+  $('#fTipo').value = F.tipo; $('#fArea').value = F.area;
+  $('#fPas').value = F.pas; $('#fNiv').value = F.niv; $('#fEst').value = F.est;
+}
+
+function pintarChips() {
+  const rot = { tipo: 'Tipo', area: 'Área', pas: 'Pasillo', niv: 'Nivel', est: 'Estado' };
+  const leg = { ocu: 'Ocupadas', vac: 'Vacías' };
+  const act = Object.keys(rot).filter(k => F[k]);
+  $('#chips').innerHTML = act.map(k =>
+    `<span class="chip">${rot[k]}: ${Fmt.esc(leg[F[k]] || F[k])}`
+    + `<button data-f="${k}" aria-label="Quitar filtro">×</button></span>`).join('')
+    + (act.length > 1 ? `<button class="btn chico" id="btnLimpiar">Limpiar todo</button>` : '');
+  $('#chips').querySelectorAll('button[data-f]').forEach(b =>
+    b.addEventListener('click', () => { F[b.dataset.f] = ''; sincronizarFiltros(); pintar(); }));
+  const bl = $('#btnLimpiar');
+  if (bl) bl.addEventListener('click', () => { limpiarFiltros(); sincronizarFiltros(); pintar(); });
+}
+
+['tipo', 'area', 'pas', 'niv', 'est'].forEach(k => {
+  const id = { tipo: 'fTipo', area: 'fArea', pas: 'fPas', niv: 'fNiv', est: 'fEst' }[k];
+  $('#' + id).addEventListener('change', e => { F[k] = e.target.value; pintar(); });
+});
+const alternar = (campo, valor) => {
+  F[campo] = F[campo] === valor ? '' : valor;
+  sincronizarFiltros(); pintar();
+};
+
+/* ===========================================================================
+   H · OCUPACION · el mosaico
+   Responde una sola pregunta: cuan lleno esta el deposito. La saturacion
+   manda y por eso ocupa la tarjeta grande; el resto se acomoda alrededor.
+   =========================================================================== */
+function pintarOcupacion(v) {
+  const hay = faltanDatos('ocupFalta');
+  $('#barraFiltros').hidden = !hay;
+  $('#mosaico').hidden = !hay;
+  if (!hay) return;
+  pintarChips();
+
+  const sat = nivelSaturacion(v.mono_.pct);
+
+  /* --- la tarjeta grande --- */
+  $('#cjHero').innerHTML = `
+    <span class="rot">Saturación monoproducto</span>
+    <div class="medio">
+      <span class="big">${Fmt.pct(v.mono_.pct)}</span>
+      <span class="sub">${Fmt.ent(v.mono_.ocu)} de ${Fmt.ent(v.mono_.n)} posiciones ocupadas</span>
+      <span class="estado"><i></i>${Fmt.esc(sat.rot)} · umbral ${UMBRAL}%</span>
+    </div>
+    <div class="cinta">
+      <div style="height:11px;background:var(--carta-3);border-radius:5px;position:relative;overflow:hidden">
+        <i style="position:absolute;inset:0 auto 0 0;width:${Math.min(100, v.mono_.pct).toFixed(1)}%;
+          background:var(--c1);border-radius:5px"></i>
+        <i style="position:absolute;top:-2px;bottom:-2px;left:${UMBRAL}%;width:1.5px;
+          background:var(--tinta-2);opacity:.55"></i>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tinta-3);margin-top:4px">
+        <span>0%</span><span>umbral ${UMBRAL}%</span><span>100%</span>
+      </div>
+    </div>`;
+
+  /* --- las dos chicas --- */
+  $('#cjOcu').innerHTML = `<h3>Ocupadas</h3>
+    <div class="val">${Fmt.ent(v.tot.ocu)}</div>
+    <div class="pie">${Fmt.plural(v.tot.lin, 'línea', 'líneas')}</div>`;
+  $('#cjVac').innerHTML = `<h3>Vacías</h3>
+    <div class="val">${Fmt.ent(v.tot.vac)}</div>
+    <div class="pie">lugar disponible</div>`;
+
+  /* --- la plata --- */
+  $('#cjPlata').innerHTML = M.conValor
+    ? `<h3>Valor en posiciones <span class="pista">${Fmt.plural(v.tot.items, 'ítem distinto', 'ítems distintos')}</span></h3>
+       <div class="val mini">${Fmt.usd(v.tot.val)}</div>
+       <div class="pie">${Fmt.usdX(v.tot.val)} · ${Fmt.usdX(v.tot.ocu ? v.tot.val / v.tot.ocu : 0)} por posición ocupada</div>`
+    : `<h3>Valor en posiciones</h3>
+       <div class="val mini" style="color:var(--tinta-3)">sin precios</div>
+       <div class="pie">Cargue el maestro valorizado en Configuración para ver los montos.</div>`;
+
+  /* --- mono, multi y total --- */
+  const fila = (et, r, color, nota) => `
+    <div class="f${et === 'Total' ? ' tot' : ''}">
+      <span class="et">${et}</span>
+      <span class="pista"><i style="width:${Math.min(100, r.pct).toFixed(1)}%;background:${color}"></i></span>
+      <span class="num"><b>${Fmt.pct(r.pct)}</b><br>${Fmt.ent(r.ocu)}/${Fmt.ent(r.n)}</span>
+    </div>${nota || ''}`;
+  $('#cjMmt').innerHTML = `<div class="mmt">
+    ${fila('Mono', v.mono_, 'var(--c1)')}
+    ${fila('Multi', v.multi_, 'var(--c2)')}
+    ${fila('Total', v.tot, 'var(--marino)')}
+    <div class="nota">En multiproducto entran varios materiales y lo que no entra queda fuera
+      del rack: ese porcentaje no se lee como saturación.</div>
+  </div>`;
+
+  /* --- por nivel --- */
+  const niveles = agrupar(v.ubis, 'niv').sort((a, b) => ordClaveDesc(a.k, b.k)).slice(0, 16);
+  G.ocupacion($('#gNivel'), niveles.map(d => ({
+    k: d.k, et: 'Nivel ' + d.k, pct: d.pct, ocu: d.ocu, n: d.n,
+    globo: globoGrupo('Nivel ' + d.k, d)
+  })), { mI: 74, umbral: true, sel: F.niv, alClic: k => alternar('niv', k),
+    aria: 'Ocupación por nivel' });
+
+  /* --- por tipo de almacén --- */
+  const tipos = agrupar(v.ubis, 'tipo').sort((a, b) => b.n - a.n).slice(0, 15);
+  G.ocupacion($('#gTipo'), tipos.map(d => ({
+    k: d.k, et: d.k, pct: d.pct, ocu: d.ocu, n: d.n,
+    color: d.mono === d.n ? 'var(--c1)' : 'var(--c2)',
+    globo: globoGrupo('Almacén ' + d.k, d)
+  })), {
+    mI: 56, umbral: true, sel: F.tipo, alClic: k => alternar('tipo', k),
+    aria: 'Ocupación por tipo de almacén',
+    leyenda: `<div class="leyenda">
+      <span><i style="background:var(--c1)"></i>Monoproducto</span>
+      <span><i style="background:var(--c2)"></i>Multiproducto</span>
+      <span style="margin-left:auto;color:var(--tinta-3)">línea punteada: umbral ${UMBRAL}%</span></div>`
+  });
+
+  /* --- el mapa --- */
+  const celdas = new Map();
+  for (const x of v.mono) {
+    const k = x.pas + '\u0000' + x.niv;
+    let c = celdas.get(k);
+    if (!c) { c = { n: 0, ocu: 0, val: 0 }; celdas.set(k, c); }
+    c.n++; c.val += x.val;
+    if (x.ocu) c.ocu++;
+  }
+  for (const c of celdas.values()) c.pct = c.n ? c.ocu / c.n * 100 : 0;
+  G.mapaCalor($('#gMapa'), celdas,
+    [...new Set(v.mono.map(x => x.pas))].sort(ordClave),
+    [...new Set(v.mono.map(x => x.niv))].sort(ordClave),
+    { alClic: k => alternar('pas', k), aria: 'Mapa de ocupación por pasillo y nivel' });
+}
+
+const globoGrupo = (titulo, d) => `<b>${Fmt.esc(titulo)}</b><table>
+  <tr><td>Ocupación</td><td>${Fmt.pct(d.pct)}</td></tr>
+  <tr><td>Ocupadas</td><td>${Fmt.ent(d.ocu)}</td></tr>
+  <tr><td>Vacías</td><td>${Fmt.ent(d.vac)}</td></tr>
+  <tr><td>Total</td><td>${Fmt.ent(d.n)}</td></tr>
+  ${d.val ? `<tr><td>Valor</td><td>${Fmt.usdX(d.val)}</td></tr>` : ''}</table>
+  <div style="margin-top:5px;color:var(--tinta-3);font-size:11px">Clic para filtrar</div>`;
+
+/* --------------------- la tabla de ubicaciones --------------------- */
+function abrirTabla() {
+  const v = vista();
+  if (!v) return;
+  $('#subTabla').innerHTML = `${Fmt.plural(v.ubis.length, 'posición', 'posiciones')}`
+    + (hayFiltro() ? ' con los filtros puestos' : ' del depósito');
+  tabla($('#tUbis'), [
+    { t: 'Ubicación', v: f => f.u, h: f => `<b class="nums">${Fmt.esc(f.u)}</b>` },
+    { t: 'Tipo', v: f => f.tipo },
+    { t: 'Clase', v: f => f.mm, h: f => `<span class="pastilla">${f.mm === 'mono' ? 'Mono' : 'Multi'}</span>` },
+    { t: 'Área', v: f => f.area },
+    { t: 'Pasillo', v: f => f.pas },
+    { t: 'Nivel', v: f => f.niv },
+    { t: 'Estado', v: f => (f.ocu ? 1 : 0), h: f => f.ocu ? 'Ocupada' : '<span style="color:var(--tinta-3)">Vacía</span>' },
+    { t: 'Ítems', n: true, v: f => f.mats, h: f => (f.mats ? Fmt.ent(f.mats) : '—') },
+    { t: 'Líneas', n: true, v: f => f.lin, h: f => (f.lin ? Fmt.ent(f.lin) : '—') },
+    { t: 'Valor', n: true, v: f => f.val, h: f => (f.val ? Fmt.usdX(f.val) : '—') },
+    { t: 'Entrada más vieja', v: f => f.fem || '', h: f => (f.fem ? Fmt.fecha(f.fem) : '—') }
+  ], v.ubis, { orden: 9, dir: -1, limite: 500, vacio: 'No hay posiciones con este filtro.' });
+  $('#dlgTabla').showModal();
+}
+
+/* ===========================================================================
+   I · VALORIZADO
+   Donde esta la plata, siempre dentro de las posiciones fisicas.
+   =========================================================================== */
+function pintarValorizado(v) {
+  if (!faltanDatos('valFalta', 'valCuerpo')) return;
+
+  if (!M.conValor) {
+    $('#valAviso').innerHTML = `<div class="aviso mal"><span class="ic">!</span><div>
+      <b>Este corte no se puede valorizar.</b> El fotostock no trae las columnas
+      <b>V/U</b> ni <b>Total</b>, y todavía no hay un maestro valorizado cargado.
+      <div style="margin-top:9px"><button class="btn chico" onclick="irA('hConfig')">Cargar maestro valorizado</button></div>
+    </div></div>`;
+  } else if (M.precio.sin) {
+    $('#valAviso').innerHTML = `<div class="aviso ojo"><span class="ic">!</span><div>
+      <b>${Fmt.plural(M.precio.sin, 'línea sin precio', 'líneas sin precio')}</b>
+      sobre ${Fmt.plural(M.precio.matsSin.size, 'material', 'materiales')} distintos.
+      Cuentan como ocupación pero suman cero pesos, así que el valor total queda corto.</div></div>`;
+  } else {
+    $('#valAviso').innerHTML = '';
+  }
+
+  const ocupadas = v.ubis.filter(x => x.ocu && x.val > 0).sort((a, b) => b.val - a.val);
+  const total = v.tot.val;
+  const diez = Math.max(1, Math.round(ocupadas.length * .1));
+  const enDiez = ocupadas.slice(0, diez).reduce((s, x) => s + x.val, 0);
+
+  $('#kvTotal').innerHTML = `<h3>Valor en posiciones</h3>
+    <div class="val mini">${Fmt.usd(total)}</div>
+    <div class="pie">${Fmt.usdX(total)}</div>`;
+  $('#kvMedia').innerHTML = `<h3>Promedio por posición</h3>
+    <div class="val mini">${Fmt.usd(v.tot.ocu ? total / v.tot.ocu : 0)}</div>
+    <div class="pie">sobre ${Fmt.plural(v.tot.ocu, 'posición ocupada', 'posiciones ocupadas')}</div>`;
+  $('#kvItems').innerHTML = `<h3>Ítems distintos</h3>
+    <div class="val">${Fmt.ent(v.tot.items)}</div>
+    <div class="pie">en ${Fmt.plural(v.lineas.length, 'línea', 'líneas')}</div>`;
+  $('#kvConc').innerHTML = `<h3>Concentración</h3>
+    <div class="val">${Fmt.pct(total ? enDiez / total * 100 : 0, 0)}</div>
+    <div class="pie">del valor está en las ${Fmt.ent(diez)} posiciones más caras,
+      el 10% de las ocupadas</div>`;
+
+  const porTipo = agrupar(v.ubis, 'tipo').filter(d => d.val > 0).sort((a, b) => b.val - a.val).slice(0, 12);
+  G.magnitud($('#gValTipo'), porTipo.map(d => ({
+    k: d.k, et: d.k, v: d.val,
+    globo: `<b>Almacén ${Fmt.esc(d.k)}</b><table>
+      <tr><td>Valor</td><td>${Fmt.usdX(d.val)}</td></tr>
+      <tr><td>Participación</td><td>${Fmt.pct(total ? d.val / total * 100 : 0)}</td></tr>
+      <tr><td>Ocupadas</td><td>${Fmt.ent(d.ocu)} de ${Fmt.ent(d.n)}</td></tr></table>
+      <div style="margin-top:5px;color:var(--tinta-3);font-size:11px">Clic para filtrar</div>`
+  })), { fmt: x => Fmt.usd(x).replace('USD ', ''), mI: 56, sel: F.tipo,
+    alClic: k => alternar('tipo', k), aria: 'Valor por tipo de almacén',
+    vacio: 'Sin valores con este filtro.' });
+
+  const porArea = agrupar(v.ubis, 'area').filter(d => d.val > 0).sort((a, b) => b.val - a.val).slice(0, 12);
+  G.magnitud($('#gValArea'), porArea.map(d => ({
+    k: d.k, et: d.k, v: d.val,
+    globo: `<b>${Fmt.esc(d.k)}</b><table>
+      <tr><td>Valor</td><td>${Fmt.usdX(d.val)}</td></tr>
+      <tr><td>Participación</td><td>${Fmt.pct(total ? d.val / total * 100 : 0)}</td></tr>
+      <tr><td>Ocupadas</td><td>${Fmt.ent(d.ocu)} de ${Fmt.ent(d.n)}</td></tr></table>
+      <div style="margin-top:5px;color:var(--tinta-3);font-size:11px">Clic para filtrar</div>`
+  })), { fmt: x => Fmt.usd(x).replace('USD ', ''), mI: 84, sel: F.area,
+    alClic: k => alternar('area', k), aria: 'Valor por área de almacenamiento',
+    vacio: 'Sin valores con este filtro.' });
+
+  // materiales: el mismo material puede estar en varias posiciones
+  const mats = new Map();
+  for (const L of v.lineas) {
+    let a = mats.get(L.mat);
+    if (!a) { a = { mat: L.mat, desc: L.desc, ctd: 0, val: 0, ubis: new Set() }; mats.set(L.mat, a); }
+    a.ctd += L.ctd; a.val += L.val; a.ubis.add(L.u);
+    if (!a.desc && L.desc) a.desc = L.desc;
+  }
+  const topMat = [...mats.values()].sort((a, b) => b.val - a.val).slice(0, 20);
+  const maxMat = topMat.length ? topMat[0].val : 1;
+  tabla($('#tTopMat'), [
+    { t: 'Material', v: f => f.mat, h: f => `<b class="nums">${Fmt.esc(f.mat)}</b>` },
+    { t: 'Descripción', v: f => f.desc, h: f => Fmt.esc((f.desc || '').slice(0, 34)) },
+    { t: 'Cantidad', n: true, v: f => f.ctd, h: f => Fmt.ent(f.ctd) },
+    { t: 'Posiciones', n: true, v: f => f.ubis.size, h: f => Fmt.ent(f.ubis.size) },
+    { t: 'Valor', n: true, v: f => f.val, h: f => `<b>${Fmt.usdX(f.val)}</b>` },
+    { t: '', v: null, h: f => barrita(f.val / maxMat * 100) }
+  ], topMat, { orden: 4, dir: -1, vacio: 'Sin materiales con valor.' });
+
+  const topUbi = ocupadas.slice(0, 20);
+  const maxUbi = topUbi.length ? topUbi[0].val : 1;
+  tabla($('#tTopUbi'), [
+    { t: 'Ubicación', v: f => f.u, h: f => `<b class="nums">${Fmt.esc(f.u)}</b>` },
+    { t: 'Tipo', v: f => f.tipo },
+    { t: 'Ítems', n: true, v: f => f.mats, h: f => Fmt.ent(f.mats) },
+    { t: 'Valor', n: true, v: f => f.val, h: f => `<b>${Fmt.usdX(f.val)}</b>` },
+    { t: '', v: null, h: f => barrita(f.val / maxUbi * 100) }
+  ], topUbi, { orden: 3, dir: -1, vacio: 'Sin posiciones con valor.' });
+}
+
+/* ===========================================================================
+   J · TENDENCIA
+   =========================================================================== */
+function serieHistorial(grano) {
+  const m = new Map();
+  for (const c of D.hist) {
+    const k = grano === 'mes' ? Fmt.mes(c.fecha) : Fmt.semana(c.fecha);
+    m.set(k, c);               // dentro del período manda el corte más nuevo
+  }
+  return [...m.entries()].sort((a, b) => a[1].fecha.localeCompare(b[1].fecha)).map(([k, c]) => ({
+    rot: grano === 'mes' ? Fmt.rotMes(k) : k,
+    rotLargo: `${k} · corte ${Fmt.fecha(c.fecha)}`,
+    fecha: c.fecha,
+    maeN: c.maeN,
+    pctMono: c.mono.n ? c.mono.ocu / c.mono.n * 100 : 0,
+    pctTot: c.tot.n ? c.tot.ocu / c.tot.n * 100 : 0,
+    val: c.val
+  }));
+}
+
+function pintarTendencia() {
+  const grano = $('#fGrano').value;
+  const s = serieHistorial(grano);
+
+  // Si cambia el maestro cambia el denominador y la curva pega un salto que
+  // no es gestion: hay que decirlo, no disimularlo.
+  const bases = [...new Set(D.hist.map(c => c.maeN))];
+  $('#tendAviso').innerHTML = bases.length > 1
+    ? `<div class="aviso ojo"><span class="ic">!</span><div>
+        <b>El maestro cambió durante el historial.</b> Hay cortes calculados sobre
+        ${bases.sort((a, b) => a - b).map(n => Fmt.ent(n)).join(' y ')} posiciones.
+        El porcentaje da un salto en esa fecha porque cambió el denominador, no porque
+        se haya movido la mercadería. La columna <b>Posiciones</b> de la tabla dice cuál
+        usó cada corte.</div></div>`
+    : '';
+
+  // donde cambia la cantidad de posiciones del maestro va una marca vertical
+  const marcas = [];
+  for (let i = 1; i < s.length; i++) {
+    if (s[i].maeN !== s[i - 1].maeN) marcas.push({ i, texto: `maestro: ${Fmt.ent(s[i].maeN)} pos.` });
+  }
+
+  G.linea($('#gTendOcu'), s, [
+    { nombre: 'Mono', campo: 'pctMono', color: 'var(--c1)', fmt: x => Fmt.pct(x) },
+    { nombre: 'Total', campo: 'pctTot', color: 'var(--c2)', fmt: x => Fmt.pct(x) }
+  ], { fmt: x => Fmt.dec(x, 0) + '%', max: 100, marcas, aria: 'Evolución de la ocupación',
+       vacio: 'Guarde al menos un corte para ver la tendencia.' });
+
+  const conValor = s.filter(p => p.val > 0);
+  G.linea($('#gTendVal'), conValor, [
+    { nombre: 'Valor', campo: 'val', color: 'var(--c3)', fmt: x => Fmt.usdX(x) }
+  ], { fmt: x => Fmt.usd(x).replace('USD ', ''), aria: 'Evolución del valor en posiciones',
+       marcas: marcas.filter(m => m.i < conValor.length),
+       vacio: 'Ningún corte guardado tiene precios.' });
+
+  tabla($('#tCortes'), [
+    { t: 'Corte', v: f => f.fecha, h: f => `<b>${Fmt.fecha(f.fecha)}</b>` },
+    { t: 'Archivo', v: f => f.archivo, h: f => Fmt.esc((f.archivo || '—').slice(0, 30)) },
+    { t: 'Posiciones', n: true, v: f => f.maeN, h: f => Fmt.ent(f.maeN) },
+    { t: 'Mono', n: true, v: f => (f.mono.n ? f.mono.ocu / f.mono.n * 100 : 0),
+      h: f => Fmt.pct(f.mono.n ? f.mono.ocu / f.mono.n * 100 : 0) },
+    { t: 'Multi', n: true, v: f => (f.multi.n ? f.multi.ocu / f.multi.n * 100 : 0),
+      h: f => Fmt.pct(f.multi.n ? f.multi.ocu / f.multi.n * 100 : 0) },
+    { t: 'Total', n: true, v: f => (f.tot.n ? f.tot.ocu / f.tot.n * 100 : 0),
+      h: f => `<b>${Fmt.pct(f.tot.n ? f.tot.ocu / f.tot.n * 100 : 0)}</b>` },
+    { t: 'Ocupadas', n: true, v: f => f.tot.ocu, h: f => Fmt.ent(f.tot.ocu) },
+    { t: 'Ítems', n: true, v: f => f.items, h: f => Fmt.ent(f.items) },
+    { t: 'Valor', n: true, v: f => f.val, h: f => (f.val ? Fmt.usdX(f.val) : '—') },
+    { t: '', v: null, h: f => `<button class="btn chico" data-borrar="${Fmt.esc(f.fecha)}">Borrar</button>` }
+  ], D.hist.slice().reverse(), {
+    orden: 0, dir: -1, vacio: 'Todavía no guardó ningún corte.'
+  });
+  $('#tCortes').querySelectorAll('button[data-borrar]').forEach(b =>
+    b.addEventListener('click', () => {
+      const f = b.dataset.borrar;
+      if (!confirm(`¿Borrar el corte del ${Fmt.fecha(f)} del historial?`)) return;
+      D.hist = D.hist.filter(c => c.fecha !== f);
+      escribirHist(); pintar();
+    }));
+}
+
+/* ===========================================================================
+   K · REPORTE
+   Una hoja A4 apaisada. Se calcula siempre sobre el deposito entero: un
+   reporte sacado con filtros puestos engaña al que lo recibe.
+   =========================================================================== */
+function pintarReporte() {
+  if (!faltanDatos('repFalta', 'repCuerpo')) return;
+  const guarda = { ...F };
+  limpiarFiltros();
+  const v = vista();
+  Object.assign(F, guarda);
+
+  const emp = $('#repEmp').value.trim();
+  const aut = $('#repAut').value.trim();
+  const nota = $('#repNota').value.trim();
+  const sat = nivelSaturacion(v.mono_.pct);
+
+  const tipos = agrupar(v.mono, 'tipo').filter(d => d.n >= 10).sort((a, b) => b.pct - a.pct).slice(0, 7);
+  const pasillos = agrupar(v.mono, 'pas').filter(d => d.n >= 10).sort((a, b) => b.pct - a.pct).slice(0, 8);
+
+  const barra = d => `<div class="f-f">
+    <span class="e">${Fmt.esc(d.k)}</span>
+    <span class="p">
+      <i style="width:${Math.min(100, d.pct).toFixed(1)}%;background:var(--c1)"></i>
+      <i style="left:${UMBRAL}%;width:1.5px;background:var(--tinta-2);opacity:.6;border-radius:0"></i>
+    </span>
+    <span class="n">${Fmt.pct(d.pct, 0)}</span>
+    <span class="n" style="width:54px;color:var(--tinta-2)">${Fmt.ent(d.vac)} lib</span></div>`;
+
+  const ficha = (rot, val, pie) => `<div class="c"><div class="r">${rot}</div>
+    <div class="v">${val}</div><div class="d">${pie}</div></div>`;
+
+  $('#filmina').innerHTML = `
+    <div class="f-cab">
+      <img src="${LOGO_CLARO}" alt="CEVA Logistics">
+      <div>
+        <h2>Ocupación del almacén</h2>
+        <div class="s">Site: <b>Finning CAT</b>${emp ? ' · ' + Fmt.esc(emp) : ''}</div>
+      </div>
+      <div class="meta">Corte al <b>${Fmt.fechaLarga(M.fecha)}</b><br>
+        ${Fmt.ent(v.tot.n)} posiciones físicas en el maestro</div>
+    </div>
+    <div class="f-cuerpo">
+      <div class="f-k">
+        ${ficha('Saturación mono', Fmt.pct(v.mono_.pct), sat.rot + ' · ' + Fmt.ent(v.mono_.n) + ' posiciones')}
+        ${ficha('Ocupadas', Fmt.ent(v.tot.ocu), 'posiciones con stock')}
+        ${ficha('Vacías', Fmt.ent(v.tot.vac), 'lugar disponible')}
+        ${ficha('Ítems distintos', Fmt.ent(v.tot.items), Fmt.plural(v.lineas.length, 'línea', 'líneas'))}
+        ${ficha('Valor en posiciones', M.conValor ? Fmt.usd(v.tot.val) : '—',
+          M.conValor ? Fmt.usdX(v.tot.val) : 'sin maestro valorizado')}
+      </div>
+      <div class="f-cols">
+        <div class="f-cj"><h4>Saturación por tipo · monoproducto</h4>
+          ${tipos.map(barra).join('') || '<div style="font-size:11px;color:var(--tinta-3)">Sin datos.</div>'}
+          <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">La marca vertical es el umbral del ${UMBRAL}%.</div></div>
+        <div class="f-cj"><h4>Mono, multi y total</h4>
+          <div class="f-f" style="color:var(--tinta-3);font-size:10px">
+            <span style="flex:1"></span><span class="n" style="width:46px">OCUP.</span>
+            <span class="n" style="width:46px">TOTAL</span><span class="n" style="width:42px">%</span></div>
+          ${[['Monoproducto', v.mono_], ['Multiproducto', v.multi_], ['Total físico', v.tot]]
+            .map(([et, r], i) => `<div class="f-f"${i === 2 ? ' style="border-top:1px solid var(--linea);padding-top:5px;margin-top:3px"' : ''}>
+              <span style="flex:1;font-size:11px">${et}</span>
+              <span class="n" style="width:46px">${Fmt.ent(r.ocu)}</span>
+              <span class="n" style="width:46px;color:var(--tinta-2)">${Fmt.ent(r.n)}</span>
+              <span class="n" style="width:42px">${Fmt.pct(r.pct)}</span></div>`).join('')}
+          <div style="margin-top:6px;font-size:10px;color:var(--tinta-3)">
+            En multiproducto entran varios materiales y lo que no entra queda fuera del rack:
+            ese porcentaje no se lee como saturación.</div></div>
+        <div class="f-cj"><h4>Pasillos más cargados · monoproducto</h4>
+          ${pasillos.map(barra).join('') || '<div style="font-size:11px;color:var(--tinta-3)">Sin datos.</div>'}</div>
+      </div>
+      <div class="f-cj" style="margin-top:11px">
+        <h4>Mapa de ocupación: pasillo por nivel · monoproducto</h4>
+        ${mapaDeFilmina(v, nota ? 205 : 250)}
+      </div>
+      ${nota ? `<div class="f-nota"><b>Comentario:</b> ${Fmt.esc(nota)}</div>` : ''}
+      <div class="f-pie">
+        <span>${aut ? 'Preparado por ' + Fmt.esc(aut) + ' · ' : ''}Generado el ${Fmt.fechaLarga(Fmt.hoy())}</span>
+        <span>La saturación se mide sólo sobre posiciones monoproducto.
+          ${M.archivo ? 'Fuente: ' + Fmt.esc(M.archivo) + '.' : ''}</span>
+      </div>
+    </div>`;
+}
+
+// Mapa compacto para la hoja impresa: mismos pasos de color que la pantalla.
+// El alto de fila sale de repartir el espacio que queda en la hoja entre los
+// pasillos que haya, asi llena la pagina con pocos pasillos y sigue entrando
+// con muchos. Si hay comentario, el comentario se lleva su parte.
+function mapaDeFilmina(v, espacio) {
+  const acc = new Map();
+  for (const x of v.mono) {
+    const k = x.pas + '\u0000' + x.niv;
+    let a = acc.get(k);
+    if (!a) { a = { n: 0, ocu: 0 }; acc.set(k, a); }
+    a.n++; if (x.ocu) a.ocu++;
+  }
+  if (!acc.size) return '<div style="font-size:11px;color:var(--tinta-3)">Sin posiciones monoproducto.</div>';
+  const filas = [...new Set(v.mono.map(x => x.pas))].sort(ordClave);
+  const cols = [...new Set(v.mono.map(x => x.niv))].sort(ordClave);
+  const ch = Math.max(11, Math.min(26, espacio / filas.length));
+  const mI = 58, mT = 16, cw = Math.max(34, Math.min(74, (1040 - mI) / cols.length));
+  const W = mI + cols.length * cw + 4, H = mT + filas.length * ch + 4;
+  let g = '';
+  cols.forEach((c, j) => {
+    g += `<text x="${mI + j * cw + cw / 2}" y="${mT - 5}" text-anchor="middle" `
+      + `style="font-size:9px;fill:var(--tinta-3)">${Fmt.esc(c)}</text>`;
+  });
+  filas.forEach((f, i) => {
+    g += `<text x="${mI - 6}" y="${mT + i * ch + ch / 2 + 3}" text-anchor="end" `
+      + `style="font-size:9px;fill:var(--tinta-2)">${Fmt.esc(f)}</text>`;
+    cols.forEach((c, j) => {
+      const d = acc.get(f + '\u0000' + c);
+      const x = mI + j * cw, y = mT + i * ch;
+      if (!d) {
+        g += `<rect x="${x + 1}" y="${y + 1}" width="${cw - 2}" height="${ch - 2}" rx="2" `
+          + `fill="var(--carta-2)" opacity=".5"/>`;
+        return;
+      }
+      const pct = d.n ? d.ocu / d.n * 100 : 0;
+      const p = G.pasoRampa(pct);
+      g += `<rect x="${x + 1}" y="${y + 1}" width="${cw - 2}" height="${ch - 2}" rx="2" fill="var(${G.RAMPA[p]})"/>`;
+      if (ch < 13) return;
+      g += `<text class="cel-num ${p >= 7 ? 'alto' : 'bajo'}" x="${x + cw / 2}" `
+        + `y="${y + ch / 2 + 3}" text-anchor="middle" `
+        + `style="font-size:${Math.min(9.5, ch * .5).toFixed(1)}px;font-weight:700">`
+        + `${Fmt.dec(pct, 0)}</text>`;
+    });
+  });
+  // El tope de alto garantiza que la hoja no se parta aunque el deposito tenga
+  // muchos mas pasillos: el dibujo se achica en vez de empujar el pie afuera.
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
+    style="width:100%;height:auto;max-height:${Math.round(espacio + 20)}px;display:block">${g}</svg>
+    <div style="display:flex;align-items:center;gap:7px;font-size:9.5px;color:var(--tinta-2);margin-top:5px">
+      <span>0%</span>
+      <span style="display:flex;height:8px;width:110px;border-radius:2px;overflow:hidden;border:1px solid var(--linea)">
+        ${G.RAMPA.map(r => `<i style="flex:1;background:var(${r})"></i>`).join('')}</span>
+      <span>100% ocupado · filas: pasillo · columnas: nivel</span></div>`;
+}
+
+function prepararImpresion() { G.fijarAncho(700); if (M) pintarReporte(); }
+function soltarImpresion() { G.fijarAncho(null); pintar(); }
+addEventListener('beforeprint', prepararImpresion);
+addEventListener('afterprint', soltarImpresion);
+
+/* ===========================================================================
+   L · CONFIGURACION Y CARGA DE ARCHIVOS
+   =========================================================================== */
+const estado = (id, clase, html) => {
+  const e = $('#' + id);
+  e.className = 'estado-carga' + (clase ? ' ' + clase : '');
+  e.innerHTML = html;
+};
+
+async function conAviso(id, trabajando, tarea) {
+  estado(id, '', trabajando);
+  try {
+    const r = await tarea();
+    return r;
+  } catch (e) {
+    estado(id, 'mal', '✗ ' + Fmt.esc(e.message || String(e)));
+    throw e;
+  }
+}
+
+$('#aMae').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const r = await conAviso('eMae', 'Leyendo el maestro…', () => cargarMaestro(f));
+    estado('eMae', 'ok', `✓ ${Fmt.plural(r.ubis, 'ubicación', 'ubicaciones')} de <b>${Fmt.esc(f.name)}</b>.`
+      + (r.emparejados ? `<br>${Fmt.plural(r.emparejados, 'ubicación traía', 'ubicaciones traían')} el pasillo `
+        + `o el nivel sin el cero adelante (4 en vez de 04): se emparejaron con los demás.` : '')
+      + (r.repetidas ? `<br>Se ignoraron ${Fmt.plural(r.repetidas, 'fila repetida', 'filas repetidas')}.` : '')
+      + (r.sinMm ? `<br>${Fmt.plural(r.sinMm, 'ubicación', 'ubicaciones')} sin <b>Tipo de Ubicación</b>: `
+        + `se tomaron como multiproducto.` : ''));
+    escribirBases(); armarModelo(); sincronizarFiltros(); pintar();
+  } catch (_) {}
+  e.target.value = '';
+});
+
+$('#aVal').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const r = await conAviso('eVal', 'Leyendo el maestro valorizado…', () => cargarValorizado(f));
+    estado('eVal', 'ok', `✓ ${Fmt.plural(r.materiales, 'material', 'materiales')} de `
+      + `<b>${Fmt.esc(f.name)}</b>, ${Fmt.ent(r.conPrecio)} con precio.`
+      + (r.varias ? `<br>${Fmt.plural(r.varias, 'material trae', 'materiales traen')} más de un precio `
+        + `(REMAN, FULL, PARTIAL o por número de serie): se usa el valor contable del maestro, `
+        + `o sea su valor total dividido por su stock.` : ''));
+    escribirBases(); armarModelo(); pintar();
+  } catch (_) {}
+  e.target.value = '';
+});
+
+// Varios fotostock de una: se guarda el resumen de cada uno y queda cargado
+// el mas nuevo, que es el que se ve en pantalla.
+$('#aFoto').addEventListener('change', async e => {
+  const files = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+  if (!files.length) return;
+  if (!D.mae) {
+    estado('eFoto', 'mal', '✗ Primero hay que cargar el maestro de ubicaciones.');
+    e.target.value = ''; return;
+  }
+  const hechos = [];
+  try {
+    for (const f of files) {
+      await conAviso('eFoto', `Leyendo ${Fmt.esc(f.name)}…`, () => cargarFotostock(f));
+      armarModelo();
+      if (files.length > 1) { guardarCorte(); hechos.push(`${Fmt.esc(f.name)} → ${Fmt.fecha(D.fecha)}`); }
+    }
+  } catch (_) { e.target.value = ''; pintar(); return; }
+  $('#inFecha').value = D.fecha;
+  estado('eFoto', 'ok', files.length > 1
+    ? `✓ ${Fmt.plural(files.length, 'corte cargado y guardado', 'cortes cargados y guardados')}:<br>`
+      + hechos.join('<br>')
+    : `✓ ${Fmt.plural(D.lineas.length, 'línea', 'líneas')} de <b>${Fmt.esc(files[0].name)}</b>.`
+      + `<br>Fecha del corte: <b>${Fmt.fecha(D.fecha)}</b>.`
+      + ` Revísela abajo y guarde el corte para que entre en la tendencia.`);
+  sincronizarFiltros(); pintar();
+  e.target.value = '';
+});
+
+$('#inFecha').addEventListener('change', e => {
+  if (!e.target.value || !M) return;
+  D.fecha = e.target.value; M.fecha = e.target.value; pintar();
+});
+
+$('#btnGuardar').addEventListener('click', () => {
+  if (!M) { estado('eGuardar', 'mal', '✗ No hay ningún corte cargado.'); return; }
+  const r = guardarCorte();
+  estado('eGuardar', 'ok', `✓ Corte del <b>${Fmt.fecha(M.fecha)}</b> `
+    + (r.reemplazado ? 'actualizado' : 'guardado') + `. Hay ${Fmt.plural(r.cortes, 'corte', 'cortes')} en el historial.`);
+  pintar();
+});
+
+$('#btnBajarResp').addEventListener('click', () => {
+  Fmt.bajar(`respaldo_ocupacion_${Fmt.hoy()}.json`, respaldo(), 'application/json');
+  estado('eResp', 'ok', '✓ Respaldo descargado.');
+});
+
+$('#aResp').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const r = restaurarRespaldo(await f.text());
+    estado('eResp', 'ok', `✓ Restaurado: ${Fmt.ent(r.ubis)} ubicaciones, `
+      + `${Fmt.ent(r.materiales)} materiales y ${Fmt.plural(r.cortes, 'corte', 'cortes')}. `
+      + `Cargue un fotostock para ver el corte actual.`);
+    if (D.pref.tema) aplicarTema(D.pref.tema);
+    $('#repEmp').value = D.pref.empresa || '';
+    $('#repAut').value = D.pref.autor || '';
+    armarModelo(); sincronizarFiltros(); pintar();
+  } catch (err) {
+    estado('eResp', 'mal', '✗ ' + Fmt.esc(err.message || String(err)));
+  }
+  e.target.value = '';
+});
+
+$('#btnBorrarHist').addEventListener('click', () => {
+  if (!confirm(`¿Borrar los ${D.hist.length} cortes del historial? Las bases quedan.`)) return;
+  D.hist = []; escribirHist(); estado('eResp', 'ok', '✓ Historial borrado.'); pintar();
+});
+
+$('#btnBorrarTodo').addEventListener('click', () => {
+  if (!confirm('¿Borrar todo lo guardado en este navegador: bases, historial y preferencias?')) return;
+  olvidarTodo();
+  D.mae = D.val = D.lineas = null; D.hist = []; D.nom = { mae: '', val: '', foto: '' };
+  M = null;
+  ['eMae', 'eVal', 'eFoto'].forEach(id => estado(id, '', 'Sin cargar.'));
+  estado('eResp', 'ok', '✓ Se borró todo.');
+  pintar();
+});
+
+function pintarConfig(v) {
+  const avisos = [];
+  if (!D.mae) avisos.push(['', 'i', '<b>Falta el maestro de ubicaciones.</b> Es el que define la capacidad del depósito.']);
+  else if (!D.lineas) avisos.push(['', 'i', '<b>Falta el fotostock.</b> Es el corte que dice qué posiciones están ocupadas.']);
+  if (D.mae && !D.val) {
+    avisos.push(['ojo', '!', '<b>Sin maestro valorizado no hay montos.</b> Este fotostock no trae '
+      + 'las columnas <b>V/U</b> ni <b>Total</b>, así que la ocupación se calcula igual pero sin dólares.']);
+  }
+  $('#cfgAvisos').innerHTML = avisos.map(([c, ic, txt]) =>
+    `<div class="aviso ${c}"><span class="ic">${ic}</span><div>${txt}</div></div>`).join('');
+
+  if (!M) { $('#tCalidad').innerHTML = '<div class="vacio">Cargue un corte para ver los controles.</div>'; return; }
+
+  const filas = [];
+  const acuerdo = M.ubis.length ? M.acuerdan / M.ubis.length * 100 : 0;
+  filas.push({
+    c: 'Fotostock contra el indicador del maestro',
+    d: `El maestro trae su propia marca de ubicación vacía. Coinciden en ${Fmt.pct(acuerdo)} de las posiciones.`,
+    n: M.discrepan,
+    ok: acuerdo >= 97,
+    nota: M.discrepan
+      ? `${Fmt.plural(M.discrepan, 'posición discrepa', 'posiciones discrepan')}. `
+        + `Si los dos archivos son del mismo día deberían coincidir casi al 100%.`
+      : 'Coinciden en todas.'
+  });
+  const fueraLin = M.fuera.reduce((s, f) => s + f.lin, 0);
+  const fueraUbis = M.fuera.reduce((s, f) => s + f.ubis.size, 0);
+  filas.push({
+    c: 'Líneas del fotostock fuera del maestro',
+    d: 'Tránsito, virtuales y almacenes que no son del site. Se descartan.',
+    n: fueraLin, ok: true,
+    nota: fueraLin
+      ? `${Fmt.plural(fueraUbis, 'ubicación', 'ubicaciones')} en los tipos `
+        + M.fuera.slice(0, 8).map(f => `<b>${Fmt.esc(f.tipo || '—')}</b> (${Fmt.ent(f.lin)})`).join(', ')
+        + (M.fuera.length > 8 ? ' y otros' : '') + '.'
+      : 'Todas las líneas caen dentro del maestro.'
+  });
+  filas.push({
+    c: 'Líneas sin precio',
+    d: 'Cuentan como ocupación pero suman cero pesos.',
+    n: M.precio.sin, ok: !M.precio.sin,
+    nota: M.precio.sin
+      ? `${Fmt.plural(M.precio.matsSin.size, 'material', 'materiales')} sin precio en el maestro valorizado.`
+      : (M.conValor ? 'Todas las líneas tienen precio.' : 'Todavía no hay fuente de precios.')
+  });
+  const sinArea = M.ubis.filter(x => x.area === '(sin área)');
+  filas.push({
+    c: 'Posiciones sin área de almacenamiento',
+    d: 'El maestro no les puso área. Caen todas juntas en "(sin área)".',
+    n: sinArea.length, ok: !sinArea.length,
+    nota: sinArea.length
+      ? `Concentran ${Fmt.usdX(sinArea.reduce((s, x) => s + x.val, 0))} y no se pueden separar `
+        + `por zona hasta que se complete el dato en SAP.`
+      : 'Todas tienen área.'
+  });
+  filas.push({
+    c: 'Posiciones bloqueadas',
+    d: 'Con bloqueo de entrada o de salida en el maestro.',
+    n: M.ubis.filter(x => x.blo).length, ok: true,
+    nota: 'Se cuentan como capacidad. Figuran en la tabla de ubicaciones.'
+  });
+
+  tabla($('#tCalidad'), [
+    { t: 'Control', v: f => f.c, h: f => `<b>${Fmt.esc(f.c)}</b><br><span style="color:var(--tinta-3);font-size:11.5px">${Fmt.esc(f.d)}</span>` },
+    { t: 'Casos', n: true, v: f => f.n, h: f => Fmt.ent(f.n) },
+    { t: 'Estado', v: f => (f.ok ? 1 : 0), h: f => `<span class="pastilla">${f.ok ? 'En orden' : 'Para mirar'}</span>` },
+    { t: 'Detalle', v: null, h: f => `<span style="font-size:12px;color:var(--tinta-2)">${f.nota}</span>` }
+  ], filas, { suelto: true });
+}
+
+/* ===========================================================================
+   M · EL RESTO DE LOS CONTROLES
+   =========================================================================== */
+function aplicarTema(t) {
+  if (t) document.documentElement.setAttribute('data-tema', t);
+  else document.documentElement.removeAttribute('data-tema');
+  D.pref.tema = t || ''; escribirPref();
+}
+$('#btnTema').addEventListener('click', () => {
+  const osc = document.documentElement.getAttribute('data-tema') === 'oscuro'
+    || (!document.documentElement.getAttribute('data-tema')
+      && matchMedia('(prefers-color-scheme: dark)').matches);
+  aplicarTema(osc ? 'claro' : 'oscuro');
+  pintar();
+});
+
+$('#btnTabla').addEventListener('click', abrirTabla);
+$('#btnCerrarTabla').addEventListener('click', () => $('#dlgTabla').close());
+
+$('#btnCsvUbis').addEventListener('click', () => {
+  const v = vista();
+  Fmt.bajar(`ubicaciones_${M.fecha}.csv`, Fmt.csv(
+    ['Ubicación', 'Tipo almacén', 'Clase', 'Área', 'Pasillo', 'Columna', 'Nivel', 'Estado',
+      'Ítems', 'Líneas', 'Cantidad', 'Valor USD', 'Entrada más vieja', 'Bloqueada'],
+    v.ubis.map(x => [x.u, x.tipo, x.mm === 'mono' ? 'Monoproducto' : 'Multiproducto', x.area,
+      x.pas, x.col, x.niv, x.ocu ? 'Ocupada' : 'Vacía', x.mats, x.lin,
+      Math.round(x.ctd), Math.round(x.val), x.fem || '', x.blo ? 'Sí' : ''])));
+});
+
+$('#btnCsvTend').addEventListener('click', () => {
+  Fmt.bajar(`tendencia_${Fmt.hoy()}.csv`, Fmt.csv(
+    ['Corte', 'Archivo', 'Maestro', 'Posiciones del maestro', 'Mono ocupadas', 'Mono total',
+      'Multi ocupadas', 'Multi total', 'Ocupadas', 'Total', '% mono', '% total', 'Ítems', 'Líneas', 'Valor USD'],
+    D.hist.map(c => [c.fecha, c.archivo || '', c.maestro || '', c.maeN,
+      c.mono.ocu, c.mono.n, c.multi.ocu, c.multi.n, c.tot.ocu, c.tot.n,
+      Fmt.dec(c.mono.n ? c.mono.ocu / c.mono.n * 100 : 0, 2),
+      Fmt.dec(c.tot.n ? c.tot.ocu / c.tot.n * 100 : 0, 2),
+      c.items, c.lineas, Math.round(c.val || 0)])));
+});
+
+$('#fGrano').addEventListener('change', pintarTendencia);
+
+['repEmp', 'repAut'].forEach(id => $('#' + id).addEventListener('input', () => {
+  D.pref[id === 'repEmp' ? 'empresa' : 'autor'] = $('#' + id).value;
+  escribirPref(); pintarReporte();
+}));
+$('#repNota').addEventListener('input', pintarReporte);
+
+$('#btnPdf').addEventListener('click', () => {
+  G.esconder(); prepararImpresion(); print(); setTimeout(soltarImpresion, 700);
+});
+
+function avisarEspacio() {
+  estado('eResp', 'mal', '✗ No entró en el navegador: el maestro es grande y el espacio '
+    + 'está lleno. Pruebe borrando el historial, o descargue el respaldo y vuelva a '
+    + 'cargar los archivos cuando los necesite.');
+}
+
+/* ===========================================================================
+   N · ARRANQUE
+   =========================================================================== */
+(function arrancar() {
+  $('#logoCab').src = LOGO_CLARO;
+
+  const pref = leerSeguro(LLAVE + '.pref');
+  if (pref) D.pref = { ...D.pref, ...pref };
+  if (D.pref.tema) document.documentElement.setAttribute('data-tema', D.pref.tema);
+  $('#repEmp').value = D.pref.empresa || '';
+  $('#repAut').value = D.pref.autor || '';
+
+  const hist = leerSeguro(LLAVE + '.hist');
+  if (Array.isArray(hist)) D.hist = hist;
+
+  if (restaurarBases()) {
+    if (D.mae) {
+      estado('eMae', 'ok', `✓ ${Fmt.plural(D.mae.size, 'ubicación guardada', 'ubicaciones guardadas')} `
+        + `de la sesión anterior${D.nom.mae ? ` (${Fmt.esc(D.nom.mae)})` : ''}. `
+        + `Cargue solamente el fotostock nuevo.`);
+    }
+    if (D.val) {
+      estado('eVal', 'ok', `✓ ${Fmt.plural(D.val.size, 'material guardado', 'materiales guardados')} `
+        + `de la sesión anterior${D.nom.val ? ` (${Fmt.esc(D.nom.val)})` : ''}.`);
+    }
+  }
+
+  $('#inFecha').value = Fmt.hoy();
+  irA('hOcup');
+})();
+
+</script>
+</body>
+</html>
