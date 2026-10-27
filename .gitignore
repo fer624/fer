@@ -1,0 +1,6 @@
+# Datos reales del maestro: se trabajan en local, no se publican.
+datos/ubicaciones.csv
+*.XLSX
+*.xlsx
+*.XLS
+*.xls

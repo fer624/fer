@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout 3D · Maestro de ubicaciones</title>
+<style>
+/* ============================================================
+   LAYOUT3D.HTML — Visor 3D del maestro de ubicaciones (SAP WM)
+   Lee un CSV generado con tools/sap_a_csv.py y arma el deposito
+   a escala: pasillos, columnas, niveles, subdivisiones y posiciones.
+   Todo corre en el navegador: ningun dato sale del equipo.
+   ============================================================ */
+
+:root{
+  --fondo:#080d13;
+  --panel:#111c26;
+  --panel-2:#16232f;
+  --linea:#253644;
+  --tinta:#ffffff;
+  --tinta-suave:#8ca2b5;
+
+  --verde:#128a42;
+  --verde-vivo:#2fd472;
+  --amarillo:#b96a05;
+  --amarillo-vivo:#fbbf24;
+  --rojo:#c31c14;
+  --rojo-vivo:#ff6b63;
+  --azul:#2563eb;
+  --azul-vivo:#60a5fa;
+
+  --fuente:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--fondo);
+  color:var(--tinta);
+  font-family:var(--fuente);
+  overflow:hidden;
+}
+:focus-visible{outline:3px solid var(--azul-vivo);outline-offset:2px}
+
+/* ---------- Estructura ---------- */
+.marco{display:flex;flex-direction:column;height:100%}
+
+.franja{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:10px 16px;
+  background:var(--panel);border-bottom:2px solid var(--linea);
+  flex-wrap:wrap;
+}
+.rotulo h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.3px}
+.rotulo p{margin:2px 0 0;font-size:12px;color:var(--tinta-suave)}
+
+.kpis{display:flex;gap:8px;flex-wrap:wrap}
+.kpi{
+  background:var(--panel-2);border:1px solid var(--linea);border-radius:12px;
+  padding:6px 12px;min-width:92px;
+}
+.kpi b{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi span{font-size:11px;color:var(--tinta-suave);font-weight:600}
+
+.cuerpo{display:flex;flex:1;min-height:0}
+
+aside{
+  width:308px;flex:0 0 308px;overflow-y:auto;
+  background:var(--panel);border-right:2px solid var(--linea);
+  padding:12px;
+}
+aside h2{
+  margin:16px 0 8px;font-size:12px;text-transform:uppercase;
+  letter-spacing:.8px;color:var(--tinta-suave);
+}
+aside h2:first-child{margin-top:0}
+
+.escena{position:relative;flex:1;min-width:0}
+canvas{display:block;width:100%;height:100%}
+
+/* ---------- Controles ---------- */
+label{display:block;font-size:12px;color:var(--tinta-suave);margin:8px 0 3px}
+select,input[type=text],input[type=number]{
+  width:100%;background:var(--panel-2);border:1px solid var(--linea);
+  color:var(--tinta);border-radius:8px;padding:7px 9px;
+  font-family:inherit;font-size:13px;
+}
+input[type=range]{width:100%;accent-color:var(--azul-vivo)}
+.fila{display:flex;gap:8px}
+.fila>*{flex:1;min-width:0}
+.tilde{
+  display:flex;align-items:center;gap:7px;margin:6px 0;
+  font-size:13px;color:var(--tinta);cursor:pointer;
+}
+.tilde input{accent-color:var(--azul-vivo);width:15px;height:15px}
+button{
+  background:var(--panel-2);border:1px solid var(--linea);color:var(--tinta);
+  border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px;cursor:pointer;
+}
+button:hover{border-color:var(--tinta-suave)}
+button.primario{background:var(--azul);border-color:var(--azul-vivo);font-weight:600}
+.pastillas{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.pastilla{
+  border:1px solid var(--linea);background:var(--panel-2);color:var(--tinta-suave);
+  border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;
+}
+.pastilla[data-activa="1"]{background:var(--azul);border-color:var(--azul-vivo);color:#fff;font-weight:600}
+
+/* ---------- Leyenda y detalle ---------- */
+.leyenda{
+  position:absolute;left:12px;bottom:12px;
+  background:rgba(17,28,38,.93);border:1px solid var(--linea);border-radius:12px;
+  padding:9px 11px;font-size:12px;max-width:240px;
+}
+.leyenda b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--tinta-suave);margin-bottom:6px}
+.leyenda div{display:flex;align-items:center;gap:7px;margin:3px 0;color:var(--tinta)}
+.muestra{width:12px;height:12px;border-radius:3px;flex:0 0 12px}
+
+.detalle{
+  background:var(--panel-2);border:1px solid var(--linea);border-radius:12px;
+  padding:10px;font-size:12px;
+}
+.detalle .codigo{font-size:14px;font-weight:700;word-break:break-all;margin-bottom:6px}
+.detalle table{width:100%;border-collapse:collapse}
+.detalle td{padding:2px 0;vertical-align:top}
+.detalle td:first-child{color:var(--tinta-suave);padding-right:8px;white-space:nowrap}
+.detalle td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+
+.aviso{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(8,13,19,.86);font-size:14px;color:var(--tinta-suave);
+  text-align:center;padding:24px;
+}
+.aviso[hidden]{display:none}
+.pie{
+  padding:5px 16px;background:var(--panel);border-top:1px solid var(--linea);
+  font-size:11px;color:var(--tinta-suave);display:flex;justify-content:space-between;gap:12px;
+}
+.alerta{color:var(--amarillo-vivo)}
+
+@media (max-width:820px){
+  .cuerpo{flex-direction:column}
+  aside{width:auto;flex:0 0 auto;max-height:42vh;border-right:0;border-bottom:2px solid var(--linea)}
+}
+</style>
+</head>
+<body>
+<div class="marco">
+
+  <header class="franja">
+    <div class="rotulo">
+      <h1>Layout 3D · Maestro de ubicaciones</h1>
+      <p id="origen">Cargando datos…</p>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </header>
+
+  <div class="cuerpo">
+    <aside>
+      <h2>Datos</h2>
+      <button class="primario" id="btnArchivo" style="width:100%">Abrir export de SAP (.XLSX / .CSV)</button>
+      <input type="file" id="archivo" accept=".csv,.xlsx,.xlsm" hidden>
+      <p style="font-size:11px;color:var(--tinta-suave);margin:6px 0 0">
+        El archivo se procesa en tu equipo. No se sube a ningún servidor.
+      </p>
+
+      <h2>Filtros</h2>
+      <label for="almacen">Tipo de almacén</label>
+      <select id="almacen"></select>
+
+      <label>Pasillos</label>
+      <div class="pastillas" id="pasillos"></div>
+
+      <label for="area">Área de almacenamiento</label>
+      <select id="area"></select>
+
+      <label for="nivelMax">Niveles visibles: <b id="nivelMaxTxt">todos</b></label>
+      <input type="range" id="nivelMax" min="1" max="15" value="15">
+
+      <label class="tilde"><input type="checkbox" id="soloVacias"> Solo ubicaciones vacías</label>
+      <label class="tilde"><input type="checkbox" id="soloBloq"> Solo bloqueadas</label>
+      <label class="tilde"><input type="checkbox" id="soloDormidas"> Sin movimiento hace +180 días</label>
+
+      <h2>Color</h2>
+      <select id="modoColor">
+        <option value="estado">Estado (vacía / ocupada / completa / bloqueada)</option>
+        <option value="ocupacion">% de ocupación volumétrica</option>
+        <option value="antiguedad">Días sin movimiento</option>
+        <option value="area">Área de almacenamiento</option>
+        <option value="familia">Familia de ubicación (G / E / R)</option>
+      </select>
+
+      <h2>Buscar</h2>
+      <div class="fila">
+        <input type="text" id="buscar" placeholder="0001-02-14-03-02-1">
+        <button id="btnBuscar" style="flex:0 0 72px">Ir</button>
+      </div>
+
+      <h2>Detalle</h2>
+      <div class="detalle" id="detalle">Hacé clic en una ubicación del plano.</div>
+
+      <h2>Medidas (metros)</h2>
+      <div class="fila">
+        <div><label for="anchoCol">Ancho columna</label><input type="number" id="anchoCol" value="1.1" step="0.1" min="0.2"></div>
+        <div><label for="profRack">Prof. rack</label><input type="number" id="profRack" value="0.8" step="0.1" min="0.2"></div>
+      </div>
+      <div class="fila">
+        <div><label for="altoNivel">Alto nivel</label><input type="number" id="altoNivel" value="0.5" step="0.05" min="0.1"></div>
+        <div><label for="anchoPasillo">Ancho pasillo</label><input type="number" id="anchoPasillo" value="2.4" step="0.1" min="0.5"></div>
+      </div>
+      <label class="tilde"><input type="checkbox" id="compacto" checked> Columnas compactas (ignorar saltos de numeración)</label>
+      <p style="font-size:11px;color:var(--tinta-suave);margin:6px 0 0">
+        El maestro de SAP no trae coordenadas X/Y/Z, así que la geometría se
+        deriva de pasillo / columna / nivel. Ajustá las medidas reales del
+        depósito acá.
+      </p>
+    </aside>
+
+    <div class="escena" id="escena">
+      <div class="leyenda" id="leyenda"></div>
+      <div class="aviso" id="aviso">Cargando datos…</div>
+    </div>
+  </div>
+
+  <div class="pie">
+    <span id="pieIzq">Arrastrar = girar · Rueda = zoom · Clic derecho = desplazar</span>
+    <span id="pieDer"></span>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three/three.module.min.js",
+    "three/addons/controls/OrbitControls.js": "./lib/three/OrbitControls.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ============================================================
+   MÓDULO 1 — Lectura de datos
+   Acepta el CSV liviano de tools/sap_a_csv.py o el export crudo
+   de SAP (.XLSX). Nada se envía a la red: todo se parsea acá.
+   ============================================================ */
+
+const COL_SAP = {
+  ubicacion:"Ubicación", almacen:"Tipo almacén", pasillo:"Pasillo", columna:"Col.",
+  nivel:"Nivel", subdiv:"Subdivis.ubicación", tipo:"Tipo de ubicación",
+  area:"Área almacenamiento", pmax:"Peso máximo", vmax:"Volumen máximo",
+  vcarga:"Volumen de carga", mov:"Fe.último movimiento", vacia:"Ind.ubicación vacía",
+  completo:"Indicador completo", bloqE:"Bloq.entrada stock", bloqS:"Bloq.salida stock"
+};
+
+const HOY = Date.now();
+const MILES = /^\d{1,3}(\.\d{3})+$/;
+
+function filasCsv(texto){
+  const filas = [];
+  let campo = "", fila = [], entre = false;
+  for (let i = 0; i < texto.length; i++){
+    const c = texto[i];
+    if (entre){
+      if (c === '"'){ if (texto[i+1] === '"'){ campo += '"'; i++; } else entre = false; }
+      else campo += c;
+    } else if (c === '"') entre = true;
+    else if (c === ","){ fila.push(campo); campo = ""; }
+    else if (c === "\n"){ fila.push(campo); filas.push(fila); fila = []; campo = ""; }
+    else if (c !== "\r") campo += c;
+  }
+  if (campo !== "" || fila.length){ fila.push(campo); filas.push(fila); }
+  return filas;
+}
+
+function num(v){ const n = parseFloat(v); return isFinite(n) ? n : 0; }
+
+function dias(fecha){
+  if (!fecha) return null;
+  const t = Date.parse(fecha.slice(0, 10));
+  return isFinite(t) ? Math.round((HOY - t) / 86400000) : null;
+}
+
+/* Fila normalizada que usa todo el visor. */
+function armar(o){
+  const f = o.flags || "";
+  const r = {
+    u:o.ubicacion, al:o.almacen, pas:o.pasillo, col:o.columna, niv:o.nivel,
+    sub:o.subdiv, pos:o.pos, tipo:o.tipo || "", area:o.area || "",
+    pmax:num(o.pmax), vmax:num(o.vmax), vcarga:num(o.vcarga),
+    mov:o.mov || "", vacia:f.includes("v"), full:f.includes("f"),
+    bloq:f.includes("e") || f.includes("s"), bloqE:f.includes("e"), bloqS:f.includes("s")
+  };
+  r.nivNum = parseInt(r.niv, 10);
+  if (!isFinite(r.nivNum)) r.nivNum = 1;
+  r.colNum = parseInt(r.col, 10);
+  r.estructurada = !!r.pas && isFinite(r.colNum) && !!r.niv;
+  r.ocup = r.vmax > 0 ? r.vcarga / r.vmax : (r.vacia ? 0 : null);
+  r.dias = dias(r.mov);
+  return r;
+}
+
+/* CSV propio (encabezados cortos). */
+function desdeCsvPropio(filas){
+  const h = filas[0].map(s => s.trim());
+  const ix = {}; h.forEach((k, i) => ix[k] = i);
+  const out = [];
+  for (let i = 1; i < filas.length; i++){
+    const f = filas[i];
+    if (!f || !f[ix.ubicacion]) continue;
+    out.push(armar({
+      ubicacion:f[ix.ubicacion], almacen:f[ix.almacen], pasillo:f[ix.pasillo],
+      columna:f[ix.columna], nivel:f[ix.nivel], subdiv:f[ix.subdiv], pos:f[ix.pos],
+      tipo:f[ix.tipo], area:f[ix.area], pmax:f[ix.peso_max], vmax:f[ix.vol_max],
+      vcarga:f[ix.vol_carga], flags:f[ix.flags], mov:f[ix.ult_mov]
+    }));
+  }
+  return out;
+}
+
+/* Export crudo de SAP: encabezados largos, con separador de miles roto. */
+function desdeSap(filas){
+  const ix = {};
+  filas[0].forEach((k, i) => {
+    const nombre = String(k == null ? "" : k).trim();
+    if (!(nombre in ix)) ix[nombre] = i;               // SAP repite nombres
+  });
+  // Las celdas pueden venir como numero, texto o Date segun como las guardo
+  // SAP: las normalizamos todas a texto plano.
+  const plano = v => {
+    if (v == null) return "";
+    if (v instanceof Date){
+      const z = new Date(v.getTime() - v.getTimezoneOffset() * 60000);
+      return z.toISOString().slice(0, 10);
+    }
+    return String(v).trim();
+  };
+  const g = (f, clave) => {
+    const i = ix[COL_SAP[clave]];
+    return i === undefined ? "" : plano(f[i]);
+  };
+  const enteros = { pmax:new Set(), vmax:new Set() };
+  for (let i = 1; i < filas.length; i++){
+    for (const k of ["pmax", "vmax"]){
+      const v = g(filas[i], k);
+      if (/^\d+$/.test(v)) enteros[k].add(v);
+    }
+  }
+  const limpiar = (v, k) => (MILES.test(v) && enteros[k].has(v.replace(/\./g, "")))
+    ? v.replace(/\./g, "") : v;
+
+  const out = [];
+  for (let i = 1; i < filas.length; i++){
+    const f = filas[i];
+    const u = g(f, "ubicacion");
+    if (!u) continue;
+    const segs = u.split("-");
+    let flags = "";
+    if (g(f, "vacia") === "X") flags += "v";
+    if (g(f, "completo") === "X") flags += "f";
+    if (g(f, "bloqE") === "X") flags += "e";
+    if (g(f, "bloqS") === "X") flags += "s";
+    out.push(armar({
+      ubicacion:u,
+      almacen:g(f, "almacen") || segs[0] || "",
+      pasillo:g(f, "pasillo") || segs[1] || "",
+      columna:g(f, "columna") || segs[2] || "",
+      nivel:g(f, "nivel") || segs[3] || "",
+      subdiv:g(f, "subdiv") || segs[4] || "",
+      pos:segs.length >= 6 ? segs[5] : "",
+      tipo:g(f, "tipo"), area:g(f, "area"),
+      pmax:limpiar(g(f, "pmax"), "pmax"), vmax:limpiar(g(f, "vmax"), "vmax"),
+      vcarga:g(f, "vcarga"), flags, mov:g(f, "mov").slice(0, 10)
+    }));
+  }
+  return out;
+}
+
+function interpretar(filas){
+  const h = (filas[0] || []).map(s => String(s == null ? "" : s).trim());
+  return h.includes("ubicacion") ? desdeCsvPropio(filas) : desdeSap(filas);
+}
+
+/* ============================================================
+   MÓDULO 2 — Geometría derivada del código de ubicación
+   SAP no guarda coordenadas (X/Y/Z vienen en 0), así que el
+   lugar físico se deduce del código:
+     almacén - pasillo - columna - nivel - subdivisión - posición
+   · pasillo     -> una calle; los racks van a los dos lados
+   · columna par -> un lado del pasillo; impar -> el otro
+   · nivel       -> altura
+   · subdivisión -> reparte el ancho de la columna
+   · posición    -> reparte la profundidad del rack
+   ============================================================ */
+
+const P = { anchoCol:1.1, profRack:0.8, altoNivel:0.5, anchoPasillo:2.4, compacto:true };
+
+function geometria(filas){
+  // Agrupaciones para repartir ancho (subdivisiones) y fondo (posiciones).
+  const subs = new Map(), poss = new Map(), bahias = new Map(), pasillos = new Set();
+  for (const r of filas){
+    if (!r.estructurada) continue;
+    pasillos.add(r.pas);
+    const kcn = r.pas + "|" + r.col + "|" + r.niv;
+    if (!subs.has(kcn)) subs.set(kcn, new Set());
+    subs.get(kcn).add(r.sub);
+    const ks = kcn + "|" + r.sub;
+    if (!poss.has(ks)) poss.set(ks, new Set());
+    poss.get(ks).add(r.pos);
+    const bahia = Math.ceil(r.colNum / 2);
+    if (!bahias.has(r.pas)) bahias.set(r.pas, new Set());
+    bahias.get(r.pas).add(bahia);
+  }
+
+  const orden = m => [...m].sort((x, y) => String(x).localeCompare(String(y)));
+  const idxPasillo = new Map();
+  orden(pasillos).forEach((p, i) => idxPasillo.set(p, i));
+
+  // Cada grupo se ordena una sola vez: con 35.000 ubicaciones, ordenar dentro
+  // del bucle principal costaba segundos.
+  const rankear = origen => {
+    const salida = new Map();
+    for (const [k, set] of origen){
+      const lista = orden(set), m = new Map();
+      lista.forEach((v, i) => m.set(v, i));
+      salida.set(k, { n:lista.length, m });
+    }
+    return salida;
+  };
+  const rSub = rankear(subs), rPos = rankear(poss);
+
+  // Columnas compactas: se eliminan los saltos de numeración del maestro.
+  const idxBahia = new Map();
+  for (const [p, set] of bahias){
+    const lista = [...set].sort((a, b) => a - b);
+    const m = new Map();
+    lista.forEach((b, i) => m.set(b, P.compacto ? i : b - 1));
+    idxBahia.set(p, m);
+  }
+
+  const paso = P.anchoPasillo + 2 * P.profRack;
+  const cajas = new Array(filas.length);
+  const sueltas = [];
+
+  for (let i = 0; i < filas.length; i++){
+    const r = filas[i];
+    if (!r.estructurada){ sueltas.push(i); continue; }
+
+    const kcn = r.pas + "|" + r.col + "|" + r.niv;
+    const gSub = rSub.get(kcn);
+    const nSub = gSub ? gSub.n : 1;
+    const iSub = gSub ? (gSub.m.get(r.sub) ?? 0) : 0;
+
+    const gPos = rPos.get(kcn + "|" + r.sub);
+    const nPos = gPos ? gPos.n : 1;
+    const iPos = gPos ? (gPos.m.get(r.pos) ?? 0) : 0;
+
+    const w = P.anchoCol / nSub;
+    const d = P.profRack / nPos;
+    const h = P.altoNivel;
+
+    const yCalle = idxPasillo.get(r.pas) * paso;
+    const lado = r.colNum % 2 === 0 ? 1 : -1;
+    const xBase = idxBahia.get(r.pas).get(Math.ceil(r.colNum / 2)) * P.anchoCol;
+
+    cajas[i] = {
+      x: xBase + (iSub + 0.5) * w,
+      y: (r.nivNum - 1) * h + h / 2,
+      z: yCalle + lado * (P.anchoPasillo / 2 + (iPos + 0.5) * d),
+      w: w * 0.9, h: h * 0.85, d: d * 0.9
+    };
+  }
+
+  // Ubicaciones sin pasillo/columna/nivel usable (zonas libres, PISO, textos):
+  // se dibujan como una grilla aparte, al frente del depósito.
+  if (sueltas.length){
+    const lado = Math.ceil(Math.sqrt(sueltas.length));
+    const celda = 0.9;
+    const z0 = -paso * 1.6;
+    sueltas.forEach((i, k) => {
+      cajas[i] = {
+        x:(k % lado) * celda, y:0.3,
+        z: z0 - Math.floor(k / lado) * celda,
+        w:celda * 0.8, h:0.6, d:celda * 0.8
+      };
+    });
+  }
+  return { cajas, pasillos:orden(pasillos), idxPasillo, paso, sueltas:sueltas.length };
+}
+
+/* ============================================================
+   MÓDULO 3 — Escena 3D
+   Una sola malla instanciada aguanta las ~35.000 ubicaciones.
+   ============================================================ */
+
+const escena = new THREE.Scene();
+escena.background = new THREE.Color(0x080d13);
+escena.fog = new THREE.Fog(0x080d13, 60, 320);
+
+const camara = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+camara.position.set(30, 26, 42);
+
+const render = new THREE.WebGLRenderer({ antialias:true });
+render.setPixelRatio(Math.min(devicePixelRatio, 2));
+const lienzo = document.getElementById("escena");
+lienzo.appendChild(render.domElement);
+
+const control = new OrbitControls(camara, render.domElement);
+control.enableDamping = true;
+control.dampingFactor = 0.08;
+control.maxPolarAngle = Math.PI / 2.05;
+
+escena.add(new THREE.HemisphereLight(0xcfe6ff, 0x0b1118, 1.05));
+const sol = new THREE.DirectionalLight(0xffffff, 1.15);
+sol.position.set(40, 70, 30);
+escena.add(sol);
+
+const piso = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshStandardMaterial({ color:0x0e1822, roughness:1, metalness:0 })
+);
+piso.rotation.x = -Math.PI / 2;
+piso.position.y = -0.02;
+escena.add(piso);
+
+const grilla = new THREE.GridHelper(1, 1, 0x253644, 0x18242f);
+escena.add(grilla);
+
+const rotulos = new THREE.Group();
+escena.add(rotulos);
+
+// Sin vertexColors: el color por instancia viaja en instanceColor y la
+// geometria de caja no tiene atributo "color".
+const material = new THREE.MeshLambertMaterial({ color:0xffffff });
+let instancias = null;
+
+const marca = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+  new THREE.LineBasicMaterial({ color:0xfbbf24 })
+);
+marca.visible = false;
+escena.add(marca);
+
+function cartel(texto, x, y, z){
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "rgba(17,28,38,.85)";
+  g.fillRect(0, 0, 256, 128);
+  g.fillStyle = "#8ca2b5";
+  g.font = "bold 76px Segoe UI, sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(texto, 128, 68);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false
+  }));
+  sp.position.set(x, y, z);
+  sp.scale.set(2.4, 1.2, 1);
+  rotulos.add(sp);
+  return sp;
+}
+
+/* ============================================================
+   MÓDULO 4 — Modos de color y leyenda
+   ============================================================ */
+
+const C = {
+  verde:0x2fd472, azul:0x3b82f6, ambar:0xfbbf24, rojo:0xff6b63,
+  gris:0x3f5160, violeta:0xa78bfa, cian:0x22d3ee, naranja:0xfb923c,
+  rosa:0xf472b6, lima:0xa3e635, acero:0x94a3b8
+};
+const PALETA = [C.azul, C.lima, C.ambar, C.violeta, C.cian, C.naranja, C.rosa,
+                C.verde, C.rojo, C.acero, C.gris];
+
+function rampa(t){           // 0 = libre (verde) -> 1 = lleno (rojo)
+  t = Math.max(0, Math.min(1, t));
+  return t < 0.5
+    ? new THREE.Color(C.verde).lerp(new THREE.Color(C.ambar), t / 0.5).getHex()
+    : new THREE.Color(C.ambar).lerp(new THREE.Color(C.rojo), (t - 0.5) / 0.5).getHex();
+}
+
+const BANDAS_DIAS = [
+  { tope:30,       etiqueta:"hasta 30 días",   color:C.verde },
+  { tope:90,       etiqueta:"31 a 90",         color:C.lima },
+  { tope:180,      etiqueta:"91 a 180",        color:C.ambar },
+  { tope:365,      etiqueta:"181 a 365",       color:C.naranja },
+  { tope:Infinity, etiqueta:"más de 365",      color:C.rojo }
+];
+
+let catAreas = new Map(), catFamilias = new Map();
+
+function color(r, modo){
+  if (modo === "estado"){
+    if (r.bloq) return C.rojo;
+    if (r.vacia) return C.verde;
+    if (r.full) return C.ambar;
+    return C.azul;
+  }
+  if (modo === "ocupacion"){
+    if (r.ocup === null) return C.gris;
+    return rampa(r.ocup);
+  }
+  if (modo === "antiguedad"){
+    if (r.dias === null) return C.gris;
+    for (const b of BANDAS_DIAS) if (r.dias <= b.tope) return b.color;
+    return C.gris;
+  }
+  if (modo === "area"){
+    const k = r.area || "(sin área)";
+    return PALETA[(catAreas.get(k) ?? PALETA.length - 1) % PALETA.length];
+  }
+  if (modo === "familia"){
+    const k = (r.tipo || "?").charAt(0).toUpperCase() || "?";
+    return PALETA[(catFamilias.get(k) ?? PALETA.length - 1) % PALETA.length];
+  }
+  return C.azul;
+}
+
+function pintarLeyenda(modo, visibles){
+  const caja = document.getElementById("leyenda");
+  const linea = (c, t) => '<div><i class="muestra" style="background:#' +
+    c.toString(16).padStart(6, "0") + '"></i>' + t + "</div>";
+  let html = "";
+  if (modo === "estado"){
+    html = "<b>Estado</b>" + linea(C.verde, "Vacía") + linea(C.azul, "Con stock") +
+           linea(C.ambar, "Marcada completa") + linea(C.rojo, "Bloqueada");
+  } else if (modo === "ocupacion"){
+    html = "<b>Ocupación volumétrica</b>" + linea(rampa(0), "0 %") +
+           linea(rampa(0.5), "50 %") + linea(rampa(1), "100 % o más") +
+           linea(C.gris, "sin volumen máximo cargado");
+  } else if (modo === "antiguedad"){
+    html = "<b>Días sin movimiento</b>" +
+           BANDAS_DIAS.map(b => linea(b.color, b.etiqueta)).join("") +
+           linea(C.gris, "sin fecha");
+  } else if (modo === "area"){
+    html = "<b>Área de almacenamiento</b>" + [...catAreas.keys()].slice(0, 10)
+      .map(k => linea(PALETA[catAreas.get(k) % PALETA.length], k)).join("");
+  } else {
+    html = "<b>Familia de ubicación</b>" + [...catFamilias.keys()].slice(0, 10)
+      .map(k => linea(PALETA[catFamilias.get(k) % PALETA.length], k)).join("");
+  }
+  caja.innerHTML = html + '<div style="color:#8ca2b5;margin-top:6px">' +
+    visibles.toLocaleString("es-AR") + " ubicaciones dibujadas</div>";
+}
+
+/* ============================================================
+   MÓDULO 5 — Filtros, armado de la malla y KPIs
+   ============================================================ */
+
+let TODO = [];          // todas las filas del archivo
+let DEL_ALMACEN = [];   // filas del almacén elegido
+let GEO = null;         // geometría de DEL_ALMACEN
+let VISIBLES = [];      // índices (sobre DEL_ALMACEN) dibujados
+let pasillosOn = new Set();
+let elegida = -1;
+
+const $ = id => document.getElementById(id);
+const nf = n => n.toLocaleString("es-AR");
+
+function leerParametros(){
+  P.anchoCol = Math.max(0.2, parseFloat($("anchoCol").value) || 1.1);
+  P.profRack = Math.max(0.2, parseFloat($("profRack").value) || 0.8);
+  P.altoNivel = Math.max(0.1, parseFloat($("altoNivel").value) || 0.5);
+  P.anchoPasillo = Math.max(0.5, parseFloat($("anchoPasillo").value) || 2.4);
+  P.compacto = $("compacto").checked;
+}
+
+function pasa(r){
+  if (pasillosOn.size && r.pas && !pasillosOn.has(r.pas)) return false;
+  const area = $("area").value;
+  if (area && (r.area || "(sin área)") !== area) return false;
+  const nmax = parseInt($("nivelMax").value, 10);
+  if (r.nivNum > nmax) return false;
+  if ($("soloVacias").checked && !r.vacia) return false;
+  if ($("soloBloq").checked && !r.bloq) return false;
+  if ($("soloDormidas").checked && !(r.dias !== null && r.dias > 180)) return false;
+  return true;
+}
+
+const m4 = new THREE.Matrix4();
+const col = new THREE.Color();
+
+function construir(encuadrar){
+  const modo = $("modoColor").value;
+  VISIBLES = [];
+  for (let i = 0; i < DEL_ALMACEN.length; i++) if (pasa(DEL_ALMACEN[i])) VISIBLES.push(i);
+
+  if (instancias){ escena.remove(instancias); instancias.dispose(); instancias = null; }
+  if (!VISIBLES.length){ pintarLeyenda(modo, 0); pintarKpis(); return; }
+
+  instancias = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), material, VISIBLES.length);
+  instancias.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+  const caja = new THREE.Box3();
+  for (let k = 0; k < VISIBLES.length; k++){
+    const i = VISIBLES[k];
+    const c = GEO.cajas[i];
+    m4.makeScale(c.w, c.h, c.d);
+    m4.setPosition(c.x, c.y, c.z);
+    instancias.setMatrixAt(k, m4);
+    instancias.setColorAt(k, col.setHex(color(DEL_ALMACEN[i], modo)));
+    caja.expandByPoint(new THREE.Vector3(c.x - c.w, c.y - c.h, c.z - c.d));
+    caja.expandByPoint(new THREE.Vector3(c.x + c.w, c.y + c.h, c.z + c.d));
+  }
+  instancias.instanceMatrix.needsUpdate = true;
+  if (instancias.instanceColor) instancias.instanceColor.needsUpdate = true;
+  escena.add(instancias);
+
+  // Piso y grilla al tamaño del depósito dibujado.
+  const tam = caja.getSize(new THREE.Vector3());
+  const centro = caja.getCenter(new THREE.Vector3());
+  const lado = Math.max(tam.x, tam.z) * 1.35 + 10;
+  piso.scale.set(lado, lado, 1);
+  piso.position.set(centro.x, -0.02, centro.z);
+  grilla.scale.setScalar(lado);
+  grilla.position.set(centro.x, 0, centro.z);
+
+  // Carteles de pasillo al inicio de cada calle.
+  rotulos.clear();
+  for (const p of GEO.pasillos){
+    cartel("P" + p, caja.min.x - 1.8, 0.9, GEO.idxPasillo.get(p) * GEO.paso);
+  }
+
+  if (encuadrar) encuadrarEn(centro, tam);
+  pintarLeyenda(modo, VISIBLES.length);
+  pintarKpis();
+  marca.visible = false;
+  elegida = -1;
+}
+
+/* Vista de tres cuartos que entra justo en la pantalla. */
+function encuadrarEn(centro, tam){
+  const radio = Math.max(4, 0.5 * Math.hypot(tam.x, tam.y, tam.z));
+  const fov = camara.fov * Math.PI / 180;
+  const dist = (radio / Math.sin(fov / 2)) * 1.0;
+  const dir = new THREE.Vector3(-0.55, 0.58, 0.85).normalize();
+  control.target.copy(centro);
+  camara.position.copy(centro).addScaledVector(dir, dist);
+  camara.near = Math.max(0.1, dist / 800);
+  camara.far = dist * 8;
+  camara.updateProjectionMatrix();
+}
+
+function pintarKpis(){
+  const filas = VISIBLES.map(i => DEL_ALMACEN[i]);
+  const n = filas.length;
+  const vacias = filas.filter(r => r.vacia).length;
+  const bloq = filas.filter(r => r.bloq).length;
+  const dormidas = filas.filter(r => r.dias !== null && r.dias > 180).length;
+  const conVol = filas.filter(r => r.ocup !== null);
+  const ocupMedia = conVol.length
+    ? conVol.reduce((a, r) => a + Math.min(r.ocup, 2), 0) / conVol.length : 0;
+
+  const tarjeta = (valor, texto, clase) =>
+    '<div class="kpi"><b' + (clase ? ' class="' + clase + '"' : "") + ">" + valor +
+    "</b><span>" + texto + "</span></div>";
+
+  $("kpis").innerHTML =
+    tarjeta(nf(n), "ubicaciones") +
+    tarjeta(nf(n - vacias), "con stock") +
+    tarjeta(n ? (100 * (n - vacias) / n).toFixed(1) + "%" : "–", "uso de posiciones") +
+    tarjeta((100 * ocupMedia).toFixed(1) + "%", "ocupación volumétrica") +
+    tarjeta(nf(dormidas), "sin mov. +180 d", dormidas ? "alerta" : "") +
+    tarjeta(nf(bloq), "bloqueadas", bloq ? "alerta" : "");
+}
+
+function pintarDetalle(i){
+  if (i < 0){ $("detalle").textContent = "Hacé clic en una ubicación del plano."; return; }
+  const r = DEL_ALMACEN[i];
+  const fila = (k, v) => "<tr><td>" + k + "</td><td>" + v + "</td></tr>";
+  const estado = r.bloq ? "Bloqueada" + (r.bloqE ? " (entrada)" : "") + (r.bloqS ? " (salida)" : "")
+    : r.vacia ? "Vacía" : r.full ? "Con stock · marcada completa" : "Con stock";
+  $("detalle").innerHTML =
+    '<div class="codigo">' + r.u + "</div><table>" +
+    fila("Estado", estado) +
+    fila("Pasillo / Col. / Nivel", (r.pas || "–") + " / " + (r.col || "–") + " / " + (r.niv || "–")) +
+    fila("Subdiv. / Pos.", (r.sub || "–") + " / " + (r.pos || "–")) +
+    fila("Tipo de ubicación", r.tipo || "–") +
+    fila("Área", r.area || "–") +
+    fila("Peso máximo", r.pmax ? r.pmax + " kg" : "–") +
+    fila("Volumen máx.", r.vmax ? nf(r.vmax) + " cm³" : "–") +
+    fila("Volumen cargado", r.vcarga ? nf(Math.round(r.vcarga)) + " cm³" : "0") +
+    fila("Ocupación", r.ocup === null ? "sin dato" : (100 * r.ocup).toFixed(1) + "%") +
+    fila("Último movimiento", r.mov ? r.mov + (r.dias !== null ? " (" + nf(r.dias) + " d)" : "") : "–") +
+    "</table>";
+}
+
+function marcar(i){
+  elegida = i;
+  pintarDetalle(i);
+  if (i < 0){ marca.visible = false; return; }
+  const c = GEO.cajas[i];
+  marca.position.set(c.x, c.y, c.z);
+  marca.scale.set(c.w * 1.25, c.h * 1.25, c.d * 1.25);
+  marca.visible = true;
+}
+
+/* ============================================================
+   MÓDULO 6 — Controles, interacción y carga del archivo
+   ============================================================ */
+
+function poblarControles(){
+  const porAlmacen = new Map();
+  for (const r of TODO) porAlmacen.set(r.al, (porAlmacen.get(r.al) || 0) + 1);
+  const sel = $("almacen");
+  sel.innerHTML = [...porAlmacen.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => '<option value="' + k + '">' + k + " · " + nf(n) + " ubic.</option>")
+    .join("");
+
+  // Categorías globales (así el color no cambia al filtrar).
+  catAreas = new Map();
+  [...new Set(TODO.map(r => r.area || "(sin área)"))].sort()
+    .forEach((k, i) => catAreas.set(k, i));
+  catFamilias = new Map();
+  [...new Set(TODO.map(r => (r.tipo || "?").charAt(0).toUpperCase() || "?"))].sort()
+    .forEach((k, i) => catFamilias.set(k, i));
+}
+
+function cambiarAlmacen(encuadrar){
+  const al = $("almacen").value;
+  DEL_ALMACEN = TODO.filter(r => r.al === al);
+  leerParametros();
+  GEO = geometria(DEL_ALMACEN);
+
+  pasillosOn = new Set();
+  $("pasillos").innerHTML = GEO.pasillos
+    .map(p => '<button class="pastilla" data-pasillo="' + p + '">P' + p + "</button>").join("") ||
+    '<span style="font-size:12px;color:var(--tinta-suave)">sin pasillos</span>';
+
+  const areas = [...new Set(DEL_ALMACEN.map(r => r.area || "(sin área)"))].sort();
+  $("area").innerHTML = '<option value="">Todas</option>' +
+    areas.map(a => '<option value="' + a + '">' + a + "</option>").join("");
+
+  const nmax = Math.max(1, ...DEL_ALMACEN.map(r => r.nivNum));
+  const rango = $("nivelMax");
+  rango.max = nmax; rango.value = nmax;
+  $("nivelMaxTxt").textContent = "todos (1–" + nmax + ")";
+
+  $("pieDer").textContent = GEO.sueltas
+    ? nf(GEO.sueltas) + " ubicaciones sin pasillo/columna/nivel: se dibujan aparte, al frente"
+    : "";
+  construir(encuadrar);
+}
+
+function rearmarGeometria(){
+  leerParametros();
+  GEO = geometria(DEL_ALMACEN);
+  construir(false);
+}
+
+$("almacen").onchange = () => cambiarAlmacen(true);
+$("area").onchange = () => construir(false);
+$("modoColor").onchange = () => construir(false);
+for (const id of ["soloVacias", "soloBloq", "soloDormidas"]) $(id).onchange = () => construir(false);
+$("nivelMax").oninput = () => {
+  const v = $("nivelMax").value;
+  $("nivelMaxTxt").textContent = v === $("nivelMax").max ? "todos (1–" + v + ")" : "1 a " + v;
+  construir(false);
+};
+for (const id of ["anchoCol", "profRack", "altoNivel", "anchoPasillo"]) $(id).onchange = rearmarGeometria;
+$("compacto").onchange = rearmarGeometria;
+
+$("pasillos").onclick = e => {
+  const b = e.target.closest(".pastilla");
+  if (!b) return;
+  const p = b.dataset.pasillo;
+  if (pasillosOn.has(p)){ pasillosOn.delete(p); b.dataset.activa = "0"; }
+  else { pasillosOn.add(p); b.dataset.activa = "1"; }
+  construir(false);
+};
+
+function buscar(){
+  const txt = $("buscar").value.trim().toUpperCase();
+  if (!txt) return;
+  const global = TODO.find(r => r.u.toUpperCase() === txt) ||
+                 TODO.find(r => r.u.toUpperCase().includes(txt));
+  if (!global){ $("buscar").value = txt + " · sin coincidencias"; return; }
+  if (global.al !== $("almacen").value){
+    $("almacen").value = global.al;
+    cambiarAlmacen(true);
+  }
+  const i = DEL_ALMACEN.indexOf(global);
+  if (i < 0) return;
+  // Si el filtro la esconde, lo aflojamos para poder mostrarla.
+  if (!VISIBLES.includes(i)){
+    $("soloVacias").checked = false; $("soloBloq").checked = false;
+    $("soloDormidas").checked = false; $("area").value = "";
+    pasillosOn.clear();
+    for (const b of $("pasillos").children) if (b.dataset) b.dataset.activa = "0";
+    $("nivelMax").value = $("nivelMax").max;
+    construir(false);
+  }
+  marcar(i);
+  const c = GEO.cajas[i];
+  control.target.set(c.x, c.y, c.z);
+  camara.position.set(c.x - 6, c.y + 5, c.z + 8);
+}
+$("btnBuscar").onclick = buscar;
+$("buscar").onkeydown = e => { if (e.key === "Enter") buscar(); };
+
+/* ---------- Clic sobre una ubicación ---------- */
+const rayo = new THREE.Raycaster();
+const puntero = new THREE.Vector2();
+let arrastre = false;
+render.domElement.addEventListener("pointerdown", () => { arrastre = false; });
+render.domElement.addEventListener("pointermove", e => {
+  if (e.buttons) arrastre = true;
+});
+render.domElement.addEventListener("pointerup", e => {
+  if (arrastre || !instancias) return;
+  const caja = render.domElement.getBoundingClientRect();
+  puntero.x = ((e.clientX - caja.left) / caja.width) * 2 - 1;
+  puntero.y = -((e.clientY - caja.top) / caja.height) * 2 + 1;
+  rayo.setFromCamera(puntero, camara);
+  const golpe = rayo.intersectObject(instancias, false)[0];
+  marcar(golpe ? VISIBLES[golpe.instanceId] : -1);
+});
+
+/* ---------- Carga de archivos ---------- */
+function aviso(texto){
+  const a = $("aviso");
+  if (texto){ a.textContent = texto; a.hidden = false; } else a.hidden = true;
+}
+
+function usar(filas, origen){
+  TODO = interpretar(filas);
+  if (!TODO.length){ aviso("El archivo no tiene ubicaciones reconocibles."); return; }
+  $("origen").textContent = origen + " · " + nf(TODO.length) + " ubicaciones";
+  poblarControles();
+  cambiarAlmacen(true);
+  aviso("");
+}
+
+function cargarScript(src){
+  return new Promise((ok, mal) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = ok; s.onerror = mal;
+    document.head.appendChild(s);
+  });
+}
+
+async function leerArchivo(file){
+  aviso("Procesando " + file.name + "…");
+  try {
+    if (/\.(xlsx|xlsm)$/i.test(file.name)){
+      if (!window.XLSX){
+        // Copia local primero; si falta, se intenta la CDN publica.
+        await cargarScript("lib/xlsx/xlsx.full.min.js").catch(() =>
+          cargarScript("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"));
+      }
+      // raw:true deja los numeros como numeros: con raw:false Excel devuelve
+      // "2.156" (separador de miles) y la ocupacion sale mil veces mas alta.
+      const libro = XLSX.read(await file.arrayBuffer(), { type:"array", cellDates:true });
+      const hoja = libro.Sheets[libro.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(hoja, { header:1, raw:true, defval:"" });
+      usar(filas, file.name);
+    } else {
+      usar(filasCsv(await file.text()), file.name);
+    }
+  } catch (err){
+    aviso("No se pudo leer el archivo: " + err.message);
+  }
+}
+
+$("btnArchivo").onclick = () => $("archivo").click();
+$("archivo").onchange = e => { if (e.target.files[0]) leerArchivo(e.target.files[0]); };
+lienzo.addEventListener("dragover", e => e.preventDefault());
+lienzo.addEventListener("drop", e => {
+  e.preventDefault();
+  if (e.dataTransfer.files[0]) leerArchivo(e.dataTransfer.files[0]);
+});
+
+/* ---------- Arranque ---------- */
+async function inicial(){
+  // Si hay un maestro propio junto al HTML lo usa; si no, los datos de muestra.
+  for (const ruta of ["datos/ubicaciones.csv", "datos/ubicaciones-demo.csv"]){
+    try {
+      const resp = await fetch(ruta, { cache:"no-store" });
+      if (!resp.ok) continue;
+      usar(filasCsv(await resp.text()), ruta.split("/").pop());
+      return;
+    } catch (err){ /* sigue con la próxima ruta */ }
+  }
+  aviso("Abrí tu export de SAP con el botón de la izquierda (o arrastralo acá).");
+}
+
+function medir(){
+  const w = lienzo.clientWidth, h = lienzo.clientHeight;
+  render.setSize(w, h, false);
+  camara.aspect = w / Math.max(1, h);
+  camara.updateProjectionMatrix();
+}
+addEventListener("resize", medir);
+medir();
+
+(function latido(){
+  requestAnimationFrame(latido);
+  control.update();
+  render.render(escena, camara);
+})();
+
+inicial();
+</script>
+</body>
+</html>
