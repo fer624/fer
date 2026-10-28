@@ -2506,7 +2506,7 @@ function curvaDeFilmina(puntos, alto) {
       Hace falta más de un corte guardado para dibujar la evolución.
       Los cortes se guardan desde la pestaña Configuración.</div>`;
   }
-  const W = 1024, H = Math.max(110, alto), mI = 46, mD = 54, mT = 12, mB = 22;
+  const W = 1024, H = Math.max(110, alto), mI = 46, mD = 26, mT = 20, mB = 22;
   const vals = puntos.map(p => p.v);
   const min = Math.min(...vals), max = Math.max(...vals);
   // El eje se apoya en numeros redondos: 65, 70, 75 y no 65, 67,2, 69,4.
@@ -2537,20 +2537,34 @@ function curvaDeFilmina(puntos, alto) {
     fill="var(--c1)" opacity=".12"/>`;
   g += `<polyline points="${linea}" fill="none" stroke="var(--c1)" stroke-width="2"
     stroke-linejoin="round" stroke-linecap="round"/>`;
-  // Un rotulo cada dos o tres fechas, para que no se pisen.
+  // Un rotulo de fecha cada dos o tres, para que no se pisen entre si.
   const salto = Math.ceil(puntos.length / 8);
+  const ult = puntos.length - 1;
   puntos.forEach((p, i) => {
-    const ultimo = i === puntos.length - 1;
-    g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${ultimo ? 4 : 2.6}"
+    const ultimo = i === ult;
+    g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${ultimo ? 4 : 2.8}"
       fill="var(--c1)" stroke="var(--carta)" stroke-width="1.5"/>`;
     if (i % salto === 0 || ultimo) {
       g += `<text x="${X(i).toFixed(1)}" y="${mT + aH + 14}" text-anchor="middle"
         style="font-size:9px;fill:var(--tinta-3)">${Fmt.esc(p.rot)}</text>`;
     }
   });
-  const ult = puntos.length - 1;
-  g += `<text x="${(X(ult) + 7).toFixed(1)}" y="${(Y(puntos[ult].v) + 3).toFixed(1)}"
-    style="font-size:11px;font-weight:700;fill:var(--c1)">${Fmt.pct(puntos[ult].v)}</text>`;
+  // El valor de cada punto. Va arriba salvo que el punto sea un valle, donde
+  // abajo queda mas limpio porque la linea no le pasa por encima; y si arriba
+  // se saldria del dibujo, tambien baja.
+  puntos.forEach((p, i) => {
+    const y0 = Y(p.v);
+    const valle = i > 0 && i < ult && puntos[i - 1].v > p.v && puntos[i + 1].v > p.v;
+    let y = valle ? y0 + 16 : y0 - 10;
+    if (y < mT + 8) y = y0 + 16;
+    if (y > mT + aH - 2) y = y0 - 10;
+    const ancla = i === 0 ? 'start' : i === ult ? 'end' : 'middle';
+    const dx = i === 0 ? -4 : i === ult ? 4 : 0;
+    const ultimo = i === ult;
+    g += `<text x="${(X(i) + dx).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${ancla}"
+      style="font-size:${ultimo ? 11 : 9.5}px;font-weight:700;font-variant-numeric:tabular-nums;
+      fill:var(${ultimo ? '--c1' : '--tinta-2'})">${Fmt.pct(p.v)}</text>`;
+  });
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
     style="width:100%;height:auto;max-height:${Math.round(H)}px;display:block">${g}</svg>`;
 }
