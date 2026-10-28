@@ -1422,6 +1422,50 @@ function restaurarBases() {
   return !!(p.mae || p.val);
 }
 
+/* ------------------- importar respaldos de otras versiones -------------------
+   La aplicacion anterior guardaba el corte con otra forma: un bloque "f" con
+   el fisico entero y una lista por tipo, sin la division mono y multi. Se
+   convierte lo que se puede y se descarta lo que no, en vez de meterlo crudo
+   y que despues reviente al dibujar la tendencia.
+   Las bases de un respaldo viejo NO se importan: ese maestro tenia 33.351
+   posiciones y pisaria el que estas usando ahora.
+   --------------------------------------------------------------------------- */
+const esCorteNuevo = c => !!(c && c.fecha && c.tot && typeof c.tot.n === 'number'
+  && c.mono && c.multi);
+
+function convertirCorteViejo(c, mmPorTipo) {
+  if (!c || !c.fecha || !c.f || typeof c.f.n !== 'number') return null;
+  let mono = null, multi = null;
+  // La division mono y multi no existia. Se reconstruye desde la lista por
+  // tipo usando el maestro de ahora, que es quien sabe que es cada tipo.
+  if (Array.isArray(c.porTipo) && mmPorTipo && mmPorTipo.size) {
+    const a = { n: 0, ocu: 0 }, b = { n: 0, ocu: 0 };
+    let completo = true;
+    for (const t of c.porTipo) {
+      const mm = mmPorTipo.get(String(t.k));
+      if (!mm) { completo = false; break; }
+      const d = mm === 'mono' ? a : b;
+      d.n += t.n || 0; d.ocu += t.ocu || 0;
+    }
+    if (completo && a.n + b.n === c.f.n) { mono = a; multi = b; }
+  }
+  return {
+    fecha: c.fecha,
+    archivo: c.archivo || '',
+    maestro: '(versión anterior)',
+    maeN: c.f.n,
+    mono: mono || { n: 0, ocu: 0 },
+    multi: multi || { n: 0, ocu: 0 },
+    tot: { n: c.f.n, ocu: c.f.ocu || 0 },
+    val: c.f.val || 0,
+    items: c.items || c.f.items || 0,
+    lineas: c.f.lin || 0,
+    conValor: !!c.f.val,
+    importado: true,
+    sinDivision: !mono
+  };
+}
+
 function respaldo() {
   return JSON.stringify({
     version: 1, generado: new Date().toISOString(),
@@ -1432,15 +1476,44 @@ function respaldo() {
 }
 
 function restaurarRespaldo(texto) {
-  const p = JSON.parse(texto);
-  if (!p || typeof p !== 'object') throw new Error('El archivo no tiene el formato del respaldo.');
-  if (Array.isArray(p.hist)) D.hist = p.hist;
-  if (p.pref) D.pref = { ...D.pref, ...p.pref };
-  if (p.nom) D.nom = { ...D.nom, ...p.nom };
-  if (Array.isArray(p.mae)) { D.mae = new Map(); for (const f of p.mae) D.mae.set(f.u, f); }
-  if (Array.isArray(p.val)) { D.val = new Map(); for (const [m, x] of p.val) D.val.set(m, x); }
-  escribirHist(); escribirPref(); escribirBases();
-  return { ubis: D.mae ? D.mae.size : 0, materiales: D.val ? D.val.size : 0, cortes: D.hist.length };
+  let p;
+  try { p = JSON.parse(texto); }
+  catch (e) { throw new Error('El archivo no es un JSON válido. ¿Es el respaldo que descargó?'); }
+  if (!p || typeof p !== 'object' || !Array.isArray(p.hist)) {
+    throw new Error('El archivo no tiene la forma de un respaldo de esta aplicación.');
+  }
+  const viejo = !!(p.app === 'ocupacion-cdr' || p.bases) && !p.mae;
+  const mmPorTipo = new Map();
+  if (D.mae) for (const f of D.mae.values()) if (!mmPorTipo.has(f.tipo)) mmPorTipo.set(f.tipo, f.mm);
+
+  const cortes = [];
+  let descartados = 0, sinDivision = 0;
+  for (const c of p.hist) {
+    const n = esCorteNuevo(c) ? c : convertirCorteViejo(c, mmPorTipo);
+    if (!n) { descartados++; continue; }
+    if (n.sinDivision) sinDivision++;
+    cortes.push(n);
+  }
+  // Los cortes se juntan con los que ya haya: gana el que trae el respaldo.
+  const m = new Map(D.hist.map(c => [c.fecha, c]));
+  for (const c of cortes) m.set(c.fecha, c);
+  D.hist = [...m.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+  let bases = false;
+  if (!viejo) {
+    if (p.pref) D.pref = { ...D.pref, ...p.pref };
+    if (p.nom) D.nom = { ...D.nom, ...p.nom };
+    if (Array.isArray(p.mae)) { D.mae = new Map(); for (const f of p.mae) D.mae.set(f.u, f); bases = true; }
+    if (Array.isArray(p.val)) { D.val = new Map(); for (const [mt, x] of p.val) D.val.set(mt, x); bases = true; }
+  }
+  escribirHist(); escribirPref();
+  if (bases) escribirBases();
+  return {
+    viejo, cortes: cortes.length, descartados, sinDivision, bases,
+    total: D.hist.length,
+    ubis: D.mae ? D.mae.size : 0,
+    materiales: D.val ? D.val.size : 0
+  };
 }
 
 function olvidarTodo() {
@@ -1907,7 +1980,7 @@ function corteAnterior() {
   const previos = D.hist.filter(c => c.fecha < M.fecha);
   if (!previos.length) return null;
   const c = previos[previos.length - 1];
-  return { ...c, mismaBase: c.maeN === D.mae.size };
+  return { ...c, mismaBase: c.maeN === D.mae.size && !!(c.mono && c.mono.n) };
 }
 
 // Devuelve el cuadradito con la flecha y la diferencia, o vacio si no se puede
@@ -1981,7 +2054,8 @@ function pintarOcupacion(v) {
     </div>`;
 
   // mini curva de los ultimos cortes guardados, adentro de la tarjeta grande
-  const ultimos = D.hist.filter(c => c.fecha <= M.fecha && c.maeN === D.mae.size).slice(-12)
+  const ultimos = D.hist.filter(c => c.fecha <= M.fecha && c.maeN === D.mae.size
+      && c.mono && c.mono.n).slice(-12)
     .map(c => ({ v: c.mono.n ? c.mono.ocu / c.mono.n * 100 : 0 }));
   const chispero = $('#chispaHero');
   if (!hayFiltro() && ultimos.length >= 2) {
@@ -2240,8 +2314,10 @@ function serieHistorial(grano) {
     rotLargo: `${k} · corte ${Fmt.fecha(c.fecha)}`,
     fecha: c.fecha,
     maeN: c.maeN,
-    pctMono: c.mono.n ? c.mono.ocu / c.mono.n * 100 : 0,
-    pctTot: c.tot.n ? c.tot.ocu / c.tot.n * 100 : 0,
+    // null y no cero: un corte importado sin la division mono/multi no vale
+    // cero por ciento, vale "no se sabe", y el grafico tiene que saltearlo.
+    pctMono: c.mono && c.mono.n ? c.mono.ocu / c.mono.n * 100 : null,
+    pctTot: c.tot.n ? c.tot.ocu / c.tot.n * 100 : null,
     val: c.val
   }));
 }
@@ -2283,12 +2359,16 @@ function pintarTendencia() {
 
   tabla($('#tCortes'), [
     { t: 'Corte', v: f => f.fecha, h: f => `<b>${Fmt.fecha(f.fecha)}</b>` },
-    { t: 'Archivo', v: f => f.archivo, h: f => Fmt.esc((f.archivo || '—').slice(0, 30)) },
+    { t: 'Archivo', v: f => f.archivo,
+      h: f => Fmt.esc((f.archivo || '—').slice(0, 28))
+        + (f.importado ? ' <span class="pastilla">importado</span>' : '') },
     { t: 'Posiciones', n: true, v: f => f.maeN, h: f => Fmt.ent(f.maeN) },
-    { t: 'Mono', n: true, v: f => (f.mono.n ? f.mono.ocu / f.mono.n * 100 : 0),
-      h: f => Fmt.pct(f.mono.n ? f.mono.ocu / f.mono.n * 100 : 0) },
-    { t: 'Multi', n: true, v: f => (f.multi.n ? f.multi.ocu / f.multi.n * 100 : 0),
-      h: f => Fmt.pct(f.multi.n ? f.multi.ocu / f.multi.n * 100 : 0) },
+    { t: 'Mono', n: true, v: f => (f.mono && f.mono.n ? f.mono.ocu / f.mono.n * 100 : -1),
+      h: f => (f.mono && f.mono.n ? Fmt.pct(f.mono.ocu / f.mono.n * 100)
+        : '<span style="color:var(--tinta-3)">—</span>') },
+    { t: 'Multi', n: true, v: f => (f.multi && f.multi.n ? f.multi.ocu / f.multi.n * 100 : -1),
+      h: f => (f.multi && f.multi.n ? Fmt.pct(f.multi.ocu / f.multi.n * 100)
+        : '<span style="color:var(--tinta-3)">—</span>') },
     { t: 'Total', n: true, v: f => (f.tot.n ? f.tot.ocu / f.tot.n * 100 : 0),
       h: f => `<b>${Fmt.pct(f.tot.n ? f.tot.ocu / f.tot.n * 100 : 0)}</b>` },
     { t: 'Ocupadas', n: true, v: f => f.tot.ocu, h: f => Fmt.ent(f.tot.ocu) },
@@ -2637,9 +2717,18 @@ $('#aResp').addEventListener('change', async e => {
   if (!f) return;
   try {
     const r = restaurarRespaldo(await f.text());
-    estado('eResp', 'ok', `✓ Restaurado: ${Fmt.ent(r.ubis)} ubicaciones, `
-      + `${Fmt.ent(r.materiales)} materiales y ${Fmt.plural(r.cortes, 'corte', 'cortes')}. `
-      + `Cargue un fotostock para ver el corte actual.`);
+    estado('eResp', 'ok',
+      `✓ ${Fmt.plural(r.cortes, 'corte importado', 'cortes importados')}. `
+      + `El historial queda con ${Fmt.plural(r.total, 'corte', 'cortes')}.`
+      + (r.bases ? `<br>Bases restauradas: ${Fmt.ent(r.ubis)} ubicaciones y `
+        + `${Fmt.ent(r.materiales)} materiales.` : '')
+      + (r.viejo ? `<br><b>Es un respaldo de la versión anterior.</b> Se trajo el historial pero `
+        + `no las bases: aquel maestro tenía otra cantidad de posiciones y pisaría el que está `
+        + `usando ahora.` : '')
+      + (r.sinDivision ? `<br>${Fmt.plural(r.sinDivision, 'corte no trae', 'cortes no traen')} `
+        + `la división entre mono y multi, que en aquella versión no se guardaba: de esos sólo `
+        + `se ve el total.` : '')
+      + (r.descartados ? `<br>Se descartaron ${Fmt.plural(r.descartados, 'corte ilegible', 'cortes ilegibles')}.` : ''));
     if (D.pref.tema) aplicarTema(D.pref.tema);
     $('#repEmp').value = D.pref.empresa || '';
     $('#repAut').value = D.pref.autor || '';
