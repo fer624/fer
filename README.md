@@ -4,7 +4,7 @@ Herramientas internas de inventario (CEVA Logistics · Site Finning).
 
 | Archivo | Para qué sirve |
 | --- | --- |
-| `control-ajustes-inventario.html` | Control de ajustes de inventario por ejercicio: carga mensual, tolerancias, gráficos, informe PDF de 3 hojas y exportación a Excel. |
+| `control-ajustes-inventario.html` | Control de ajustes de inventario por ejercicio: carga mensual, tolerancias, gráficos, informe ejecutivo en PDF (una hoja A4 horizontal) y exportación a Excel. |
 | `operador.html` | Vista de operador. |
 | `monitor.html` | Vista de monitor. |
 
