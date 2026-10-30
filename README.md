@@ -67,7 +67,17 @@ el neto. El KPI que resume el W2W es *de la diferencia bruta, cuánto netea*.
   marcar a mano.
 - **Signo de la diferencia** — por defecto negativo = faltante.
 - **Neteo entre propietarios** — por defecto no netea entre propietarios distintos.
-- **Ventana del conteo** — marca los conteos que caen fuera de fecha.
+- **Ventana del conteo** — se ajusta sola a las fechas del archivo hasta que
+  guardes la configuración a mano; a partir de ahí manda lo que fijaste. Sirve
+  para probar bajadas de otros años sin tocar nada.
+
+### Volumen
+
+Probado con 60.000 ubicaciones y 247.682 filas de conteo (31 MB de CSV): la
+carga tarda unos 14 segundos, recargar la página 2,4 segundos y el navegador
+usa unos 230 MB. Para trabajar cómodo conviene dejar el listado de diferencias
+en 500 o 2.000 filas; con 10.000 la tabla tarda varios segundos en dibujarse.
+El CSV y el Excel bajan todo igual, sin el límite de pantalla.
 
 Los datos quedan guardados en el navegador (IndexedDB) del equipo donde se cargan.
 

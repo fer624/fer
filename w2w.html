@@ -959,7 +959,7 @@ const U = {
 const Config = {
   def:{
     ini:'2026-01-01', fin:'2026-12-31',
-    verde:90, amarillo:70,
+    verde:90, amarillo:70, ventanaAuto:1,
     signo:0,            // 0 = negativo es faltante
     dif:'auto',         // 'auto' usa la columna de diferencia si existe
     netProp:0,          // 0 = no netear entre propietarios distintos
@@ -988,6 +988,7 @@ const Config = {
     c.verde=+cfgVerde.value; c.amarillo=+cfgAmarillo.value;
     c.signo=+cfgSigno.value; c.dif=cfgDif.value;
     c.netProp=+cfgProp.value; c.inter=+cfgInter.value;
+    c.ventanaAuto=0;   // a partir de acá la ventana la fija el usuario
     Config.persistir(); Motor.reconstruir(); U.toast('Configuración guardada','ok');
   },
   persistir(){ try{localStorage.setItem('w2w26_cfg',JSON.stringify(Config.d));}catch(e){} }
@@ -1548,6 +1549,20 @@ const Motor = {
       if(set.size>1) cal.push({tipo:'Material con más de una unidad de medida',crit:'Alta',ref:mk,
         detalle:'Unidades: '+[...set].join(', ')+'. El neteo en unidades mezcla magnitudes distintas.'});
     });
+    /* Mientras el usuario no fije la ventana a mano, se toma del propio
+       archivo: así una bajada de otro año no marca todo como fuera de fecha. */
+    let minF=null,maxF=null;
+    ubis.forEach(o=>o.docs.forEach(d=>{
+      if(d.f===null) return;
+      if(minF===null||d.f<minF) minF=d.f;
+      if(maxF===null||d.f>maxF) maxF=d.f;
+    }));
+    if(Config.d.ventanaAuto && minF!==null){
+      Config.d.ini=U.iso(new Date(minF));
+      Config.d.fin=U.iso(new Date(maxF));
+      Config.persistir();
+      try{ Config.aForm(); }catch(e){}
+    }
     const iniW=new Date(Config.d.ini+'T00:00:00').getTime(), finW=new Date(Config.d.fin+'T23:59:59').getTime();
     let fuera=0;
     ubis.forEach(o=>{ if(o.ultF!==null && (o.ultF<iniW||o.ultF>finW)) fuera++; });
@@ -1608,18 +1623,20 @@ Motor.neteo = function(){
     itemsDif++; brutoUnid+=Math.abs(it.qd); ubisDif.add(it.u);
     const k=Motor.claveNeteo(it,variosProp);
     if(!grupos.has(k)) grupos.set(k,{k,prod:it.prod,prodK:it.prodK,prop:it.prop,desc:it.desc,
-      falt:0,sobr:0,neto:0,nF:0,nS:0,faltItems:[],sobrItems:[],um:it.um});
+      falt:0,sobr:0,neto:0,nF:0,nS:0,faltItems:[],sobrItems:[],
+      faltUbis:new Set(),sobrUbis:new Set(),um:it.um});
     const g=grupos.get(k);
     if(!g.desc && it.desc) g.desc=it.desc;
     if(!g.um && it.um) g.um=it.um;
     g.neto+=it.qd;
-    if(it.qd<0){ g.falt+=-it.qd; g.nF++; g.faltItems.push(it); }
-    else       { g.sobr+= it.qd; g.nS++; g.sobrItems.push(it); }
+    if(it.qd<0){ g.falt+=-it.qd; g.faltItems.push(it); g.faltUbis.add(it.u); }
+    else       { g.sobr+= it.qd; g.sobrItems.push(it); g.sobrUbis.add(it.u); }
   }
 
   let netoAbs=0, faltNeto=0, sobrNeto=0, faltNetoVal=0, sobrNetoVal=0;
   let matNeto=0, matNetea=0, sinPrecio=[];
   grupos.forEach(g=>{
+    g.nF=g.faltUbis.size; g.nS=g.sobrUbis.size;
     g.netea = g.falt>0 && g.sobr>0;
     g.compensado = Math.min(g.falt,g.sobr)*2;   // unidades que se cancelan entre sí
     g.precio = M.precios.has(g.prodK) ? M.precios.get(g.prodK) : null;
@@ -1638,7 +1655,7 @@ Motor.neteo = function(){
   const compensado = brutoUnid - netoAbs;
 
   M.net={
-    grupos:[...grupos.values()],
+    grupos:[...grupos.values()], mapa:grupos,
     brutoUnid, netoAbs, compensado,
     pctNetea: brutoUnid ? compensado/brutoUnid*100 : 0,
     itemsDif, ubisDif:ubisDif.size,
@@ -1650,14 +1667,30 @@ Motor.neteo = function(){
   };
 };
 
-/* Ubicaciones donde el mismo material aparece con el signo opuesto. */
-Motor.espejo = function(it){
+/* Ubicaciones donde el mismo material aparece con el signo opuesto.
+   El grupo se busca por Map y la muestra corta apenas junta las que pide
+   quien llama: con decenas de miles de diferencias, recorrer la lista
+   entera para cada ítem hace inusable la pantalla.                        */
+Motor.espejo = function(it,max){
   const net=Motor.M.net; if(!net) return [];
-  const k=Motor.claveNeteo(it,net.variosProp);
-  const g=net.grupos.find(x=>x.k===k);
+  const g=net.mapa.get(Motor.claveNeteo(it,net.variosProp));
   if(!g) return [];
   const otros = it.qd<0 ? g.sobrItems : g.faltItems;
-  return otros.filter(o=>o.u!==it.u);
+  const out=[];
+  for(let i=0;i<otros.length;i++){
+    if(otros[i].u===it.u) continue;
+    out.push(otros[i]);
+    if(max && out.length>=max) break;
+  }
+  return out;
+};
+/* Cuántas ubicaciones distintas tienen el signo opuesto, sin recorrer nada. */
+Motor.espejoN = function(it){
+  const net=Motor.M.net; if(!net) return 0;
+  const g=net.mapa.get(Motor.claveNeteo(it,net.variosProp));
+  if(!g) return 0;
+  const ubis = it.qd<0 ? g.sobrUbis : g.faltUbis;
+  return ubis.has(it.u) ? ubis.size-1 : ubis.size;
 };
 
 /* ---------- FILTROS GLOBALES ---------- */
@@ -2019,11 +2052,11 @@ const Vista = {
     if(difSigno.value==='f') its=its.filter(i=>i.qd<0);
     if(difSigno.value==='s') its=its.filter(i=>i.qd>0);
 
-    /* se precalcula el espejo una vez por ítem */
-    const conEsp=new Map();
-    its.forEach(it=>conEsp.set(it,Motor.espejo(it)));
-    if(difEspejo.value==='si') its=its.filter(i=>conEsp.get(i).length>0);
-    if(difEspejo.value==='no') its=its.filter(i=>conEsp.get(i).length===0);
+    /* cuántas ubicaciones espejo tiene cada ítem: es O(1) por ítem */
+    const nEsp=new Map();
+    its.forEach(it=>nEsp.set(it,Motor.espejoN(it)));
+    if(difEspejo.value==='si') its=its.filter(i=>nEsp.get(i)>0);
+    if(difEspejo.value==='no') its=its.filter(i=>nEsp.get(i)===0);
 
     const prec=m=>Motor.M.precios.has(m)?Motor.M.precios.get(m):null;
     const mag=it=>{const p=prec(it.prodK);return p===null?null:Math.abs(it.qd*p);};
@@ -2035,7 +2068,7 @@ const Vista = {
     else its.sort((a,b)=>U.natSort(a.zona,b.zona)||U.natSort(a.pasillo,b.pasillo)
                         ||U.natSort(a.col,b.col)||U.natSort(a.nivel,b.nivel)||U.natSort(a.pos,b.pos));
 
-    const conE=its.filter(i=>conEsp.get(i).length>0).length;
+    const conE=its.filter(i=>nEsp.get(i)>0).length;
     const magTot=its.reduce((a,b)=>a+(mag(b)||0),0);
     kpiDif.innerHTML=[
       kpi('Ítems listados',U.num(its.length),'del pase vigente, con los filtros aplicados','bad'),
@@ -2053,7 +2086,8 @@ const Vista = {
        {t:'Teórico',num:true},{t:'Contado',num:true},{t:'Diferencia',num:true},{t:'UM'},
        {t:'Magnitud',num:true},{t:'Espejo — dónde está el contrario'}],
       its.slice(0,lim).map((it,i)=>{
-        const esp=conEsp.get(it);
+        const esp=nEsp.get(it) ? Motor.espejo(it,3) : [];
+        const nE=nEsp.get(it);
         const row=[
           `<b class="mono">${U.esc(it.lbl)}</b>`, U.esc(it.zona), U.esc(it.pasillo),
           `<span class="tag ${it.pase===1?'b':it.pase===2?'a':'r'}">${it.pase}°</span>`,
@@ -2061,8 +2095,8 @@ const Vista = {
           it.qt!==null?U.num(it.qt):'—', it.qc!==null?U.num(it.qc):'—',
           signo(it.qd), U.esc(it.um||'—'),
           mag(it)!==null?U.num(mag(it),0):'<span class="cero">—</span>',
-          esp.length
-            ? `<span class="esp">${esp.slice(0,3).map(o=>'<b>'+U.esc(o.lbl)+'</b> '+signo(o.qd)).join(' · ')}${esp.length>3?' <span class="rc-mini">+'+(esp.length-3)+' más</span>':''}</span>`
+          nE
+            ? `<span class="esp">${esp.map(o=>'<b>'+U.esc(o.lbl)+'</b> '+signo(o.qd)).join(' · ')}${nE>esp.length?' <span class="rc-mini">+'+(nE-esp.length)+' más</span>':''}</span>`
             : '<span class="esp none">sin espejo</span>'
         ];
         row._attr=` class="pick" data-i="${i}"`;
@@ -2388,10 +2422,10 @@ const Export = {
     if(cual==='dif') return [
       ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Pase','Documento','Fecha','Hora',
        'Material','Descripcion','Teorico','Contado','Diferencia','UM','Propietario','Contador',
-       'Status Conteo','Tipo almacen','Area almacenamiento','Ubicaciones espejo'],
+       'Status Conteo','Tipo almacen','Area almacenamiento','Ubicaciones espejo','Cantidad de espejos'],
       (Vista._dif||[]).map(it=>[it.lbl,it.zona,it.sector,it.pasillo,it.col,it.nivel,it.pos,it.pase,it.doc,
         it.f?U.fmt(new Date(it.f)):'',U.hhmm(it.h),it.prod,it.desc,it.qt,it.qc,it.qd,it.um,it.prop,it.usr,
-        it.st,it.tipoAlm,it.areaAlm,Motor.espejo(it).map(o=>o.lbl).join(' | ')])];
+        it.st,it.tipoAlm,it.areaAlm,Motor.espejo(it,20).map(o=>o.lbl).join(' | '),Motor.espejoN(it)])];
     if(cual==='ubis') return [
       ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Estado Ubi','MO/MU','En universo',
        'Estado W2W','Pases','Ultimo conteo','Hora','Contador','Status Conteo','Items','Items con diferencia'],
