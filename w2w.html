@@ -1068,7 +1068,10 @@ const CAMPOS = {
     {k:'contador',  lbl:'Contador', alias:['CONTADOR','USUARIO','OPERADOR','USER','RESPONSABLE','OPERARIO','CREADOPOR']},
     {k:'tipoAlm',   lbl:'Tipo almacén', alias:['TIPOALMACEN','TIPODEALMACEN','ALMACEN','WAREHOUSETYPE','TIPOALM']},
     {k:'areaAlm',   lbl:'Área almacenamiento', alias:['AREAALMACENAMIENTO','AREADEALMACENAMIENTO','AREAALM','STORAGEAREA','AREA']},
-    {k:'areaAct',   lbl:'Área de actividad', alias:['AREADEACTIVIDAD','AREAACTIVIDAD','ACTIVIDAD','ACTIVITYAREA','AREAACT']}
+    {k:'areaAct',   lbl:'Área de actividad', alias:['AREADEACTIVIDAD','AREAACTIVIDAD','ACTIVIDAD','ACTIVITYAREA','AREAACT']},
+    {k:'stInv',     lbl:'Status Inv (INAC / ACTI / COUN / POST)', alias:['STATUSINV','STATUSINVENTARIO','ESTADOINV','STINV','STATUSDEINVENTARIO'], not:'INV2'},
+    {k:'stInv2',    lbl:'Status Inv2', alias:['STATUSINV2','STATUSINVENTARIO2','ESTADOINV2','STINV2']},
+    {k:'statusUbi', lbl:'Status Ubi', alias:['STATUSUBI','STATUSUBICACION','ESTADOUBICACION']}
   ],
   valor:[
     {k:'mat',    lbl:'Material', req:true, alias:['MATERIAL','PRODUCTO','SKU','CODIGOMATERIAL','NUMEROMATERIAL','NROMATERIAL','ARTICULO'], not:'TEXTO'},
@@ -1234,7 +1237,10 @@ const Datos = {
         usr:m.contador?String(r[m.contador]??'').trim():'',
         tipoAlm:m.tipoAlm?String(r[m.tipoAlm]??'').trim():'',
         areaAlm:m.areaAlm?String(r[m.areaAlm]??'').trim():'',
-        areaAct:m.areaAct?String(r[m.areaAct]??'').trim():''
+        areaAct:m.areaAct?String(r[m.areaAct]??'').trim():'',
+        stInv:m.stInv?String(r[m.stInv]??'').trim():'',
+        stInv2:m.stInv2?String(r[m.stInv2]??'').trim():'',
+        statusUbi:m.statusUbi?String(r[m.statusUbi]??'').trim():''
       });
     }
     return out;
@@ -1366,15 +1372,29 @@ const Motor = {
     return null;
   },
 
+  /* El status que manda: si la bajada no trae Status Conteo se usa Status Inv. */
+  stEfectivo(c){ return c.st || c.stInv || ''; },
+
   /* ---------- ¿este Status Conteo equivale a CONTADA? ---------- */
   statusEsContado(st){
     const cfg=Config.d.statusOK;
     if(Array.isArray(cfg)) return cfg.includes(st||'(sin status)');
     return Motor.autoContado(st);
   },
+  /* Códigos de status de inventario de SAP. Se resuelven por tabla porque
+     son abreviaturas de cuatro letras que ningún patrón de texto acierta:
+     COUN y POST significan contada y los patrones los daban por no contada. */
+  CODIGOS:{
+    INAC:false,  // documento inactivo, todavía no se activó
+    ACTI:false,  // activo: la ubicación entró al conteo pero nadie contó aún
+    COUN:true,   // contada
+    POST:true,   // contabilizada
+    CLOS:true, CNTD:true, DEL:false, NACT:false
+  },
   autoContado(st){
     const s=U.hdr(st);
     if(!s) return true;   // sin Status Conteo, el registro con cantidad vale como contado
+    if(Object.prototype.hasOwnProperty.call(Motor.CODIGOS,s)) return Motor.CODIGOS[s];
     if(/PENDIENT|ABIERT|ACTIV|CREAD|PROCES|ASIGNAD|NOCONTAD|SINCONTAR|BORRAD|ANULAD|CANCELAD|NOOK/.test(s)) return false;
     if(/CONTAD|COMPLET|CERRAD|FINALIZ|REALIZAD|CONFIRM|CONTABILIZ|TERMINAD|RECUENT/.test(s)) return true;
     if(/^OK$/.test(s)) return true;
@@ -1447,7 +1467,7 @@ const Motor = {
       if(refKeyValida && rk!==refKeyValida){ regFueraRef++; continue; }
       if(!c.u) continue;
 
-      const st=c.st||'(sin status)';
+      const st=Motor.stEfectivo(c)||'(sin status)';
       if(!statusSet.has(st)) statusSet.set(st,{st,n:0,contado:Motor.statusEsContado(st)});
       statusSet.get(st).n++;
 
@@ -1459,7 +1479,7 @@ const Motor = {
       }
       regValidos++;
 
-      if(!Motor.statusEsContado(c.st)){ o.docAbierto=true; continue; }
+      if(!Motor.statusEsContado(Motor.stEfectivo(c))){ o.docAbierto=true; continue; }
       if(c.f===null) sinFecha++;
       if(!c.doc) sinDoc++;
       if(c.qt===null && c.qc===null && (c.qd===null||c.qd===undefined)) sinCant++;
@@ -1474,8 +1494,9 @@ const Motor = {
       const claveDoc = c.doc ? 'D'+c.doc : 'T'+(c.f||0)+'_'+(c.h===null?'':c.h);
       if(!porUbi.has(c.u)) porUbi.set(c.u,new Map());
       const docs=porUbi.get(c.u);
-      if(!docs.has(claveDoc)) docs.set(claveDoc,{doc:c.doc||'(sin documento)',f:c.f,h:c.h,st:c.st,usr:c.usr,items:[]});
+      if(!docs.has(claveDoc)) docs.set(claveDoc,{doc:c.doc||'(sin documento)',f:c.f,h:c.h,st:c.st,usr:c.usr,items:[],conCant:false});
       const d=docs.get(claveDoc);
+      if(c.qc!==null || (c.qd!==null && c.qd!==undefined)) d.conCant=true;
       if(d.f===null&&c.f!==null) d.f=c.f;
       if(d.h===null&&c.h!==null) d.h=c.h;
       if(!d.usr&&c.usr) d.usr=c.usr;
@@ -1484,10 +1505,29 @@ const Motor = {
 
     /* ---------- 3 · DERIVACIÓN DEL PASE Y ESTADO ---------- */
     const items=[], vigentes=[];
+    /* Un documento sin ninguna cantidad informada es una ubicación activada
+       pero no contada. Si se contara como pase, la ubicación cerraría "sin
+       diferencia" sin que nadie la haya contado nunca. */
+    let docsTot=0, docsSinCant=0;
+    porUbi.forEach(docs=>docs.forEach(d=>{ docsTot++; if(!d.conCant) docsSinCant++; }));
+    const filtrar = docsSinCant>0 && docsSinCant<docsTot;
+    if(docsSinCant>0 && docsSinCant===docsTot)
+      cal.push({tipo:'Ningún documento trae cantidades',crit:'Alta',ref:U.num(docsTot)+' documentos',
+        detalle:'No se pudo leer ninguna cantidad contada ni diferencia. Revisá el mapeo de columnas: el avance se muestra igual, pero el resultado va a estar vacío.'});
+    else if(docsSinCant>0)
+      cal.push({tipo:'Documentos activados sin cantidad informada',crit:'Alta',ref:U.num(docsSinCant)+' documentos',
+        detalle:'La ubicación tiene documento de inventario pero ninguna fila con cantidad contada ni diferencia: se cuenta como NO contada, no como cerrada sin diferencia.'});
+
     porUbi.forEach((docs,u)=>{
       const o=ubis.get(u);
-      const lista=[...docs.values()].sort((a,b)=>
+      let lista=[...docs.values()].sort((a,b)=>
         (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9) || U.natSort(a.doc,b.doc));
+      if(filtrar){
+        const conCant=lista.filter(d=>d.conCant);
+        if(conCant.length<lista.length) o.docAbierto=true;
+        lista=conCant;
+      }
+      if(!lista.length){ o.estado='PEND'; o.contada=false; o.docs=[]; return; }
 
       lista.forEach((d,idx)=>{
         d.pase=idx+1;

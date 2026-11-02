@@ -63,8 +63,14 @@ el neto. El KPI que resume el W2W es *de la diferencia bruta, cuánto netea*.
 
 ### Configuración que conviene revisar antes de empezar
 
-- **Status Conteo que equivalen a CONTADA** — se detectan solos, pero se pueden
-  marcar a mano.
+- **Status Conteo que equivalen a CONTADA** — se detectan solos y se pueden
+  marcar a mano. Los códigos de SAP se resuelven por tabla: `COUN` y `POST`
+  son contada, `INAC` y `ACTI` no. Si la bajada no trae Status Conteo se usa
+  la columna **Status Inv**.
+
+  Además, un documento de inventario sin ninguna cantidad informada se cuenta
+  como **no contada**, no como cerrada sin diferencia: una ubicación con el
+  documento activado pero que nadie contó todavía está pendiente.
 - **Signo de la diferencia** — por defecto negativo = faltante.
 - **Neteo entre propietarios** — por defecto no netea entre propietarios distintos.
 - **Ventana del conteo** — se ajusta sola a las fechas del archivo hasta que
