@@ -94,6 +94,24 @@ textarea[data-k]{background:#fff0b8;border-color:#e3b53c}
 .kpi .h .ob{font-size:12px;color:#0f2744}
 table.hm td.obc{background:#dce6f4!important;color:#0f2744!important;font-weight:700}
 .stg .p .ob{background:rgba(255,255,255,.92);color:#0f2744;box-shadow:none}
+/* ---------- Hoja 1 compacta (cuando hay observaciones largas) ---------- */
+.rp.dense{gap:2.2mm;padding-top:6mm;padding-bottom:6mm}
+.rp.dense .hd{padding-bottom:1.6mm}
+.rp.dense .note{padding:1.2mm 3mm;font-size:11px;line-height:1.25}
+.rp.dense .tile{padding:1.6mm 2.4mm 1mm}
+.rp.dense .tiles.t7 .tile svg{height:5.5mm}
+.rp.dense .tiles.t7 .tile .v{font-size:21px}
+.rp.dense .stg{padding-top:1.8mm;padding-bottom:1.8mm}
+.rp.dense .stg .v{font-size:22px}
+.rp.dense .bal{padding:1.2mm 3mm;margin-top:1.5mm}
+.rp.dense .bal .bn{font-size:20px}
+.rp.dense .p1a .flow{margin-bottom:1mm}
+.rp.dense2 .tiles.t7 .tile svg{display:none}
+.rp.dense2 .tiles.t7 .tile{padding-bottom:1.6mm}
+.rp.dense2 .hd h1{font-size:21px}
+.rp.dense3{gap:1.6mm}
+.rp.dense3 .bal{display:none}
+.rp.dense3 .p1a .flow{margin-bottom:0}
 /* ---------- App shell ---------- */
 :root{--num:Bahnschrift,"DIN Alternate","Segoe UI",Calibri,sans-serif;--surf:#f3f5f8}
 body{background:var(--surf)}
@@ -1636,10 +1654,19 @@ function pageN3(){
   return`<div class="rp">${h}</div>`;
 }
 
+/* Si el contenido de la hoja 1 no entra (p. ej. con un comentario largo en Observaciones), la compacta de a pasos */
+function fitPages(){
+  document.querySelectorAll('#sheets>.rp').forEach(rp=>{
+    const p1b=rp.querySelector('.p1b'),ft=rp.querySelector('.foot2');if(!p1b||!ft)return;
+    const over=()=>[...p1b.children].some(e=>e.getBoundingClientRect().bottom>ft.getBoundingClientRect().top+1);
+    for(const c of ['dense','dense2','dense3']){if(!over())break;rp.classList.add(c)}
+  });
+}
 function renderReport(){
   const w=$('#sheets');w.className='rpwrap';
   const t3=S.days[F]&&(S.days[F].tar||S.days[F].invU);
   w.innerHTML=(pageN1()+pageN2()+(t3?pageN3():'')).replace(/Hoja (\d) de [23]/g,'Hoja $1 de '+(t3?3:2));
+  fitPages();
 }
 
 /* ======================= Mail / PDF ======================= */
