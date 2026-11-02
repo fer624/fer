@@ -491,13 +491,14 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
   </div>
   <div id="p2Empty"></div>
   <div id="p2Body">
+    <div id="avisoPrecio"></div>
     <div class="rc-nivel rc-nivel-ubi">Diferencia bruta — por ubicación</div>
     <div class="grid c4 mb12" id="kpiBruto"></div>
     <div class="rc-nivel rc-nivel-mat">Resultado neto — por material</div>
     <div class="grid c4 mb12" id="kpiNeto"></div>
 
     <div class="grid c2 mb12">
-      <div class="card"><h3>Bruto vs neto <span class="mini">en unidades</span></h3><div class="chart-wrap"><canvas id="chBrutoNeto"></canvas></div></div>
+      <div class="card"><h3>Bruto vs neto <span class="mini" id="brutoNetoUm">valorizado</span></h3><div class="chart-wrap"><canvas id="chBrutoNeto"></canvas></div></div>
       <div class="card"><h3>Top 15 materiales por magnitud del neto</h3><div class="chart-wrap"><canvas id="chTopNeto"></canvas></div></div>
     </div>
 
@@ -1421,16 +1422,27 @@ const Motor = {
     const t0=performance.now();
     const cal=[];   // incidencias de calidad de datos
     const ubis=new Map();
+    /* Las incidencias que se repiten por ubicación se agrupan: una lista de
+       decenas de miles de filas idénticas no se puede leer ni usar. */
+    const estNoRec=new Map(), dupMaestro=new Map();
 
     /* ---------- 1 · MAESTRO DE UBICACIONES ---------- */
     let sinUbi=0;
     Datos.maestro.forEach((r,i)=>{
       if(!r.u){ sinUbi++; cal.push({tipo:'Maestro sin ubicación',crit:'Alta',ref:'fila '+(i+2),detalle:'La fila no tiene código de ubicación y se descarta.'}); return; }
-      if(ubis.has(r.u)){ cal.push({tipo:'Ubicación duplicada en el maestro',crit:'Media',ref:r.lbl||r.u,detalle:'Se conserva la primera aparición (fila '+(i+2)+' descartada).'}); return; }
+      if(ubis.has(r.u)){
+        if(!dupMaestro.has(r.u)) dupMaestro.set(r.u,0);
+        dupMaestro.set(r.u,dupMaestro.get(r.u)+1);
+        return;
+      }
       const est=Motor.detEstadoUbi(r.estadoUbi);
       const mm =Motor.detMOMU(r.momu);
-      if(!est) cal.push({tipo:'Estado Ubi no reconocido',crit:'Alta',ref:r.lbl||r.u,
-        detalle:'Valor "'+(r.estadoUbi||'(vacío)')+'". Se trata como Física para no dejarla fuera del conteo.'});
+      if(!est){
+        const v=r.estadoUbi||'(vacío)';
+        if(!estNoRec.has(v)) estNoRec.set(v,{n:0,ej:[]});
+        const x=estNoRec.get(v); x.n++;
+        if(x.ej.length<5) x.ej.push(r.lbl||r.u);
+      }
       ubis.set(r.u,{
         u:r.u, lbl:r.lbl||r.u,
         pasillo:r.pasillo||'(sin pasillo)', col:r.col||'', nivel:r.nivel||'', pos:r.pos||'',
@@ -1575,8 +1587,23 @@ const Motor = {
     });
 
     /* ---------- 4 · INCIDENCIAS DE CALIDAD ---------- */
-    huerfanas.forEach(h=>cal.push({tipo:'Ubicación contada que no está en el maestro',crit:'Alta',ref:h.lbl,
-      detalle:U.num(h.n)+' registros de conteo. Queda fuera del avance porque el universo lo define el maestro.'}));
+    estNoRec.forEach((x,v)=>cal.push({tipo:'Estado Ubi no reconocido',crit:'Alta',
+      ref:'valor "'+v+'" · '+U.num(x.n)+' ubicaciones',
+      detalle:'No coincide con Física, Intermedia ni Virtual, así que se trata como Física para no dejarla fuera del conteo. Ejemplos: '+x.ej.join(', ')+'.'}));
+    if(dupMaestro.size){
+      let rep=0; dupMaestro.forEach(v=>rep+=v);
+      cal.push({tipo:'Ubicaciones duplicadas en el maestro',crit:'Media',
+        ref:U.num(dupMaestro.size)+' ubicaciones · '+U.num(rep)+' filas repetidas',
+        detalle:'Se conserva la primera aparición de cada una. Ejemplos: '+[...dupMaestro.keys()].slice(0,5).join(', ')+'.'});
+    }
+    if(huerfanas.size){
+      let regH=0; huerfanas.forEach(h=>regH+=h.n);
+      cal.push({tipo:'Ubicaciones contadas que no están en el maestro',crit:'Alta',
+        ref:U.num(huerfanas.size)+' ubicaciones · '+U.num(regH)+' registros',
+        detalle:'Quedan fuera del avance Y del resultado, porque el universo lo define el maestro. '+
+                'Si el número es alto, el maestro no corresponde a esta bajada. Ejemplos: '+
+                [...huerfanas.values()].slice(0,5).map(h=>h.lbl).join(', ')+'.'});
+    }
     if(sinFecha) cal.push({tipo:'Conteos sin fecha de recuento',crit:'Alta',ref:U.num(sinFecha)+' registros',
       detalle:'Sin fecha no se puede ordenar el pase con precisión. Revisá el mapeo de columnas.'});
     if(sinDoc) cal.push({tipo:'Conteos sin número de documento',crit:'Alta',ref:U.num(sinDoc)+' registros',
@@ -1675,6 +1702,10 @@ Motor.neteo = function(){
 
   let netoAbs=0, faltNeto=0, sobrNeto=0, faltNetoVal=0, sobrNetoVal=0;
   let matNeto=0, matNetea=0, sinPrecio=[];
+  /* Agregados en dinero: sumar unidades entre materiales distintos no
+     significa nada (un tornillo y un motor no se suman). El único agregado
+     válido entre materiales es el valorizado.                              */
+  let faltBrutoU=0, sobrBrutoU=0, faltBrutoV=0, sobrBrutoV=0, netoAbsVal=0, unidSinPrecio=0;
   grupos.forEach(g=>{
     g.nF=g.faltUbis.size; g.nS=g.sobrUbis.size;
     g.netea = g.falt>0 && g.sobr>0;
@@ -1684,6 +1715,14 @@ Motor.neteo = function(){
     if(!g.desc && Motor._txt) g.desc = Motor._txt.get(g.prodK)||'';
     g.netoVal = g.precio===null ? null : g.neto*g.precio;
     g.brutoVal = g.precio===null ? null : (g.falt+g.sobr)*g.precio;
+    g.faltVal = g.precio===null ? null : g.falt*g.precio;
+    g.sobrVal = g.precio===null ? null : g.sobr*g.precio;
+    faltBrutoU += g.falt; sobrBrutoU += g.sobr;
+    if(g.precio===null){ unidSinPrecio += g.falt+g.sobr; }
+    else{
+      faltBrutoV += g.faltVal; sobrBrutoV += g.sobrVal;
+      netoAbsVal += Math.abs(g.netoVal);
+    }
     netoAbs += Math.abs(g.neto);
     if(g.neto!==0) matNeto++;
     if(g.netea) matNetea++;
@@ -1693,11 +1732,19 @@ Motor.neteo = function(){
   });
 
   const compensado = brutoUnid - netoAbs;
+  const brutoVal = faltBrutoV + sobrBrutoV;
+  const compensadoVal = brutoVal - netoAbsVal;
 
   M.net={
     grupos:[...grupos.values()], mapa:grupos,
     brutoUnid, netoAbs, compensado,
     pctNetea: brutoUnid ? compensado/brutoUnid*100 : 0,
+    faltBrutoU, sobrBrutoU, faltBrutoV, sobrBrutoV,
+    brutoVal, netoAbsVal, compensadoVal,
+    pctNeteaVal: brutoVal ? compensadoVal/brutoVal*100 : 0,
+    unidSinPrecio,
+    cobPrecio: brutoUnid ? (brutoUnid-unidSinPrecio)/brutoUnid*100 : 100,
+    hayPrecios: brutoVal>0,
     itemsDif, ubisDif:ubisDif.size,
     matDif:grupos.size, matNeto, matNetea,
     faltNeto, sobrNeto, faltNetoVal, sobrNetoVal,
@@ -2011,39 +2058,56 @@ const Vista = {
   /* ═══════════ PÁGINA 2 · RESULTADO NETO ═══════════ */
   neto(){
     const net=Motor.M.net, mon=net.moneda?' '+net.moneda:'';
+    /* El encabezado va en dinero: entre materiales distintos las unidades no
+       se pueden sumar. Las unidades quedan como dato secundario.            */
+    const $=(v)=>net.hayPrecios ? U.num(v,0)+mon : '—';
+
+    avisoPrecio.innerHTML = net.hayPrecios
+      ? (net.cobPrecio<99.95
+          ? `<div class="note warn">Cobertura de precios: <b>${U.pct(net.cobPrecio,1)}</b> de la diferencia bruta
+             tiene precio en el maestro de ítems. Las <b>${U.num(net.unidSinPrecio,0)}</b> unidades sin precio
+             quedan fuera de los importes y se listan al pie de esta pantalla.</div>`
+          : '')
+      : `<div class="note bad">No hay precios cargados. Los importes aparecen vacíos y el porcentaje que netea
+         se calcula en unidades, que entre materiales distintos no es comparable.
+         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 5.</div>`;
 
     kpiBruto.innerHTML=[
       kpi('Ítems con diferencia',U.num(net.itemsDif),'material · ubicación del pase vigente','bad'),
       kpi('Ubicaciones con diferencia',U.num(net.ubisDif),'sobre el universo físico','bad'),
-      kpi('Faltante bruto',U.num(net.grupos.reduce((a,g)=>a+g.falt,0),0),'unidades, sin netear'),
-      kpi('Sobrante bruto',U.num(net.grupos.reduce((a,g)=>a+g.sobr,0),0),'unidades, sin netear')
+      kpi('Faltante bruto',$(net.faltBrutoV),U.num(net.faltBrutoU,0)+' unidades, sin netear','bad'),
+      kpi('Sobrante bruto',$(net.sobrBrutoV),U.num(net.sobrBrutoU,0)+' unidades, sin netear','ok')
     ].join('');
 
+    const pct = net.hayPrecios ? net.pctNeteaVal : net.pctNetea;
     kpiNeto.innerHTML=[
-      kpi('De la diferencia bruta, netea',U.pct(net.pctNetea,1),
-          U.num(net.compensado,0)+' de '+U.num(net.brutoUnid,0)+' unidades se cancelan entre ubicaciones',
-          net.pctNetea>=50?'ok':'warn'),
+      kpi('De la diferencia bruta, netea',U.pct(pct,1),
+          net.hayPrecios
+            ? $(net.compensadoVal)+' de '+$(net.brutoVal)+' se cancelan entre ubicaciones'
+            : U.num(net.compensado,0)+' de '+U.num(net.brutoUnid,0)+' unidades (sin precios)',
+          pct>=50?'ok':'warn'),
       kpi('Materiales con neto ≠ 0',U.num(net.matNeto),'de '+U.num(net.matDif)+' materiales con diferencia','bad'),
-      kpi('Faltante neto',U.num(net.faltNeto,0)+' u',
-          net.faltNetoVal?U.num(net.faltNetoVal,0)+mon+' de magnitud':'sin precio cargado','bad'),
-      kpi('Sobrante neto',U.num(net.sobrNeto,0)+' u',
-          net.sobrNetoVal?U.num(net.sobrNetoVal,0)+mon+' de magnitud':'sin precio cargado','ok')
+      kpi('Faltante neto',$(net.faltNetoVal),U.num(net.faltNeto,0)+' unidades','bad'),
+      kpi('Sobrante neto',$(net.sobrNetoVal),U.num(net.sobrNeto,0)+' unidades','ok')
     ].join('');
 
-    const faltB=net.grupos.reduce((a,g)=>a+g.falt,0), sobrB=net.grupos.reduce((a,g)=>a+g.sobr,0);
+    const enPlata=net.hayPrecios;
     chart('chBrutoNeto',{type:'bar',
       data:{labels:['Faltante','Sobrante'],datasets:[
-        {label:'Bruto',data:[faltB,sobrB],backgroundColor:'#8A94A6'},
-        {label:'Neto',data:[net.faltNeto,net.sobrNeto],backgroundColor:['#D9453D','#1E9E5A']}]},
+        {label:'Bruto',data:enPlata?[net.faltBrutoV,net.sobrBrutoV]:[net.faltBrutoU,net.sobrBrutoU],
+         backgroundColor:'#8A94A6'},
+        {label:'Neto',data:enPlata?[net.faltNetoVal,net.sobrNetoVal]:[net.faltNeto,net.sobrNeto],
+         backgroundColor:['#D9453D','#1E9E5A']}]},
       options:{scales:{y:{beginAtZero:true}}}});
 
-    const top=net.grupos.filter(g=>g.neto!==0)
-      .sort((a,b)=>Math.abs(b.netoVal??b.neto)-Math.abs(a.netoVal??a.neto)).slice(0,15);
+    const base=enPlata?net.grupos.filter(g=>g.neto!==0&&g.netoVal!==null):net.grupos.filter(g=>g.neto!==0);
+    const top=base.sort((a,b)=>Math.abs(enPlata?b.netoVal:b.neto)-Math.abs(enPlata?a.netoVal:a.neto)).slice(0,15);
     chart('chTopNeto',{type:'bar',
-      data:{labels:top.map(g=>g.prod),datasets:[{label:'Neto',
-        data:top.map(g=>g.netoVal!==null?g.netoVal:g.neto),
+      data:{labels:top.map(g=>g.prod),datasets:[{label:enPlata?'Neto valorizado':'Neto en unidades',
+        data:top.map(g=>enPlata?g.netoVal:g.neto),
         backgroundColor:top.map(g=>g.neto<0?'#D9453D':'#1E9E5A')}]},
       options:{indexAxis:'y',plugins:{legend:{display:false}}}});
+    document.getElementById('brutoNetoUm').textContent=enPlata?('valorizado'+(mon||'')):'en unidades · sin precios cargados';
 
     Vista.tablaNeto();
 
@@ -2069,8 +2133,8 @@ const Vista = {
     netCount.textContent=U.num(g.length)+' materiales · se muestran hasta 2.000';
     tabla('tbNeto',
       [{t:'Material'},{t:'Descripción'},{t:'UM'},{t:'Ubis c/falt.',num:true},{t:'Ubis c/sobr.',num:true},
-       {t:'Faltante bruto',num:true},{t:'Sobrante bruto',num:true},{t:'NETO',num:true},{t:'Netea'},
-       {t:'Precio',num:true},{t:'Neto valorizado',num:true}],
+       {t:'Faltante bruto',num:true},{t:'Sobrante bruto',num:true},{t:'NETO u',num:true},{t:'Netea'},
+       {t:'Precio',num:true},{t:'Faltante $',num:true},{t:'Sobrante $',num:true},{t:'NETO $',num:true}],
       g.slice(0,2000).map(x=>[
         `<b class="mono">${U.esc(x.prod)}</b>${x.prop&&net.variosProp?'<br><span class="rc-mini">'+U.esc(x.prop)+'</span>':''}`,
         U.esc(x.desc||'—'), U.esc(x.um||'—'),
@@ -2080,7 +2144,9 @@ const Vista = {
         signo(x.neto),
         x.netea?'<span class="net-si">SÍ</span>':'<span class="net-no">NO</span>',
         x.precio!==null?U.num(x.precio,2):'<span class="cero">—</span>',
-        dinero(x.netoVal)
+        x.faltVal?`<span class="falt">${U.num(x.faltVal,0)}</span>`:'<span class="cero">—</span>',
+        x.sobrVal?`<span class="sobr">${U.num(x.sobrVal,0)}</span>`:'<span class="cero">—</span>',
+        `<b>${dinero(x.netoVal)}</b>`
       ]));
   },
 
@@ -2453,9 +2519,10 @@ const Export = {
       V.m.porPasillo.map(z=>[z.k,z.t,z.cont,(z.t?z.cont/z.t*100:0).toFixed(1),z.cerr,(z.t?z.cerr/z.t*100:0).toFixed(1),z.pend,z.c2,z.c3])];
     if(cual==='neto') return [
       ['Material','Descripcion','UM','Propietario','Ubis con faltante','Ubis con sobrante',
-       'Faltante bruto','Sobrante bruto','Neto','Netea','Precio','Neto valorizado','Moneda'],
+       'Faltante bruto u','Sobrante bruto u','Neto u','Netea','Precio',
+       'Faltante valorizado','Sobrante valorizado','Neto valorizado','Moneda'],
       net.grupos.map(g=>[g.prod,g.desc,g.um,g.prop,g.nF,g.nS,g.falt,g.sobr,g.neto,g.netea?'SI':'NO',
-        g.precio,g.netoVal,g.moneda])];
+        g.precio,g.faltVal,g.sobrVal,g.netoVal,g.moneda])];
     if(cual==='sinPrecio') return [
       ['Material','Descripcion','Neto','Faltante bruto','Sobrante bruto'],
       net.sinPrecio.filter(g=>g.neto!==0).map(g=>[g.prod,g.desc,g.neto,g.falt,g.sobr])];
@@ -2504,19 +2571,30 @@ const Export = {
       ['Cerradas sin diferencia',m.ok],['Cerradas con diferencia',m.dif],
       [''],
       ['RESULTADO — el neto se calcula sobre todo el depósito'],
+      ['Moneda',net.moneda||''],
       ['Ítems con diferencia',net.itemsDif],
       ['Ubicaciones con diferencia',net.ubisDif],
-      ['Diferencia bruta (unidades)',+net.brutoUnid.toFixed(3)],
-      ['Unidades que netean',+net.compensado.toFixed(3)],
-      ['% que netea',+net.pctNetea.toFixed(2)],
       ['Materiales con diferencia',net.matDif],
       ['Materiales con neto distinto de cero',net.matNeto],
-      ['Faltante neto (unidades)',+net.faltNeto.toFixed(3)],
-      ['Sobrante neto (unidades)',+net.sobrNeto.toFixed(3)],
+      [''],
+      ['EN DINERO — es el único agregado comparable entre materiales'],
+      ['Faltante bruto valorizado',+net.faltBrutoV.toFixed(2)],
+      ['Sobrante bruto valorizado',+net.sobrBrutoV.toFixed(2)],
+      ['Diferencia bruta valorizada',+net.brutoVal.toFixed(2)],
+      ['Valor que netea entre ubicaciones',+net.compensadoVal.toFixed(2)],
+      ['% que netea',+net.pctNeteaVal.toFixed(2)],
       ['Faltante neto valorizado',+net.faltNetoVal.toFixed(2)],
       ['Sobrante neto valorizado',+net.sobrNetoVal.toFixed(2)],
+      ['Cobertura de precios (%)',+net.cobPrecio.toFixed(2)],
+      [''],
+      ['EN UNIDADES — sólo válido material por material, no sumado'],
+      ['Faltante bruto (unidades)',+net.faltBrutoU.toFixed(3)],
+      ['Sobrante bruto (unidades)',+net.sobrBrutoU.toFixed(3)],
+      ['Faltante neto (unidades)',+net.faltNeto.toFixed(3)],
+      ['Sobrante neto (unidades)',+net.sobrNeto.toFixed(3)],
       [''],
       ['Auditoría de cliente: sólo conteo. El stock no se toca. Faltante y sobrante no se suman entre sí.'],
+      ['Las unidades no se suman entre materiales distintos: el agregado del informe es el valorizado.'],
       ['Si un material falta en una ubicación y sobra en otra, la diferencia netea: el stock está mal ubicado.']
     ];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),'Resumen');

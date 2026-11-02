@@ -51,6 +51,16 @@ El neteo es por material (+ propietario, si en el archivo hay más de uno) y se
 calcula siempre sobre **todo el depósito**: los filtros afectan el listado, no
 el neto. El KPI que resume el W2W es *de la diferencia bruta, cuánto netea*.
 
+**Los importes van en dinero, no en unidades.** Entre materiales distintos las
+unidades no se pueden sumar: un tornillo y un motor no son comparables. Por eso
+el faltante, el sobrante y el porcentaje que netea se calculan valorizados, con
+las unidades como dato secundario. En la tabla por material, donde la unidad sí
+tiene sentido, se muestran las dos cosas.
+
+Si faltan precios en el maestro de ítems, la pantalla avisa qué porcentaje de la
+diferencia bruta quedó sin valorizar y lista los materiales afectados. Sin
+archivo de precios el tablero cae a unidades y lo dice explícitamente.
+
 ### Pantallas
 
 1. **Avance del W2W** — cobertura, cierre, embudo de pases, ritmo y proyección.
