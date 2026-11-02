@@ -227,21 +227,59 @@ input::placeholder{color:var(--acero-300)}
 .filas{display:flex;flex-direction:column}
 .fil{
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,2.6fr) 92px 64px 120px 92px;
-  gap:10px;align-items:center;
+  grid-template-columns:minmax(0,1.1fr) minmax(0,2.4fr) 104px minmax(228px,1fr);
+  grid-template-areas:"id desc tot ctrl" "partes partes partes partes";
+  gap:8px 12px;align-items:center;
   padding:10px 0;border-bottom:1px solid var(--acero-100);
 }
 .fil.cab{
+  grid-template-areas:"id desc tot ctrl";
   font-size:12.5px;font-weight:600;color:var(--acero-500);text-transform:uppercase;
   letter-spacing:.4px;border-bottom:2px solid var(--acero-100);padding-bottom:8px;
 }
-.fil .desc{font-size:14px;min-width:0;overflow-wrap:anywhere}
+.fil .cid{grid-area:id;min-width:0;overflow-wrap:anywhere}
+.fil .desc{grid-area:desc;font-size:14px;min-width:0;overflow-wrap:anywhere}
 .fil .desc small{display:block;color:var(--acero-500);font-size:12.5px}
 .fil .ced{text-align:right;font-variant-numeric:tabular-nums}
-.fil input{text-align:right;padding:9px 10px;font-variant-numeric:tabular-nums;font-weight:600}
+/* Conteo ciego: la fila sólo marca que ya se contó, nunca si coincide. */
 .fil.contada{background:var(--verde-suave)}
-.fil.difer{background:var(--rojo-suave)}
-.fil.sobra{background:var(--azul-suave)}
+
+.ctot{grid-area:tot;text-align:right;min-width:0}
+.ctot .tot{font-size:23px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1;overflow-wrap:anywhere}
+.ctot .tot.cero{color:var(--acero-300);font-weight:400}
+.ctot small{display:block;font-size:11px;color:var(--acero-500);text-transform:uppercase;letter-spacing:.3px}
+
+.cctrl{grid-area:ctrl;display:flex;gap:6px;align-items:center;justify-content:flex-end;min-width:0;flex-wrap:wrap}
+.cctrl input.cant{flex:0 1 76px;width:76px;min-width:0;text-align:right;padding:9px 8px;font-variant-numeric:tabular-nums;font-weight:600}
+.cctrl .btn{flex:0 0 auto}
+.btn.mas{background:var(--amarillo);color:#1a1205;min-width:54px;padding:9px 10px;font-size:15px}
+.btn.mas:hover{filter:brightness(1.08)}
+
+.cpartes{grid-area:partes;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.cpartes:empty{display:none}
+.parte{
+  display:inline-flex;align-items:center;gap:5px;background:var(--papel);
+  border:1px solid var(--acero-300);border-radius:99px;
+  padding:3px 4px 3px 10px;font-size:12.5px;
+}
+.parte b{font-variant-numeric:tabular-nums}
+.parte small{color:var(--acero-500);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.parte .quitar{
+  border:none;background:var(--acero-100);color:var(--acero-700);cursor:pointer;
+  width:20px;height:20px;border-radius:50%;font-size:13px;line-height:1;padding:0;
+}
+.parte .quitar:hover{background:var(--rojo-suave);color:var(--rojo)}
+.mas-partes{font-size:12px;color:var(--acero-500)}
+
+.pegajoso{
+  position:sticky;top:calc(env(safe-area-inset-top, 0px) + var(--hbarra, 64px));
+  z-index:9;background:var(--blanco);border-bottom:1px solid var(--acero-100);
+  margin:-18px -18px 14px;padding:12px 18px;
+  display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;
+}
+.pegajoso .campo{margin-bottom:0;flex:1 1 200px}
+.pegajoso .chips{flex:1 1 100%}
+
 .marca{
   display:inline-block;border-radius:7px;padding:3px 8px;font-size:12.5px;font-weight:700;
   font-variant-numeric:tabular-nums;white-space:nowrap;
@@ -263,17 +301,17 @@ input::placeholder{color:var(--acero-300)}
 @media (max-width:860px){
   .fil.cab{display:none}
   .fil{
-    grid-template-columns:1fr 120px;
-    grid-template-areas:"id id" "desc desc" "sist cant" "dif cant";
-    gap:6px 10px;padding:12px;border-radius:12px;border:var(--borde);margin-bottom:8px;
+    grid-template-columns:1fr 94px;
+    grid-template-areas:"id tot" "desc tot" "ctrl ctrl" "partes partes";
+    gap:4px 10px;padding:12px;border-radius:12px;border:var(--borde);margin-bottom:8px;
   }
-  .fil .cid{grid-area:id}
-  .fil .desc{grid-area:desc}
-  .fil .csist{grid-area:sist;text-align:left}
-  .fil .ccant{grid-area:cant;align-self:center}
-  .fil .cdif{grid-area:dif;text-align:left}
-  .fil input{font-size:17px;padding:12px 10px}
-  .fil .ced.csist::before{content:"Sistema: ";color:var(--acero-500);font-weight:400}
+  .ctot{align-self:start}
+  .ctot .tot{font-size:27px}
+  .cctrl{justify-content:flex-start;margin-top:8px}
+  .cctrl input.cant{flex:1 1 60px;width:auto;min-width:0;font-size:17px;padding:11px 10px}
+  .btn.mas{min-width:64px;padding:11px 12px;font-size:16px}
+  .cctrl .btn{padding:11px 14px}
+  .pegajoso{margin:-18px -18px 12px;padding:10px 18px}
 }
 
 /* ---------- Tablas ---------- */
@@ -424,7 +462,9 @@ let uid=null, miNombre='', puedeEscribir=null;
 let sesiones=[];                            // metadatos de cada inventario
 let sid=null, meta=null;                    // inventario abierto
 let cat=[];                                 // catálogo: filas de la foto de stock
-let conteos=new Map();                      // idx → {cant, nota, por, ts}
+let conteos=new Map();                      // idx → {cant, partes:[{n,z,t}], por, ts}
+const pendientes=new Map();                 // idx → partes aún no confirmadas por el servidor
+let zona='';                                // zona que se está recorriendo ahora
 let extras=new Map();                       // id  → hallazgo sin catalogar
 let unsubSes=null, unsubCont=null, unsubMeta=null;
 let vista='inicio';
@@ -520,11 +560,6 @@ function pintarBarra(){
   const c = limpiar(el('barraAcc'));
   el('sub').textContent = sid && meta ? meta.nombre : 'Conteo físico contra la foto de stock';
   if (sid){
-    if (meta && !meta.cerrado){
-      const b = nodo('button','btn chico claro', meta.ciego ? 'Conteo ciego: sí' : 'Conteo ciego: no');
-      b.title = 'En conteo ciego no se muestra el stock del sistema mientras contás.';
-      b.onclick = alternarCiego; c.appendChild(b);
-    }
     const s = nodo('button','btn chico claro','Cambiar de inventario');
     s.onclick = ()=>{ cerrarSesion(); ir('inicio'); };
     c.appendChild(s);
@@ -749,12 +784,9 @@ function pintarMapeo(){
   inom.oninput = ()=>{ pend.nombre = inom.value; };
   cn.appendChild(inom); p.appendChild(cn);
 
-  const cc = nodo('div','campo');
-  const lab = nodo('label','sw','');
-  const ick = document.createElement('input'); ick.type='checkbox'; ick.id='ciego'; ick.checked = pend.ciego !== false;
-  ick.onchange = ()=>{ pend.ciego = ick.checked; };
-  lab.appendChild(ick); lab.appendChild(nodo('span','','Conteo ciego — ocultar el stock del sistema mientras se cuenta'));
-  cc.appendChild(lab); p.appendChild(cc);
+  const cc = nodo('div','aviso info');
+  cc.textContent = 'El conteo es ciego: mientras contás no se muestra el stock del sistema ni si coincide. Las diferencias aparecen recién en el informe.';
+  p.appendChild(cc);
 
   el('vMapeo').appendChild(p);
 
@@ -844,7 +876,6 @@ async function crearSesion(filas){
   if (puedeEscribir === false){ avisar('No tenés permiso para crear inventarios en este artefacto.', 'mal'); return; }
   const nid = idNuevo();
   const nombre = (el('nomInv') && el('nomInv').value.trim()) || sugerirNombre();
-  const ciego = !(el('ciego') && el('ciego').checked === false);
   const bloques = Math.ceil(filas.length / TAM_BLOQUE);
   if (filas.length > 9000) avisar('Son ' + fmtE(filas.length) + ' líneas: el guardado va a tardar y la pantalla de conteo puede ponerse lenta. Conviene dividir el conteo por depósito o por familia.', 'ojo');
 
@@ -868,7 +899,7 @@ async function crearSesion(filas){
     }
     await DB.doc('inventarios/' + nid).set({
       nombre, creado: Date.now(), archivo: pend ? pend.nombreArch : '—', hoja: pend ? pend.hoja : '',
-      totalFilas: filas.length, bloques, ciego, cerrado:false, contadas:0,
+      totalFilas: filas.length, bloques, ciego:true, cerrado:false, contadas:0,
       conCosto: filas.some(f=>f.costo!==null),
       creadoPor: miNombre || '', creadoPorId: uid || ''
     });
@@ -884,6 +915,8 @@ async function abrirSesion(id){
   cerrarSesion();
   sid = id;
   meta = sesiones.find(s=>s.id===id) || null;
+  pendientes.clear();
+  recuperarZona();
   avisar('Cargando el inventario…', 'info');
   try {
     const snap = await DB.collection('inventarios/' + id + '/catalogo').get();
@@ -909,6 +942,13 @@ async function abrirSesion(id){
       if (x.extra) extras.set(d.id, Object.assign({id:d.id}, x));
       else conteos.set(Number(x.idx), x);
     });
+    // lo pendiente se descarta en cuanto el servidor confirma el mismo total
+    Array.from(pendientes.keys()).forEach(i=>{
+      const esp = pendientes.get(i).reduce((a,x)=>a + (Number(x.n)||0), 0);
+      const g = conteos.get(i);
+      const real = g && g.cant!==null && g.cant!==undefined ? g.cant : null;
+      if ((!pendientes.get(i).length && real===null) || real === esp) pendientes.delete(i);
+    });
     pintarKpis();
     if (vista==='contar') refrescarFilas();
     if (vista==='dif') pintarDif();
@@ -920,7 +960,7 @@ async function abrirSesion(id){
 function cerrarSesion(){
   if (unsubCont) unsubCont(); if (unsubMeta) unsubMeta();
   unsubCont = unsubMeta = null;
-  sid = null; meta = null; cat = []; conteos = new Map(); extras = new Map();
+  sid = null; meta = null; cat = []; conteos = new Map(); extras = new Map(); pendientes.clear(); zona='';
   busq=''; filtro='todas';
   pintarBarra();
 }
@@ -953,25 +993,16 @@ function confirmar(msg){
   return false;
 }
 
-async function alternarCiego(){
-  if (!meta || !DB) return;
-  const nuevo = !meta.ciego;
-  try { await encolar(DB.doc('inventarios/'+sid), ()=>DB.doc('inventarios/'+sid).update({ciego:nuevo})); }
-  catch(e){ avisar('No se pudo cambiar el modo de conteo (' + (e.code||'error') + ').', 'mal'); return; }
-  meta.ciego = nuevo; pintarBarra();
-  if (vista==='contar') pintarContar();
-}
-
 /* ============================================================
    9. Indicadores
    ============================================================ */
 function calcular(){
   let contadas=0, exactas=0, difU=0, difVal=0, difAbsVal=0, faltU=0, sobU=0, faltVal=0, sobVal=0, conDif=0;
   cat.forEach(f=>{
-    const c = conteos.get(f.i);
-    if (!c || c.cant===null || c.cant===undefined) return;
+    const cant = contadoDe(f.i);
+    if (cant===null) return;
     contadas++;
-    const d = c.cant - f.sist;
+    const d = cant - f.sist;
     const val = (f.costo||0) * d;
     difU += d; difVal += val; difAbsVal += Math.abs(val);
     if (d===0) exactas++; else conDif++;
@@ -1011,34 +1042,40 @@ function pintarContar(){
   const v = limpiar(el('vContar'));
   const p = nodo('div','panel');
 
-  const h = nodo('div','herram');
-  const cb = nodo('div','campo');
-  cb.appendChild(nodo('label','','Buscar por código, descripción o ubicación'));
-  const ib = document.createElement('input'); ib.type='text'; ib.id='busq'; ib.value=busq;
-  ib.placeholder = 'Ej.: pasillo A, 7840, tornillo…';
-  ib.autocomplete='off';
-  ib.oninput = ()=>{ busq = ib.value; refrescarFilas(); };
-  cb.appendChild(ib); h.appendChild(cb);
-  p.appendChild(h);
+  // ---- barra fija: zona actual + búsqueda ----
+  const peg = nodo('div','pegajoso');
+  const cz = nodo('div','campo');
+  cz.appendChild(nodo('label','','Zona donde estás contando ahora'));
+  const iz = document.createElement('input');
+  iz.type='text'; iz.id='zona'; iz.value=zona; iz.autocomplete='off';
+  iz.placeholder='Ej.: Pasillo B · entrepiso · fondo';
+  iz.oninput = ()=>{ zona = iz.value; recordarZona(); };
+  cz.appendChild(iz); peg.appendChild(cz);
 
-  const ch = nodo('div','chips'); ch.style.marginBottom='14px';
-  [['todas','Todas'],['pend','Pendientes'],['hechas','Contadas'],['dif','Con diferencia']].forEach(([k,t])=>{
+  const cb = nodo('div','campo');
+  cb.appendChild(nodo('label','','Buscar código, descripción o ubicación'));
+  const ib = document.createElement('input'); ib.type='text'; ib.id='busq'; ib.value=busq;
+  ib.placeholder='Ej.: 7840, tornillo, A-01'; ib.autocomplete='off';
+  ib.oninput = ()=>{ busq = ib.value; refrescarFilas(); };
+  cb.appendChild(ib); peg.appendChild(cb);
+
+  const ch = nodo('div','chips');
+  [['todas','Todas'],['pend','Pendientes'],['hechas','Contadas']].forEach(([k,t])=>{
     const b = nodo('button','chip', t);
     b.setAttribute('aria-pressed', String(filtro===k));
     b.onclick = ()=>{ filtro=k; pintarContar(); };
     ch.appendChild(b);
   });
-  p.appendChild(ch);
+  peg.appendChild(ch);
+  p.appendChild(peg);
 
-  if (meta && meta.ciego) p.appendChild(nodo('div','aviso ojo','Conteo ciego activo: el stock del sistema está oculto. Se revela en Diferencias.'));
+  p.appendChild(nodo('p','ayuda','Cada vez que encontrás mercadería, sumala. No hace falta juntar todo primero: el total se va acumulando y queda anotado dónde apareció cada parte.'));
 
   const cab = nodo('div','fil cab');
   cab.appendChild(nodo('div','','Código'));
-  cab.appendChild(nodo('div','','Descripción / ubicación'));
-  cab.appendChild(nodo('div','ced', meta && meta.ciego ? '' : 'Sistema'));
-  cab.appendChild(nodo('div','ced','UM'));
+  cab.appendChild(nodo('div','','Descripción'));
   cab.appendChild(nodo('div','ced','Contado'));
-  cab.appendChild(nodo('div','ced','Dif.'));
+  cab.appendChild(nodo('div','','Sumar lo que encontrás'));
   p.appendChild(cab);
 
   const cont = nodo('div','filas'); cont.id='filas';
@@ -1048,8 +1085,33 @@ function pintarContar(){
   v.appendChild(p);
 
   v.appendChild(panelHallazgos());
+  medirBarra();
   refrescarFilas();
 }
+
+/* ---- zona actual: comodidad de este dispositivo, no dato compartido ---- */
+function recordarZona(){
+  try { localStorage.setItem('zona:' + sid, zona); } catch(e){}
+}
+function recuperarZona(){
+  try { zona = localStorage.getItem('zona:' + sid) || ''; } catch(e){ zona = ''; }
+}
+
+/* ---- estado de cada línea: lo pendiente de guardar manda sobre lo guardado ---- */
+function partesDe(i){
+  if (pendientes.has(i)) return pendientes.get(i);
+  const c = conteos.get(i);
+  if (!c) return [];
+  if (Array.isArray(c.partes)) return c.partes;
+  if (c.cant!==null && c.cant!==undefined) return [{n:c.cant, z:'', t:c.ts||0}];
+  return [];
+}
+function contadoDe(i){
+  const ps = partesDe(i);
+  if (!ps.length) return null;
+  return ps.reduce((a,x)=>a + (Number(x.n)||0), 0);
+}
+function bloqueado(){ return puedeEscribir === false || !!(meta && meta.cerrado) || !DB; }
 
 function visibles(){
   const q = norm(busq);
@@ -1059,11 +1121,9 @@ function visibles(){
       const h = norm(f.sku) + ' ' + norm(f.desc) + ' ' + norm(f.ubic) + ' ' + norm(f.lote);
       if (!h.includes(q)) continue;
     }
-    const c = conteos.get(f.i);
-    const hecha = !!(c && c.cant!==null && c.cant!==undefined);
+    const hecha = contadoDe(f.i) !== null;
     if (filtro==='pend' && hecha) continue;
     if (filtro==='hechas' && !hecha) continue;
-    if (filtro==='dif' && (!hecha || c.cant===f.sist)) continue;
     out.push(f);
   }
   return out;
@@ -1071,67 +1131,15 @@ function visibles(){
 
 function refrescarFilas(){
   const cont = el('filas'); if (!cont) return;
-  // Mientras alguien está tipeando no se reconstruye la lista: sólo se
-  // actualizan los indicadores, para no perder el foco ni el cursor.
+  // Mientras alguien tipea no se reconstruye la lista: sólo se actualizan
+  // los totales, para no perder el foco ni el cursor.
   const foco = document.activeElement;
-  if (foco && foco.tagName==='INPUT' && cont.contains(foco)){ actualizarMarcas(cont, foco); return; }
+  if (foco && foco.tagName==='INPUT' && cont.contains(foco)){ actualizarTotales(cont); return; }
   const lista = visibles();
   limpiar(cont);
-  const ciego = !!(meta && meta.ciego);
-  const bloqueado = puedeEscribir === false || (meta && meta.cerrado);
 
   lista.slice(0,TOPE_FILAS).forEach(f=>{
-    const c = conteos.get(f.i);
-    const hecha = !!(c && c.cant!==null && c.cant!==undefined);
-    const d = hecha ? c.cant - f.sist : null;
-    const r = nodo('div','fil' + (hecha ? (d===0 ? ' contada' : (d<0 ? ' difer' : ' sobra')) : ''));
-    r.dataset.i = f.i;
-
-    const cid = nodo('div','cid'); cid.appendChild(nodo('span','sku', f.sku));
-    r.appendChild(cid);
-
-    const de = nodo('div','desc', f.desc || '(sin descripción)');
-    const sub = [f.ubic && ('Ubic. ' + f.ubic), f.lote && ('Lote ' + f.lote)].filter(Boolean).join(' · ');
-    if (sub) de.appendChild(nodo('small','', sub));
-    r.appendChild(de);
-
-    r.appendChild(nodo('div','ced csist', ciego ? '' : fmt(f.sist)));
-    r.appendChild(nodo('div','ced', f.um || ''));
-
-    const cc = nodo('div','ccant');
-    const inp = document.createElement('input');
-    inp.type='text'; inp.inputMode='decimal'; inp.autocomplete='off';
-    inp.value = hecha ? nf2.format(c.cant) : '';
-    inp.placeholder = '—';
-    inp.setAttribute('aria-label','Cantidad contada de ' + f.sku);
-    inp.disabled = !!bloqueado;
-    inp.oninput = ()=>guardarConteo(f, inp.value);
-    inp.onkeydown = e=>{
-      if (e.key==='Enter'){
-        e.preventDefault();
-        const todos = Array.prototype.slice.call(document.querySelectorAll('#filas input'));
-        const k = todos.indexOf(inp);
-        if (k>=0 && todos[k+1]) todos[k+1].focus();
-        else inp.blur();
-      }
-    };
-    // al salir del campo se muestra la cantidad tal como quedó registrada
-    inp.onblur = ()=>{
-      const t = inp.value.trim();
-      if (t===''){ return; }
-      const n = parseNum(t);
-      if (n===null){ avisar('No se entendió "' + t + '" como cantidad en ' + f.sku + '.', 'mal'); return; }
-      inp.value = nf2.format(n);
-    };
-    cc.appendChild(inp); r.appendChild(cc);
-
-    const cd = nodo('div','cdif');
-    if (!hecha) cd.appendChild(nodo('span','marca nada','sin contar'));
-    else if (d===0) cd.appendChild(nodo('span','marca ok','exacto'));
-    else cd.appendChild(nodo('span','marca ' + (d<0?'falta':'sobra'), fmtF(d)));
-    r.appendChild(cd);
-
-    cont.appendChild(r);
+    cont.appendChild(filaConteo(f));
   });
 
   const corte = el('corte');
@@ -1145,47 +1153,145 @@ function refrescarFilas(){
   }
 }
 
-/** Refresca clases e indicadores sin tocar el campo que está en uso. */
-function actualizarMarcas(cont, foco){
-  Array.prototype.forEach.call(cont.children, r=>{
-    const i = Number(r.dataset.i);
-    const f = cat[i]; if (!f) return;
-    const c = conteos.get(i);
-    const hecha = !!(c && c.cant!==null && c.cant!==undefined);
-    const d = hecha ? c.cant - f.sist : null;
-    r.className = 'fil' + (hecha ? (d===0 ? ' contada' : (d<0 ? ' difer' : ' sobra')) : '');
-    const cd = r.querySelector('.cdif');
-    if (cd){
-      limpiar(cd);
-      if (!hecha) cd.appendChild(nodo('span','marca nada','sin contar'));
-      else if (d===0) cd.appendChild(nodo('span','marca ok','exacto'));
-      else cd.appendChild(nodo('span','marca ' + (d<0?'falta':'sobra'), fmtF(d)));
+function filaConteo(f){
+  const total = contadoDe(f.i);
+  const hecha = total !== null;
+  // Conteo ciego: la fila sólo dice si ya se contó, nunca si coincide.
+  const r = nodo('div','fil' + (hecha ? ' contada' : ''));
+  r.dataset.i = f.i;
+
+  const cid = nodo('div','cid'); cid.appendChild(nodo('span','sku', f.sku)); r.appendChild(cid);
+
+  const de = nodo('div','desc', f.desc || '(sin descripción)');
+  const sub = nodo('small','');
+  if (f.um) { const b = nodo('b','', f.um); sub.appendChild(b); sub.appendChild(document.createTextNode(' · ')); }
+  sub.appendChild(document.createTextNode([f.ubic && ('Ubic. ' + f.ubic), f.lote && ('Lote ' + f.lote)].filter(Boolean).join(' · ') || 'sin ubicación'));
+  de.appendChild(sub);
+  r.appendChild(de);
+
+  const ct = nodo('div','ctot');
+  ct.appendChild(nodo('div','tot' + (hecha?'':' cero'), hecha ? nf2.format(total) : '—'));
+  ct.appendChild(nodo('small','', hecha ? 'contado' : 'sin contar'));
+  r.appendChild(ct);
+
+  const cc = nodo('div','cctrl');
+  if (!bloqueado()){
+    const b1 = nodo('button','btn chico mas','+1');
+    b1.title = 'Sumar una unidad';
+    b1.onclick = ()=>agregarParte(f, 1);
+    cc.appendChild(b1);
+
+    const inp = document.createElement('input');
+    inp.type='text'; inp.inputMode='decimal'; inp.autocomplete='off';
+    inp.className='cant'; inp.placeholder='cant.';
+    inp.setAttribute('aria-label','Cantidad encontrada de ' + f.sku);
+    const sumar = ()=>{
+      const t = inp.value.trim();
+      if (t===''){ inp.focus(); return; }
+      const n = parseNum(t);
+      if (n===null){ avisar('No se entendió "' + t + '" como cantidad.', 'mal'); return; }
+      inp.value = '';
+      agregarParte(f, n);
+    };
+    inp.onkeydown = e=>{ if (e.key==='Enter'){ e.preventDefault(); sumar(); } };
+    cc.appendChild(inp);
+
+    const bs = nodo('button','btn chico','Sumar');
+    bs.onclick = sumar;
+    cc.appendChild(bs);
+  } else {
+    cc.appendChild(nodo('span','ayuda','sólo lectura'));
+  }
+  r.appendChild(cc);
+
+  const cp = nodo('div','cpartes');
+  pintarPartes(cp, f);
+  r.appendChild(cp);
+  return r;
+}
+
+/** Cada hallazgo queda listado y se puede quitar: así se corrige sin rehacer. */
+function pintarPartes(cp, f){
+  limpiar(cp);
+  const ps = partesDe(f.i);
+  if (ps.length < 1) return;
+  const ult = ps.slice(-8);
+  const base = ps.length - ult.length;
+  if (base > 0) cp.appendChild(nodo('span','mas-partes','+' + base + ' antes'));
+  ult.forEach((pt,k)=>{
+    const i = base + k;
+    const chip = nodo('span','parte');
+    chip.appendChild(nodo('b','', nf2.format(Number(pt.n)||0)));
+    if (pt.z) chip.appendChild(nodo('small','', pt.z));
+    if (!bloqueado()){
+      const x = nodo('button','quitar','×');
+      x.title = 'Quitar este hallazgo';
+      x.setAttribute('aria-label','Quitar ' + nf2.format(Number(pt.n)||0) + (pt.z?(' de '+pt.z):''));
+      x.onclick = ()=>quitarParte(f, i);
+      chip.appendChild(x);
     }
-    const inp = r.querySelector('input');
-    if (inp && inp !== foco){
-      const v = hecha ? nf2.format(c.cant) : '';
-      if (inp.value !== v) inp.value = v;
-    }
+    cp.appendChild(chip);
   });
 }
 
-const esperas = new Map();
-function guardarConteo(f, texto){
-  if (!DB) return;
-  clearTimeout(esperas.get(f.i));
-  esperas.set(f.i, setTimeout(()=>{
-    const ref = DB.doc('inventarios/' + sid + '/conteos/' + f.i);
-    const t = String(texto).trim();
-    const cant = t==='' ? null : parseNum(t);
-    if (t!=='' && cant===null) return;              // texto a medio escribir: no toco nada
-    encolar(ref, ()=>{
-      if (cant===null) return ref.delete();
-      return ref.set({idx:f.i, sku:f.sku, cant, por: miNombre||'', porId: uid||'', ts: Date.now()});
-    }).then(actualizarAvance).catch(e=>{
-      avisar('No se pudo guardar el conteo de ' + f.sku + ' (' + (e.code||'error') + ').', 'mal');
-    });
-  }, 450));
+/** Refresca totales y hallazgos sin tocar el campo que está en uso. */
+function actualizarTotales(cont){
+  const foco = document.activeElement;
+  Array.prototype.forEach.call(cont.children, r=>{
+    const i = Number(r.dataset.i);
+    const f = cat[i]; if (!f) return;
+    const total = contadoDe(i);
+    const hecha = total !== null;
+    r.className = 'fil' + (hecha ? ' contada' : '');
+    const t = r.querySelector('.tot');
+    if (t){
+      t.textContent = hecha ? nf2.format(total) : '—';
+      t.className = 'tot' + (hecha?'':' cero');
+    }
+    const s = r.querySelector('.ctot small');
+    if (s) s.textContent = hecha ? 'contado' : 'sin contar';
+    const cp = r.querySelector('.cpartes');
+    if (cp && !cp.contains(foco)) pintarPartes(cp, f);
+  });
 }
+
+/* ---- escritura de los hallazgos ---- */
+function escribirPartes(f, partes){
+  const ref = DB.doc('inventarios/' + sid + '/conteos/' + f.i);
+  pendientes.set(f.i, partes);
+  if (vista==='contar') actualizarTotales(el('filas') || document.createElement('div'));
+  pintarKpis();
+  return encolar(ref, ()=>{
+    const ps = pendientes.get(f.i) || partes;
+    if (!ps.length) return ref.delete();
+    const cant = ps.reduce((a,x)=>a + (Number(x.n)||0), 0);
+    return ref.set({idx:f.i, sku:f.sku, cant, partes:ps, por: miNombre||'', porId: uid||'', ts: Date.now()});
+  }).then(actualizarAvance).catch(e=>{
+    pendientes.delete(f.i);
+    if (vista==='contar') refrescarFilas();
+    avisar('No se pudo guardar el conteo de ' + f.sku + ' (' + (e.code||'error') + ').', 'mal');
+  });
+}
+
+function agregarParte(f, n){
+  if (!DB || bloqueado() || n===null || !isFinite(n)) return;
+  escribirPartes(f, partesDe(f.i).concat([{n, z: (zona||'').trim(), t: Date.now()}]));
+}
+
+function quitarParte(f, k){
+  if (!DB || bloqueado()) return;
+  const ps = partesDe(f.i).slice();
+  if (k < 0 || k >= ps.length) return;
+  ps.splice(k, 1);
+  escribirPartes(f, ps);
+}
+
+/** Alto real de la barra superior, para que la zona y el buscador queden fijos debajo. */
+function medirBarra(){
+  const b = document.querySelector('.barra');
+  if (b) document.documentElement.style.setProperty('--hbarra', b.offsetHeight + 'px');
+}
+window.addEventListener('resize', medirBarra);
 
 let esperaAvance=null;
 function actualizarAvance(){
@@ -1272,19 +1378,23 @@ function informe(){
   // Una línea por fila del catálogo, o agrupado por SKU.
   const base = [];
   cat.forEach(f=>{
+    const cant = contadoDe(f.i);
+    const hecha = cant !== null;
     const c = conteos.get(f.i);
-    const hecha = !!(c && c.cant!==null && c.cant!==undefined);
+    const zs = Array.from(new Set(partesDe(f.i).map(x=>(x.z||'').trim()).filter(Boolean)));
     base.push({
       sku:f.sku, desc:f.desc, ubic:f.ubic, um:f.um, lote:f.lote,
-      sist:f.sist, cant: hecha ? c.cant : null, costo:f.costo,
-      dif: hecha ? c.cant - f.sist : null,
-      val: hecha && f.costo!==null ? (c.cant - f.sist) * f.costo : null,
-      por: hecha ? (c.por||'') : '', hecha, extra:false
+      sist:f.sist, cant, costo:f.costo,
+      dif: hecha ? cant - f.sist : null,
+      val: hecha && f.costo!==null ? (cant - f.sist) * f.costo : null,
+      zonas: zs, hallazgos: partesDe(f.i).length,
+      por: hecha ? ((c&&c.por)||'') : '', hecha, extra:false
     });
   });
   extras.forEach(x=>{
     base.push({sku:x.sku, desc:x.desc||'', ubic:x.ubic||'', um:'', lote:'', sist:0, cant:x.cant, costo:x.costo??null,
-               dif:x.cant, val: x.costo!==null&&x.costo!==undefined ? x.cant*x.costo : null, por:x.por||'', hecha:true, extra:true});
+               dif:x.cant, val: x.costo!==null&&x.costo!==undefined ? x.cant*x.costo : null,
+               zonas: x.ubic?[x.ubic]:[], hallazgos:1, por:x.por||'', hecha:true, extra:true});
   });
 
   let filas = base;
@@ -1292,16 +1402,18 @@ function informe(){
     const m = new Map();
     base.forEach(r=>{
       let a = m.get(r.sku);
-      if (!a){ a = {sku:r.sku, desc:r.desc, ubic:'', um:r.um, lote:'', sist:0, cant:null, costo:r.costo, dif:null, val:null, por:r.por, hecha:false, extra:r.extra, lineas:0, ubics:new Set()}; m.set(r.sku, a); }
-      a.sist += r.sist; a.lineas++;
+      if (!a){ a = {sku:r.sku, desc:r.desc, ubic:'', um:r.um, lote:'', sist:0, cant:null, costo:r.costo, dif:null, val:null, por:r.por, hecha:false, extra:r.extra, lineas:0, hallazgos:0, ubics:new Set(), zs:new Set()}; m.set(r.sku, a); }
+      a.sist += r.sist; a.lineas++; a.hallazgos += (r.hallazgos||0);
       if (r.ubic) a.ubics.add(r.ubic);
+      (r.zonas||[]).forEach(z=>a.zs.add(z));
       if (r.hecha){ a.hecha = true; a.cant = (a.cant||0) + r.cant; }
       if (!a.desc && r.desc) a.desc = r.desc;
       if (a.costo===null && r.costo!==null) a.costo = r.costo;
     });
     filas = Array.from(m.values()).map(a=>{
       a.ubic = a.ubics.size===1 ? Array.from(a.ubics)[0] : (a.ubics.size ? a.ubics.size + ' ubic.' : '');
-      delete a.ubics;
+      a.zonas = Array.from(a.zs);
+      delete a.ubics; delete a.zs;
       a.dif = a.hecha ? a.cant - a.sist : null;
       a.val = a.hecha && a.costo!==null ? a.dif * a.costo : null;
       return a;
@@ -1369,7 +1481,7 @@ function pintarDif(){
   const th = document.createElement('thead'); const tr = document.createElement('tr');
   const cols = ['Código','Descripción','Ubicación','UM','Sistema','Contado','Dif. unid.','Dif. %'];
   if (meta && meta.conCosto) cols.push('Dif. $');
-  cols.push('Estado');
+  cols.push('Dónde apareció','Estado');
   cols.forEach((x,i)=>tr.appendChild(nodo('th', (i>=4 && i<=8) ? 'n' : '', x)));
   th.appendChild(tr); t.appendChild(th);
 
@@ -1385,6 +1497,8 @@ function pintarDif(){
     f.appendChild(nodo('td','n', r.hecha ? fmtF(r.dif) : '—'));
     f.appendChild(nodo('td','n', r.hecha && r.sist ? fmtF(r.dif/r.sist*100) + '%' : '—'));
     if (meta && meta.conCosto) f.appendChild(nodo('td','n', r.val===null ? '—' : fmtF(r.val)));
+    const zt = (r.zonas||[]).join(' · ');
+    f.appendChild(nodo('td','', zt || (r.hecha ? 'sin zona' : '—')));
     const td = document.createElement('td');
     if (!r.hecha) td.appendChild(nodo('span','marca nada','sin contar'));
     else if (r.extra) td.appendChild(nodo('span','marca sobra','sin catalogar'));
@@ -1426,14 +1540,14 @@ function matriz(filas){
   const conCosto = !!(meta && meta.conCosto);
   const cab = ['Codigo','Descripcion','Ubicacion','UM','Lote','Stock sistema','Contado','Dif unidades','Dif %'];
   if (conCosto) cab.push('Costo unitario','Dif valorizada');
-  cab.push('Estado','Contado por');
+  cab.push('Estado','Zonas donde se encontro','Hallazgos','Contado por');
   const cuerpo = filas.map(r=>{
     const est = !r.hecha ? 'Sin contar' : r.extra ? 'Sin catalogar' : r.dif===0 ? 'Exacto' : r.dif<0 ? 'Faltante' : 'Sobrante';
     const fila = [r.sku, r.desc||'', r.ubic||'', r.um||'', r.lote||'',
       r.sist, r.hecha?r.cant:null, r.hecha?r.dif:null,
       r.hecha && r.sist ? +(r.dif/r.sist*100).toFixed(2) : null];
     if (conCosto) fila.push(r.costo===null?null:r.costo, r.val===null?null:+r.val.toFixed(2));
-    fila.push(est, r.por||'');
+    fila.push(est, (r.zonas||[]).join(' | '), r.hallazgos||0, r.por||'');
     return fila;
   });
   return [cab].concat(cuerpo);
@@ -1455,8 +1569,24 @@ async function exportar(filas, formato){
     } else {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(datos);
-      ws['!cols'] = [{wch:16},{wch:38},{wch:14},{wch:7},{wch:12},{wch:13},{wch:11},{wch:12},{wch:9},{wch:13},{wch:14},{wch:12},{wch:16}];
+      ws['!cols'] = [{wch:16},{wch:38},{wch:14},{wch:7},{wch:12},{wch:13},{wch:11},{wch:12},{wch:9},{wch:13},{wch:14},{wch:12},{wch:26},{wch:10},{wch:16}];
       XLSX.utils.book_append_sheet(wb, ws, 'Diferencias');
+
+      // Detalle: cada hallazgo por separado, con su zona y su hora
+      const det = [['Codigo','Descripcion','Zona del hallazgo','Cantidad','Fecha y hora','Quien']];
+      cat.forEach(f=>{
+        partesDe(f.i).forEach(pt=>{
+          det.push([f.sku, f.desc||'', pt.z||'', Number(pt.n)||0,
+                    pt.t ? new Date(pt.t).toLocaleString(LOC) : '', ((conteos.get(f.i)||{}).por)||'']);
+        });
+      });
+      extras.forEach(x=>det.push([x.sku, x.desc||'', x.ubic||'', x.cant,
+                                  x.ts ? new Date(x.ts).toLocaleString(LOC) : '', x.por||'']));
+      if (det.length > 1){
+        const wd = XLSX.utils.aoa_to_sheet(det);
+        wd['!cols'] = [{wch:16},{wch:34},{wch:22},{wch:11},{wch:19},{wch:14}];
+        XLSX.utils.book_append_sheet(wb, wd, 'Detalle de conteos');
+      }
       const res = [
         ['Inventario', (meta&&meta.nombre)||''],
         ['Archivo origen', (meta&&meta.archivo)||''],
@@ -1512,7 +1642,7 @@ async function crearEjemplo(){
     await DB.doc('inventarios/' + nid + '/catalogo/0').set({n:0, desde:0, filas:base});
     await DB.doc('inventarios/' + nid).set({
       nombre:'EJEMPLO · Insumos de packaging', creado:Date.now(), archivo:'ejemplo (datos ficticios)',
-      hoja:'Ejemplo', totalFilas:base.length, bloques:1, ciego:false, cerrado:false, contadas:0,
+      hoja:'Ejemplo', totalFilas:base.length, bloques:1, ciego:true, cerrado:false, contadas:0,
       conCosto:true, creadoPor: miNombre||'', creadoPorId: uid||''
     });
     avisar('Ejemplo creado con datos ficticios. Cargá cantidades en Contar y mirá el informe.', 'ok');
