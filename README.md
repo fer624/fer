@@ -67,9 +67,17 @@ archivo de precios el tablero cae a unidades y lo dice explícitamente.
 2. **Resultado Neto** — neto por material, % que netea, faltante y sobrante netos.
 3. **Diferencias a Verificar** — ítems del pase vigente con su **espejo**: dónde
    aparece el mismo material con signo opuesto, para ir a verificar el conteo.
+   Haciendo clic en un material del Resultado Neto se baja directo acá,
+   filtrado por ese material.
 4. **Mapa del Depósito** — estado por ubicación y concentración de diferencias.
 5. **Archivos y Configuración** — carga, Status Conteo, umbrales y control de
    calidad de datos.
+
+> El Resultado Neto agrega **por material sobre todo el depósito**; las
+> Diferencias listan **ítem por ubicación** y respetan los filtros y el límite
+> de filas en pantalla. Por eso las dos pantallas no muestran lo mismo: para
+> encontrar un material en el listado, buscalo por su código o entrá con el
+> clic desde el Resultado Neto.
 
 ### Configuración que conviene revisar antes de empezar
 
