@@ -418,7 +418,7 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
   </div>
   <div class="fl"><label>Desde</label><input type="date" id="fDesde"></div>
   <div class="fl"><label>Hasta</label><input type="date" id="fHasta"></div>
-  <div class="fl"><label>Buscar ubicación o material</label><input type="text" id="fBuscar" placeholder="Ej. A-01-01 o 10045"></div>
+  <div class="fl"><label>Buscar ubicación, zona o material</label><input type="text" id="fBuscar" placeholder="Ej. A-01-01, ZONA C o 0963741.000"></div>
   <div class="flex right no-print">
     <button class="btn ghost sm" onclick="UI.resetFiltros()">Limpiar</button>
   </div>
@@ -1802,6 +1802,17 @@ Motor.recalcular = function(){
   if(!M){ Motor.V=null; Vista.render(); return; }
   const f=Motor.filtros();
 
+  /* Ubicaciones que contienen el material buscado en su pase vigente. Sin
+     esto, escribir un código de material descarta todas las ubicaciones
+     (ninguna se llama como el material) y el listado queda vacío. */
+  let ubisQ=null;
+  if(f.q){
+    ubisQ=new Set();
+    for(const it of M.vigentes){
+      if(U.norm(it.prod).includes(f.q) || U.norm(it.desc).includes(f.q)) ubisQ.add(it.u);
+    }
+  }
+
   const arr=M.arr.filter(o=>{
     if(f.zona && o.zona!==f.zona) return false;
     if(f.pasillo && o.pasilloFull!==f.pasillo) return false;
@@ -1812,7 +1823,7 @@ Motor.recalcular = function(){
     if(f.estado && o.estado!==f.estado) return false;
     if(f.d1!==null && (o.ultF===null||o.ultF<f.d1)) return false;
     if(f.d2!==null && (o.ultF===null||o.ultF>f.d2)) return false;
-    if(f.q && !U.norm(o.lbl).includes(f.q) && !U.norm(o.zona).includes(f.q)) return false;
+    if(f.q && !U.norm(o.lbl).includes(f.q) && !U.norm(o.zona).includes(f.q) && !ubisQ.has(o.u)) return false;
     return true;
   });
   const set=new Set(arr.map(o=>o.u));
@@ -1823,7 +1834,8 @@ Motor.recalcular = function(){
     if(f.usr && it.usr!==f.usr) return false;
     if(f.q){
       const q=f.q;
-      if(!U.norm(it.lbl).includes(q) && !U.norm(it.prod).includes(q) && !U.norm(it.desc).includes(q)) return false;
+      if(!U.norm(it.lbl).includes(q) && !U.norm(it.prod).includes(q)
+         && !U.norm(it.desc).includes(q) && !U.norm(it.zona).includes(q)) return false;
     }
     return true;
   });
@@ -2135,7 +2147,8 @@ const Vista = {
       [{t:'Material'},{t:'Descripción'},{t:'UM'},{t:'Ubis c/falt.',num:true},{t:'Ubis c/sobr.',num:true},
        {t:'Faltante bruto',num:true},{t:'Sobrante bruto',num:true},{t:'NETO u',num:true},{t:'Netea'},
        {t:'Precio',num:true},{t:'Faltante $',num:true},{t:'Sobrante $',num:true},{t:'NETO $',num:true}],
-      g.slice(0,2000).map(x=>[
+      g.slice(0,2000).map(x=>{
+      const fila=[
         `<b class="mono">${U.esc(x.prod)}</b>${x.prop&&net.variosProp?'<br><span class="rc-mini">'+U.esc(x.prop)+'</span>':''}`,
         U.esc(x.desc||'—'), U.esc(x.um||'—'),
         U.num(x.nF), U.num(x.nS),
@@ -2147,7 +2160,10 @@ const Vista = {
         x.faltVal?`<span class="falt">${U.num(x.faltVal,0)}</span>`:'<span class="cero">—</span>',
         x.sobrVal?`<span class="sobr">${U.num(x.sobrVal,0)}</span>`:'<span class="cero">—</span>',
         `<b>${dinero(x.netoVal)}</b>`
-      ]));
+      ];
+      fila._attr=` class="pick" data-mat="${U.esc(x.prod)}" title="Ver en qué ubicaciones está esta diferencia"`;
+      return fila;
+    }));
   },
 
   /* ═══════════ PÁGINA 3 · DIFERENCIAS A VERIFICAR ═══════════ */
@@ -2758,6 +2774,16 @@ const UI = {
   refSelect.addEventListener('change',()=>{
     Config.d.ref=refSelect.value; Config.persistir(); Motor.reconstruir();
     U.toast(refSelect.value?'Referencia aplicada':'Se usan todas las referencias','ok');
+  });
+
+  /* clic en un material del resultado neto: baja al detalle por ubicación */
+  document.getElementById('tbNeto').addEventListener('click',e=>{
+    const tr=e.target.closest('tr.pick'); if(!tr) return;
+    fBuscar.value=tr.dataset.mat;
+    difEspejo.value=''; difSigno.value='';
+    Motor.recalcular();
+    UI.ir('p3');
+    U.toast('Mostrando las diferencias del material '+U.esc(tr.dataset.mat)+'. Limpiá el buscador para volver a verlas todas.','ok');
   });
 
   /* clic en una fila de diferencias */
