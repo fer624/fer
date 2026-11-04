@@ -365,10 +365,65 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
         border:1px solid rgba(0,0,0,.15)}
 .xy-dot:hover{outline:2px solid var(--ceva-cyan);outline-offset:1px;z-index:5}
 
+/* ---- Tabla de trazabilidad de recuentos ---- */
+table.dt thead th.grp{background:var(--ceva-blue-2);text-align:center;border-left:2px solid #fff}
+table.dt thead th.p1{background:#14407d} table.dt thead th.p2{background:#8a5a0a}
+table.dt thead th.p3{background:#4a3487}
+table.dt td.sep{border-left:2px solid var(--line)}
+table.dt td.res{background:rgba(0,87,184,.06);font-weight:700}
+html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
+
+/* ---- Ventana de detalle ---- */
+.det-bg{position:fixed;inset:0;background:rgba(10,30,70,.45);display:none;z-index:200;
+        align-items:center;justify-content:center;padding:20px}
+.det-bg.show{display:flex}
+.det-win{background:var(--card);border-radius:12px;box-shadow:var(--shadow-lg);
+         max-width:640px;width:100%;max-height:86vh;display:flex;flex-direction:column}
+.det-win .det-h{display:flex;align-items:center;justify-content:space-between;gap:10px;
+                padding:12px 16px;border-bottom:1px solid var(--line)}
+.det-win .det-h h3{font-size:14px}
+.det-win .det-b{padding:12px 16px;overflow:auto}
+
+/* ---- Productividad ---- */
+.prod-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.nom-grid{display:grid;grid-template-columns:130px 1fr;gap:6px 10px;align-items:center;
+          max-height:320px;overflow:auto;padding-right:4px}
+.nom-grid .u{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;font-weight:700}
+.nom-grid input{padding:5px 8px;font-size:12px}
+
+/* ============ REPORTE DE AVANCE PARA IMPRIMIR ============ */
+#reporte{display:none}
+.rep-h{display:flex;align-items:center;gap:12px;border-bottom:2.5px solid var(--ceva-red);padding-bottom:6px;margin-bottom:8px}
+.rep-h img{height:26px}
+.rep-h .t1{font-size:15px;font-weight:700;color:var(--ceva-blue)}
+.rep-h .t2{font-size:10px;color:var(--gray)}
+.rep-h .right{margin-left:auto;text-align:right;font-size:10px;color:var(--gray)}
+.rep-k{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:8px}
+.rep-k div{border:1px solid var(--line);border-left:3px solid var(--ceva-blue-2);border-radius:5px;padding:5px 7px}
+.rep-k b{display:block;font-size:17px;line-height:1.1}
+.rep-k span{font-size:8.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--gray-2);font-weight:700}
+.rep-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rep-bar{height:14px;background:#eceff3;border-radius:3px;overflow:hidden;margin:2px 0 6px}
+.rep-bar i{display:block;height:100%}
+.rep-fun{display:grid;grid-template-columns:118px 1fr 74px;gap:3px 6px;align-items:center;font-size:9.5px}
+.rep-fun .b{height:11px;background:#eceff3;border-radius:2px;overflow:hidden}
+.rep-fun .b i{display:block;height:100%}
+.rep-fun .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+#reporte table{width:100%;border-collapse:collapse;font-size:9px}
+#reporte th{background:var(--ceva-blue);color:#fff;text-align:left;padding:3px 5px;font-size:8.5px}
+#reporte td{padding:2.5px 5px;border-bottom:1px solid #e6eaf0}
+#reporte td.n{text-align:right;font-variant-numeric:tabular-nums}
+#reporte h4{font-size:10px;margin:6px 0 3px;color:var(--ceva-blue);text-transform:uppercase;letter-spacing:.4px}
+.rep-pie{margin-top:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--gray)}
+
 @media print{
-  .topbar,.nav,.filterbar,.no-print,.tb-btn{display:none !important}
+  @page{size:A4 landscape;margin:9mm}
+  html,body{background:#fff !important}
+  .topbar,.nav,.filterbar,.no-print,.tb-btn,.toast,.modal-bg,.det-bg{display:none !important}
   .page{display:none !important}
-  .page.active{display:block !important}
+  body.imprimiendo .page{display:none !important}
+  body.imprimiendo #reporte{display:block !important}
+  #reporte{color:#000}
   .card{break-inside:avoid;box-shadow:none;border:1px solid #ccc}
   .tbl-scroll{max-height:none !important;overflow:visible !important}
 }
@@ -385,7 +440,8 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
   </div>
   <div class="spacer"></div>
   <div class="pill-status" id="statusPill">Sin datos cargados</div>
-  <button class="tb-btn primary" onclick="UI.ir('p5')">⬆ Cargar archivos</button>
+  <button class="tb-btn primary" onclick="UI.ir('p6')">⬆ Cargar archivos</button>
+  <button class="tb-btn" onclick="Reporte.imprimir()">🖨 Reporte</button>
   <button class="tb-btn" onclick="Export.excel()">⤓ Excel</button>
   <button class="tb-btn" onclick="UI.toggleTheme()" title="Modo claro / oscuro">◐</button>
   <img class="logo-sec" id="logoInv" alt="Inventory Management">
@@ -393,10 +449,11 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
 
 <div class="nav" id="nav">
   <button data-p="p1" class="active">1 · Avance del W2W</button>
-  <button data-p="p2">2 · Resultado Neto</button>
-  <button data-p="p3">3 · Diferencias a Verificar</button>
+  <button data-p="p2">2 · Resultado</button>
+  <button data-p="p3">3 · Recuentos y Diferencias</button>
   <button data-p="p4">4 · Mapa del Depósito</button>
-  <button data-p="p5">5 · Archivos y Configuración <span class="tag r hidden" id="navErr">0</span></button>
+  <button data-p="p5">5 · Productividad</button>
+  <button data-p="p6">6 · Archivos y Configuración <span class="tag r hidden" id="navErr">0</span></button>
 </div>
 
 <div class="filterbar" id="filterbar">
@@ -430,9 +487,9 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
     <div class="big">📦</div>
     <h2>No hay datos cargados todavía</h2>
     <p>Cargá el <b>Maestro de Ubicaciones</b> y la <b>Bajada de Conteos de SAP</b> desde la pantalla
-    <b>5 · Archivos y Configuración</b>.<br>
+    <b>6 · Archivos y Configuración</b>.<br>
     Todo se procesa en tu navegador: el tablero funciona 100% offline y no envía información a ningún servidor.</p>
-    <button class="btn lg" onclick="UI.ir('p5')">⬆ Cargar archivos</button>
+    <button class="btn lg" onclick="UI.ir('p6')">⬆ Cargar archivos</button>
   </div>
 
   <div id="p1Body" class="hidden">
@@ -492,32 +549,32 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
   <div id="p2Empty"></div>
   <div id="p2Body">
     <div id="avisoPrecio"></div>
-    <div class="rc-nivel rc-nivel-ubi">Diferencia bruta — por ubicación</div>
+    <div class="rc-nivel rc-nivel-ubi">Diferencias encontradas</div>
     <div class="grid c4 mb12" id="kpiBruto"></div>
-    <div class="rc-nivel rc-nivel-mat">Resultado neto — por material</div>
-    <div class="grid c4 mb12" id="kpiNeto"></div>
+    <div id="bloqueNeteo"></div>
 
-    <div class="grid c2 mb12">
-      <div class="card"><h3>Bruto vs neto <span class="mini" id="brutoNetoUm">valorizado</span></h3><div class="chart-wrap"><canvas id="chBrutoNeto"></canvas></div></div>
-      <div class="card"><h3>Top 15 materiales por magnitud del neto</h3><div class="chart-wrap"><canvas id="chTopNeto"></canvas></div></div>
+    <div class="grid c3 mb12">
+      <div class="card"><h3>Faltantes y sobrantes <span class="mini">cantidad de ítems</span></h3><div class="chart-wrap"><canvas id="chFaltSobr"></canvas></div></div>
+      <div class="card"><h3>Ítems con diferencia por zona</h3><div class="chart-wrap"><canvas id="chDifZona"></canvas></div></div>
+      <div class="card"><h3>Top 15 materiales por magnitud <span class="mini" id="brutoNetoUm">valorizado</span></h3><div class="chart-wrap"><canvas id="chTopNeto"></canvas></div></div>
     </div>
 
     <div class="card mb12">
-      <h3>Resultado neto por material <span class="mini" id="netCount"></span></h3>
+      <h3>Resultado por material <span class="mini" id="netCount"></span></h3>
       <div class="flex mb8 no-print">
         <button class="btn sm ghost" onclick="Export.csv('neto')">⤓ CSV</button>
         <div class="fl"><label>Mostrar</label>
           <select id="netFiltro">
             <option value="todos">Todos los materiales con diferencia</option>
-            <option value="neto">Sólo con neto distinto de cero</option>
+            <option value="neto">Sólo con resultado distinto de cero</option>
             <option value="netea">Sólo los que netean (faltante y sobrante)</option>
           </select>
         </div>
         <div class="fl"><label>Ordenar por</label>
           <select id="netOrden">
-            <option value="val">Magnitud valorizada del neto</option>
-            <option value="abs">Magnitud del neto en unidades</option>
-            <option value="bruto">Diferencia bruta</option>
+            <option value="val">Magnitud valorizada</option>
+            <option value="abs">Magnitud en unidades</option>
+            <option value="bruto">Faltante más sobrante</option>
             <option value="mat">Material</option>
           </select>
         </div>
@@ -536,9 +593,10 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
 <!-- ══════════════ PÁGINA 3 · DIFERENCIAS A VERIFICAR ══════════════ -->
 <div class="page" id="p3">
   <div class="note">
-    Diferencias del <b>pase vigente</b> de cada ubicación. La columna <b>Espejo</b> muestra en qué otras ubicaciones
-    aparece el mismo material con signo opuesto: son las candidatas a <b>verificar el conteo</b> para confirmar si la
-    diferencia netea. No implica mover ni ajustar nada.
+    Una fila por <b>ubicación y material</b>, con los tres recuentos al lado. Cuando una diferencia se contabiliza,
+    SAP actualiza el stock y el teórico del pase siguiente ya trae el ajuste: por eso el <b>resultado</b> se mide
+    contra el teórico del primer conteo. La columna <b>Espejo</b> indica si el mismo material aparece con signo
+    opuesto en otra ubicación. Nada de esto implica mover ni ajustar: es sólo conteo.
   </div>
   <div id="p3Empty"></div>
   <div id="p3Body">
@@ -569,6 +627,12 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
         <div class="fl"><label>Mostrar</label>
           <select id="difLimit"><option value="500">500 filas</option><option value="2000">2.000 filas</option><option value="10000">10.000 filas</option></select>
         </div>
+        <div class="fl"><label>Filas</label>
+          <select id="difQue">
+            <option value="dif">Sólo con diferencia</option>
+            <option value="todas">Todos los recuentos</option>
+          </select>
+        </div>
         <div class="flex right no-print">
           <button class="btn sm ghost" onclick="Export.csv('dif')">⤓ CSV completo</button>
           <button class="btn sm gray" onclick="window.print()">🖨 Hoja de verificación</button>
@@ -577,11 +641,9 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
     </div>
     <div class="grid kpis mb12" id="kpiDif"></div>
     <div class="card">
-      <h3>Ítems con diferencia <span class="mini" id="difCount"></span></h3>
-      <div class="rc-split">
-        <div class="tbl-scroll" style="max-height:640px"><table class="dt" id="tbDif"></table></div>
-        <div id="difDetalle" class="rc-detalle"></div>
-      </div>
+      <h3>Recuentos por ubicación y material <span class="mini" id="difCount"></span></h3>
+      <div class="tbl-scroll" style="max-height:660px"><table class="dt" id="tbDif"></table></div>
+      <div class="mini mt8" style="color:var(--gray-2)">Clic en una fila para ver el detalle completo.</div>
     </div>
   </div>
 </div>
@@ -621,8 +683,62 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
   </div>
 </div>
 
-<!-- ══════════════ PÁGINA 5 · ARCHIVOS Y CONFIGURACIÓN ══════════════ -->
+<!-- ══════════════ PÁGINA 5 · PRODUCTIVIDAD ══════════════ -->
 <div class="page" id="p5">
+  <div class="note">
+    Cada documento de inventario se le atribuye al contador que lo registró. Una ubicación contada por dos personas
+    en pases distintos suma para las dos. <b>Ocupadas</b> y <b>vacías</b> salen del Status Ubi del archivo.
+  </div>
+  <div id="p5Empty"></div>
+  <div id="p5Body">
+    <div class="grid kpis mb12" id="kpiProd"></div>
+
+    <div class="grid c2 mb12">
+      <div class="card"><h3>Ubicaciones contadas por contador</h3><div class="chart-wrap lg"><canvas id="chProdUbi"></canvas></div></div>
+      <div class="card"><h3>Ocupadas y vacías por contador</h3><div class="chart-wrap lg"><canvas id="chProdOcu"></canvas></div></div>
+    </div>
+
+    <div class="card mb12">
+      <h3>Detalle por contador <span class="mini" id="prodCount"></span></h3>
+      <div class="flex mb8 no-print">
+        <button class="btn sm ghost" onclick="Export.csv('productividad')">⤓ CSV</button>
+        <div class="fl"><label>Ordenar por</label>
+          <select id="prodOrden">
+            <option value="ubis">Ubicaciones contadas</option>
+            <option value="ritmo">Ubicaciones por hora</option>
+            <option value="dif">Ítems con diferencia</option>
+            <option value="nombre">Nombre</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-scroll" style="max-height:520px"><table class="dt" id="tbProd"></table></div>
+    </div>
+
+    <div class="card">
+      <h3>Nombres de los contadores <span class="mini">se guardan en este navegador</span></h3>
+      <div class="note">Escribí el apellido y nombre al lado de cada usuario. Aparecen en la tabla, en el CSV y en el reporte.</div>
+      <div class="grid c2">
+        <div>
+          <div class="nom-grid" id="nomGrid"></div>
+          <div class="flex mt12">
+            <button class="btn sm" onclick="Prod.guardarNombres()">Guardar nombres</button>
+            <button class="btn sm ghost" onclick="Prod.borrarNombres()">Borrar todos</button>
+          </div>
+        </div>
+        <div>
+          <label>Pegar desde Excel <span class="rc-mini">una línea por usuario: usuario, tabulación, apellido y nombre</span></label>
+          <textarea id="nomPegar" rows="10" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;
+            font-size:12px;padding:8px;border:1px solid var(--acero-300,#a9b6c1);border-radius:8px;
+            background:var(--card);color:var(--txt)" placeholder="FINARG17&#9;Cuitiño, Fernando&#10;FINARG08&#9;Pérez, Ana"></textarea>
+          <button class="btn sm claro mt8" onclick="Prod.pegarNombres()">Aplicar lista pegada</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PÁGINA 6 · ARCHIVOS Y CONFIGURACIÓN ══════════════ -->
+<div class="page" id="p6">
   <div class="card mb12">
     <h3>Carga y actualización de archivos</h3>
     <div class="note">Formatos aceptados: <b>.xlsx .xls .xlsm .csv .txt</b>. Los archivos quedan guardados en el navegador.
@@ -758,6 +874,18 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
     </div>
   </div>
 </div>
+
+<!-- ══════════════ VENTANA DE DETALLE ══════════════ -->
+<div class="det-bg" id="mdDet">
+  <div class="det-win">
+    <div class="det-h"><h3 id="detTitulo">Detalle</h3>
+      <button class="x" onclick="UI.cerrarDet()">×</button></div>
+    <div class="det-b" id="detCuerpo"></div>
+  </div>
+</div>
+
+<!-- ══════════════ REPORTE DE AVANCE (sólo al imprimir) ══════════════ -->
+<div id="reporte"></div>
 
 <div class="toast" id="toast"></div>
 <script>
@@ -977,7 +1105,7 @@ const Config = {
     netProp:0,          // 0 = no netear entre propietarios distintos
     inter:0,            // las intermedias quedan fuera del universo
     ref:'',             // referencia del W2W; vacío = todas
-    tema:'light',
+    tema:'light', nombres:{},
     statusOK:null       // null = auto-detección por el texto del Status Conteo
   },
   d:{},
@@ -1542,7 +1670,7 @@ const Motor = {
     }
 
     /* ---------- 3 · DERIVACIÓN DEL PASE Y ESTADO ---------- */
-    const vigentes=[];
+    const vigentes=[], prodMap=new Map();
     /* Un documento sin ninguna cantidad informada es una ubicación activada
        pero no contada. Si se contara como pase, la ubicación cerraría "sin
        diferencia" sin que nadie la haya contado nunca. */
@@ -1577,11 +1705,28 @@ const Motor = {
       lista.forEach((d,idx)=>{
         d.pase=idx+1;
         d.dif=false; d.difItems=0; d.difUnid=0;
+
+        /* Productividad: el documento se le atribuye a quien lo registró. */
+        const pu=d.usr||'(sin contador)';
+        if(!prodMap.has(pu)) prodMap.set(pu,{usr:pu,ubis:new Set(),ocu:new Set(),vac:new Set(),
+          items:0,dif:0,horas:new Set(),min:null,max:null,docs:0});
+        const P=prodMap.get(pu);
+        P.ubis.add(o.u); P.docs++;
+        if(d.f!==null){
+          const ts=d.f+(d.h||0)*60000;
+          if(P.min===null||ts<P.min) P.min=ts;
+          if(P.max===null||ts>P.max) P.max=ts;
+          if(d.h!==null) P.horas.add(U.iso(new Date(d.f))+'|'+Math.floor(d.h/60));
+        }
+        const su=U.hdr((d.items[0]||{}).statusUbi||'');
+        if(su.includes('OCUP')) P.ocu.add(o.u); else if(su.includes('VAC')) P.vac.add(o.u);
+
         d.items.forEach(c=>{
           const qd=Motor.dif(c);
           d.difItems += (qd!==null && qd!==0) ? 1 : 0;
           d.difUnid  += (qd!==null) ? Math.abs(qd) : 0;
           if(qd!==null && qd!==0) d.dif=true;
+          P.items++; if(qd!==null && qd!==0) P.dif++;
 
           /* Sólo se guarda el consolidado por material: el detalle fila por
              fila de cada pase no lo consume ninguna vista y, en un W2W real,
@@ -1592,16 +1737,23 @@ const Motor = {
             prod:c.prod, prodK:k, desc:c.desc, um:c.um, prop:c.prop,
             qtPrim:null, qcUlt:null, qdRawUlt:null,
             pasePrim:d.pase, paseUlt:d.pase, docPrim:d.doc, docUlt:d.doc,
-            fUlt:d.f, hUlt:d.h, usr:usr, st:c.st, stDoc:'', stInv:'', stInv2:'',
-            tipoAlm:c.tipoAlm, areaAlm:c.areaAlm, areaAct:c.areaAct
+            fUlt:d.f, hUlt:d.h, usr:usr, st:c.st, stDoc:'', stInv:'', stInv2:'', statusUbi:'',
+            tipoAlm:c.tipoAlm, areaAlm:c.areaAlm, areaAct:c.areaAct,
+            pd:[], docs:[]
           });
           const m=porMat.get(k);
           if(m.qtPrim===null && c.qt!==null) m.qtPrim=c.qt;   // teórico del primer conteo
           if(c.qc!==null) m.qcUlt=c.qc;                        // contado del último
           const raw=Motor.difRaw(c); if(raw!==null) m.qdRawUlt=raw;
+          /* teórico, contado y diferencia de cada pase, para la trazabilidad */
+          const ix=(d.pase-1)*3;
+          m.pd[ix]=c.qt; m.pd[ix+1]=c.qc;
+          m.pd[ix+2]= raw===null ? null : (Config.d.signo ? -raw : raw);
+          m.docs[d.pase-1]=d.doc;
           m.paseUlt=d.pase; m.docUlt=d.doc; m.fUlt=d.f; m.hUlt=d.h;
           if(usr) m.usr=usr;
           if(c.st) m.st=c.st;
+          if(c.statusUbi) m.statusUbi=c.statusUbi;
           if(c.stDoc) m.stDoc=c.stDoc;
           if(c.stInv) m.stInv=c.stInv;
           if(c.stInv2) m.stInv2=c.stInv2;
@@ -1638,7 +1790,9 @@ const Motor = {
           sector:o.sector, col:o.col, nivel:o.nivel, pos:o.pos,
           estadoUbi:o.estadoUbi, momu:o.momu, enUniverso:o.enUniverso,
           doc:m.docUlt, docPrim:m.docPrim, f:m.fUlt, h:m.hUlt,
-          pase:m.paseUlt, pasePrim:m.pasePrim, pases:lista.length,
+          pase:m.paseUlt, pasePrim:m.pasePrim, pases:lista.length, pd:m.pd, docs:m.docs,
+          statusUbi:m.statusUbi,
+          confirmada:(m.paseUlt>m.pasePrim && m.qdRawUlt===0 && m.difAud!==null && m.difAud!==0),
           prod:m.prod, prodK:m.prodK, desc:m.desc,
           qt:m.qtPrim, qc:m.qcUlt, qd:m.difAud,
           qdUlt:(m.qdRawUlt===null?null:(Config.d.signo?-m.qdRawUlt:m.qdRawUlt)),
@@ -1736,7 +1890,7 @@ const Motor = {
       ref:Config.d.ref,
       detalle:'El archivo trae '+refsOrd.length+' referencias que declaran el número de conteo ('+
               refsOrd.map(r=>r.lbl).slice(0,4).join(', ')+'). Al filtrar por una sola se pierden los demás pases. '+
-              'Dejá "Todas las referencias" en la pantalla 5.'});
+              'Dejá "Todas las referencias" en la pantalla 6.'});
 
     const iniW=new Date(Config.d.ini+'T00:00:00').getTime(), finW=new Date(Config.d.fin+'T23:59:59').getTime();
     let fuera=0;
@@ -1772,7 +1926,7 @@ const Motor = {
     const serieDia=[...dayMap.entries()].map(([iso,s])=>({iso,n:s.size})).sort((a,b)=>a.iso<b.iso?-1:1);
 
     Motor.M={
-      ubis, arr:[...ubis.values()], vigentes,
+      ubis, arr:[...ubis.values()], vigentes, prod:[...prodMap.values()],
       refs, statusSet, props, precios, monedas,
       cal, serieDia, horaMap,
       st:{regTot,regValidos,regFueraRef,sinUbi,sinFecha,sinDoc,sinCant,
@@ -1789,13 +1943,15 @@ Motor.neteo = function(){
   const M=Motor.M;
   const variosProp = M.props.size>1;
   const grupos=new Map();
-  let brutoUnid=0, itemsDif=0;
-  const ubisDif=new Set();
+  let brutoUnid=0, itemsDif=0, itemsFalt=0, itemsSobr=0;
+  const ubisDif=new Set(), porZona=new Map();
 
   for(const it of M.vigentes){
     if(!it.enUniverso) continue;
     if(it.qd===null || it.qd===0) continue;
     itemsDif++; brutoUnid+=Math.abs(it.qd); ubisDif.add(it.u);
+    if(it.qd<0) itemsFalt++; else itemsSobr++;
+    porZona.set(it.zona,(porZona.get(it.zona)||0)+1);
     const k=Motor.claveNeteo(it,variosProp);
     if(!grupos.has(k)) grupos.set(k,{k,prod:it.prod,prodK:it.prodK,prop:it.prop,desc:it.desc,
       falt:0,sobr:0,neto:0,nF:0,nS:0,faltItems:[],sobrItems:[],
@@ -1815,6 +1971,7 @@ Motor.neteo = function(){
      válido entre materiales es el valorizado.                              */
   let faltBrutoU=0, sobrBrutoU=0, faltBrutoV=0, sobrBrutoV=0, netoAbsVal=0, unidSinPrecio=0;
   grupos.forEach(g=>{
+    g.itemsF=g.faltItems.length; g.itemsS=g.sobrItems.length;
     g.nF=g.faltUbis.size; g.nS=g.sobrUbis.size;
     g.netea = g.falt>0 && g.sobr>0;
     g.compensado = Math.min(g.falt,g.sobr)*2;   // unidades que se cancelan entre sí
@@ -1853,7 +2010,8 @@ Motor.neteo = function(){
     unidSinPrecio,
     cobPrecio: brutoUnid ? (brutoUnid-unidSinPrecio)/brutoUnid*100 : 100,
     hayPrecios: brutoVal>0,
-    itemsDif, ubisDif:ubisDif.size,
+    itemsDif, ubisDif:ubisDif.size, itemsFalt, itemsSobr, porZona:[...porZona.entries()],
+    faltVal:faltBrutoV, sobrVal:sobrBrutoV,
     matDif:grupos.size, matNeto, matNetea,
     faltNeto, sobrNeto, faltNetoVal, sobrNetoVal,
     sinPrecio,
@@ -2022,15 +2180,74 @@ const LBL_EST = {PEND:'Pendiente de contar',C2:'En 2° conteo',C3:'En 3° conteo
 const CLS_EST = {PEND:'st-pend',C2:'st-c2',C3:'st-c3',OK:'st-ok',DIF:'st-dif'};
 const CH = {};
 
+/* Etiquetas dibujadas sobre el gráfico: sin esto los valores sólo se ven
+   pasando el mouse, que en una pantalla de depósito no sirve de nada. */
+const Etiquetas={
+  id:'etiquetas',
+  afterDatasetsDraw(c,a,o){
+    const fmt = o && o.fmt==='money' ? (v=>U.num(v,0)) : (v=>U.num(v,0));
+    const dark=document.documentElement.getAttribute('data-theme')==='dark';
+    const ctx=c.ctx; ctx.save();
+    ctx.font='700 11px Segoe UI, sans-serif'; ctx.textBaseline='middle';
+    c.data.datasets.forEach((ds,di)=>{
+      const meta=c.getDatasetMeta(di);
+      if(meta.hidden) return;
+      const tipo=meta.type||c.config.type;
+      meta.data.forEach((el,i)=>{
+        const v=ds.data[i];
+        if(v===null||v===undefined||v===0||!isFinite(v)) return;
+        const txt=fmt(v);
+        if(tipo==='doughnut'||tipo==='pie'){
+          const ang=Math.abs(el.endAngle-el.startAngle);
+          if(ang<0.30) return;                       // porción muy chica: va en la leyenda
+          const pos=el.getCenterPoint();
+          ctx.textAlign='center'; ctx.fillStyle='#fff';
+          ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.35)';
+          ctx.strokeText(txt,pos.x,pos.y); ctx.fillText(txt,pos.x,pos.y);
+        }else if(tipo==='bar'){
+          ctx.fillStyle=dark?'#EDF0F5':'#1F2430';
+          const horiz=c.options.indexAxis==='y';
+          if(horiz){
+            if(el.width<18) return;
+            ctx.textAlign='left'; ctx.fillText(txt,el.x+4,el.y);
+          }else{
+            if(el.height<10) return;
+            ctx.textAlign='center'; ctx.fillText(txt,el.x,el.y-9);
+          }
+        }
+      });
+    });
+    ctx.restore();
+  }
+};
+
+/* Leyenda con el número al lado de cada categoría. */
+function leyendaConValores(c){
+  const ds=c.data.datasets[0]||{data:[]};
+  const total=ds.data.reduce((a,b)=>a+(+b||0),0);
+  return c.data.labels.map((l,i)=>{
+    const v=+ds.data[i]||0;
+    const pct=total?' · '+U.pct(v/total*100,1):'';
+    return {
+      text:l+'  '+U.num(v)+pct,
+      fillStyle:Array.isArray(ds.backgroundColor)?ds.backgroundColor[i]:ds.backgroundColor,
+      strokeStyle:'transparent', index:i,
+      hidden:!c.getDataVisibility(i)
+    };
+  });
+}
+
 function chart(id,cfg){
   const el=document.getElementById(id); if(!el) return;
   if(CH[id]) CH[id].destroy();
+  cfg.plugins=(cfg.plugins||[]).concat([Etiquetas]);
   const dark=document.documentElement.getAttribute('data-theme')==='dark';
   const grid=dark?'rgba(255,255,255,.08)':'rgba(0,0,0,.07)';
   const tick=dark?'#9AA4B6':'#5A6474';
   cfg.options=cfg.options||{};
   cfg.options.responsive=true; cfg.options.maintainAspectRatio=false;
   cfg.options.animation={duration:400};
+  cfg.options.layout=Object.assign({padding:{top:16,right:34}},cfg.options.layout||{});
   cfg.options.plugins=cfg.options.plugins||{};
   cfg.options.plugins.legend=Object.assign({labels:{boxWidth:11,font:{size:11},color:tick}},cfg.options.plugins.legend||{});
   if(cfg.options.scales){
@@ -2075,10 +2292,11 @@ const Vista = {
       p1Empty.classList.remove('hidden'); p1Body.classList.add('hidden');
       const msg=`<div class="empty"><div class="big">📦</div><h2>Todavía no hay datos suficientes</h2>
         <p>Hacen falta el <b>Maestro de Ubicaciones</b> y la <b>Bajada de Conteos de SAP</b>.</p>
-        <button class="btn lg" onclick="UI.ir('p5')">⬆ Ir a cargar archivos</button></div>`;
+        <button class="btn lg" onclick="UI.ir('p6')">⬆ Ir a cargar archivos</button></div>`;
       p2Empty.innerHTML=msg; p2Body.classList.add('hidden');
       p3Empty.innerHTML=msg; p3Body.classList.add('hidden');
       Object.keys(CH).forEach(k=>{CH[k].destroy();delete CH[k];});
+      Prod.render();
       Vista.calidad();
       Vista.historial();
       return;
@@ -2089,6 +2307,7 @@ const Vista = {
     Vista.avance();
     Vista.neto();
     Vista.diferencias();
+    Prod.render();
     Mapa.render();
     Vista.calidad();
     Vista.historial();
@@ -2190,44 +2409,54 @@ const Vista = {
           : '')
       : `<div class="note bad">No hay precios cargados. Los importes aparecen vacíos y el porcentaje que netea
          se calcula en unidades, que entre materiales distintos no es comparable.
-         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 5.</div>`;
+         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 6.</div>`;
 
+    const nF=net.itemsFalt, nS=net.itemsSobr;
     kpiBruto.innerHTML=[
-      kpi('Ítems con diferencia',U.num(net.itemsDif),'un ítem es un material en una ubicación','bad'),
       kpi('Ubicaciones con diferencia',U.num(net.ubisDif),'sobre el universo físico','bad'),
-      kpi('Faltante bruto',$(net.faltBrutoV),U.num(net.faltBrutoU,0)+' unidades, sin netear','bad'),
-      kpi('Sobrante bruto',$(net.sobrBrutoV),U.num(net.sobrBrutoU,0)+' unidades, sin netear','ok')
+      kpi('Ítems con diferencia',U.num(net.itemsDif),'un ítem es un material en una ubicación','bad'),
+      kpi('Faltante',U.num(nF)+(nF===1?' ítem':' ítems'),
+          (net.hayPrecios?$(net.faltVal)+' · ':'')+U.num(net.faltBrutoU,0)+' unidades','bad'),
+      kpi('Sobrante',U.num(nS)+(nS===1?' ítem':' ítems'),
+          (net.hayPrecios?$(net.sobrVal)+' · ':'')+U.num(net.sobrBrutoU,0)+' unidades','ok')
     ].join('');
 
+    /* El neteo sólo se muestra cuando de verdad hay materiales que netean:
+       si ninguno se cancela, bruto y neto son el mismo número y mostrar los
+       dos sólo confunde. */
     const pct = net.hayPrecios ? net.pctNeteaVal : net.pctNetea;
-    kpiNeto.innerHTML=[
-      kpi('De la diferencia bruta, netea',U.pct(pct,1),
-          net.hayPrecios
-            ? $(net.compensadoVal)+' de '+$(net.brutoVal)+' se cancelan entre ubicaciones'
-            : U.num(net.compensado,0)+' de '+U.num(net.brutoUnid,0)+' unidades (sin precios)',
-          pct>=50?'ok':'warn'),
-      kpi('Materiales con neto ≠ 0',U.num(net.matNeto),'de '+U.num(net.matDif)+' materiales con diferencia','bad'),
-      kpi('Faltante neto',$(net.faltNetoVal),U.num(net.faltNeto,0)+' unidades','bad'),
-      kpi('Sobrante neto',$(net.sobrNetoVal),U.num(net.sobrNeto,0)+' unidades','ok')
-    ].join('');
+    document.getElementById('bloqueNeteo').innerHTML = net.matNetea
+      ? '<div class="rc-nivel rc-nivel-mat">Neteo entre ubicaciones — el mismo material con signo opuesto</div>'+
+        '<div class="grid c4 mb12">'+[
+          kpi('Materiales que netean',U.num(net.matNetea),'de '+U.num(net.matDif)+' con diferencia','ok'),
+          kpi('De la diferencia, netea',U.pct(pct,1),
+              net.hayPrecios?$(net.compensadoVal)+' de '+$(net.brutoVal):U.num(net.compensado,0)+' de '+U.num(net.brutoUnid,0)+' unidades',
+              pct>=50?'ok':'warn'),
+          kpi('Faltante neto',$(net.faltNetoVal),U.num(net.faltNeto,0)+' unidades','bad'),
+          kpi('Sobrante neto',$(net.sobrNetoVal),U.num(net.sobrNeto,0)+' unidades','ok')
+        ].join('')+'</div>'
+      : '<div class="note ok mb12">Ningún material aparece con signo opuesto en otra ubicación: '+
+        '<b>todas las diferencias son netas</b>, no hay nada que se cancele entre ubicaciones.</div>';
 
     const enPlata=net.hayPrecios;
-    chart('chBrutoNeto',{type:'bar',
-      data:{labels:['Faltante','Sobrante'],datasets:[
-        {label:'Bruto',data:enPlata?[net.faltBrutoV,net.sobrBrutoV]:[net.faltBrutoU,net.sobrBrutoU],
-         backgroundColor:'#8A94A6'},
-        {label:'Neto',data:enPlata?[net.faltNetoVal,net.sobrNetoVal]:[net.faltNeto,net.sobrNeto],
-         backgroundColor:['#D9453D','#1E9E5A']}]},
-      options:{scales:{y:{beginAtZero:true}}}});
+    chart('chFaltSobr',{type:'bar',
+      data:{labels:['Faltantes','Sobrantes'],
+            datasets:[{label:'Ítems',data:[nF,nS],backgroundColor:['#D9453D','#1E9E5A']}]},
+      options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+
+    const zs=net.porZona.slice().sort((a,b)=>b[1]-a[1]).slice(0,14);
+    chart('chDifZona',{type:'bar',
+      data:{labels:zs.map(z=>z[0]),datasets:[{label:'Ítems con diferencia',data:zs.map(z=>z[1]),backgroundColor:'#0057B8'}]},
+      options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
 
     const base=enPlata?net.grupos.filter(g=>g.neto!==0&&g.netoVal!==null):net.grupos.filter(g=>g.neto!==0);
     const top=base.sort((a,b)=>Math.abs(enPlata?b.netoVal:b.neto)-Math.abs(enPlata?a.netoVal:a.neto)).slice(0,15);
     chart('chTopNeto',{type:'bar',
-      data:{labels:top.map(g=>g.prod),datasets:[{label:enPlata?'Neto valorizado':'Neto en unidades',
-        data:top.map(g=>enPlata?g.netoVal:g.neto),
+      data:{labels:top.map(g=>g.prod),datasets:[{label:enPlata?'Magnitud':'Unidades',
+        data:top.map(g=>Math.abs(enPlata?g.netoVal:g.neto)),
         backgroundColor:top.map(g=>g.neto<0?'#D9453D':'#1E9E5A')}]},
       options:{indexAxis:'y',plugins:{legend:{display:false}}}});
-    document.getElementById('brutoNetoUm').textContent=enPlata?('valorizado'+(mon||'')):'en unidades · sin precios cargados';
+    document.getElementById('brutoNetoUm').textContent=enPlata?('valorizado'+(mon||'')):'en unidades · sin precios';
 
     Vista.tablaNeto();
 
@@ -2253,8 +2482,8 @@ const Vista = {
     netCount.textContent=U.num(g.length)+' materiales · se muestran hasta 2.000';
     tabla('tbNeto',
       [{t:'Material'},{t:'Descripción'},{t:'UM'},{t:'Ubis c/falt.',num:true},{t:'Ubis c/sobr.',num:true},
-       {t:'Faltante bruto',num:true},{t:'Sobrante bruto',num:true},{t:'NETO u',num:true},{t:'Netea'},
-       {t:'Precio',num:true},{t:'Faltante $',num:true},{t:'Sobrante $',num:true},{t:'NETO $',num:true}],
+       {t:'Faltante u',num:true},{t:'Sobrante u',num:true},{t:'RESULTADO u',num:true},{t:'Netea'},
+       {t:'Precio',num:true},{t:'Faltante $',num:true},{t:'Sobrante $',num:true},{t:'RESULTADO $',num:true}],
       g.slice(0,2000).map(x=>{
       const fila=[
         `<b class="mono">${U.esc(x.prod)}</b>${x.prop&&net.variosProp?'<br><span class="rc-mini">'+U.esc(x.prop)+'</span>':''}`,
@@ -2274,68 +2503,84 @@ const Vista = {
     }));
   },
 
-  /* ═══════════ PÁGINA 3 · DIFERENCIAS A VERIFICAR ═══════════ */
+  /* ═══════════ PÁGINA 3 · RECUENTOS Y DIFERENCIAS ═══════════
+     Una fila por ubicación y material, con los tres pases al lado. */
   diferencias(){
-    const net=Motor.M.net;
-    let its=Motor.V.vig.filter(it=>it.enUniverso && it.qd!==null && it.qd!==0);
+    const soloDif = difQue.value!=='todas';
+    let its=Motor.V.vig.filter(it=>it.enUniverso && (!soloDif || (it.qd!==null && it.qd!==0)));
 
     if(difSigno.value==='f') its=its.filter(i=>i.qd<0);
     if(difSigno.value==='s') its=its.filter(i=>i.qd>0);
 
-    /* cuántas ubicaciones espejo tiene cada ítem: es O(1) por ítem */
     const nEsp=new Map();
-    its.forEach(it=>nEsp.set(it,Motor.espejoN(it)));
+    its.forEach(it=>nEsp.set(it,(it.qd===null||it.qd===0)?0:Motor.espejoN(it)));
     if(difEspejo.value==='si') its=its.filter(i=>nEsp.get(i)>0);
     if(difEspejo.value==='no') its=its.filter(i=>nEsp.get(i)===0);
 
     const prec=m=>Motor.M.precios.has(m)?Motor.M.precios.get(m):null;
-    const mag=it=>{const p=prec(it.prodK);return p===null?null:Math.abs(it.qd*p);};
+    const mag=it=>{const p=prec(it.prodK);return (p===null||it.qd===null)?null:Math.abs(it.qd*p);};
 
     const ord=difOrden.value;
-    if(ord==='val')      its.sort((a,b)=>(mag(b)??-1)-(mag(a)??-1)||Math.abs(b.qd)-Math.abs(a.qd));
-    else if(ord==='abs') its.sort((a,b)=>Math.abs(b.qd)-Math.abs(a.qd));
+    if(ord==='val')      its.sort((a,b)=>(mag(b)??-1)-(mag(a)??-1)||Math.abs(b.qd||0)-Math.abs(a.qd||0));
+    else if(ord==='abs') its.sort((a,b)=>Math.abs(b.qd||0)-Math.abs(a.qd||0));
     else if(ord==='mat') its.sort((a,b)=>U.natSort(a.prod,b.prod)||U.natSort(a.lbl,b.lbl));
     else its.sort((a,b)=>U.natSort(a.zona,b.zona)||U.natSort(a.pasillo,b.pasillo)
                         ||U.natSort(a.col,b.col)||U.natSort(a.nivel,b.nivel)||U.natSort(a.pos,b.pos));
 
-    const conE=its.filter(i=>nEsp.get(i)>0).length;
-    const magTot=its.reduce((a,b)=>a+(mag(b)||0),0);
+    const conDif=its.filter(i=>i.qd!==null&&i.qd!==0);
+    const conE=conDif.filter(i=>nEsp.get(i)>0).length;
+    const magTot=conDif.reduce((a,b)=>a+(mag(b)||0),0);
+    const conf=conDif.filter(i=>i.confirmada).length;
     kpiDif.innerHTML=[
-      kpi('Ítems listados',U.num(its.length),'diferencia de auditoría, con los filtros aplicados','bad'),
-      kpi('Con espejo',U.num(conE),'el mismo material aparece con signo opuesto en otra ubicación','ok'),
-      kpi('Sin espejo',U.num(its.length-conE),'candidatas a diferencia neta real','bad'),
+      kpi('Ítems listados',U.num(its.length),soloDif?'sólo los que tienen diferencia':'todos los recuentos','bad'),
+      kpi('Confirmados por recuento',U.num(conf),'el último pase ya cuadra tras contabilizar','warn'),
+      kpi('Con espejo',U.num(conE),'el mismo material con signo opuesto en otra ubicación','ok'),
       kpi('Magnitud listada',magTot?U.num(magTot,0):'—','suma del valor absoluto, sólo para priorizar','info')
     ].join('');
 
     const lim=+difLimit.value;
     Vista._dif=its;
-    difCount.textContent=U.num(its.length)+' ítems · se muestran '+U.num(Math.min(lim,its.length));
+    difCount.textContent=U.num(its.length)+' filas · se muestran '+U.num(Math.min(lim,its.length));
 
-    tabla('tbDif',
-      [{t:'Ubicación'},{t:'Zona'},{t:'Pasillo'},{t:'Pases'},{t:'Material'},{t:'Descripción'},
-       {t:'Teórico 1° conteo',num:true},{t:'Contado final',num:true},{t:'Diferencia auditoría',num:true},
-       {t:'Dif. último pase',num:true},{t:'UM'},{t:'Magnitud',num:true},{t:'Espejo — dónde está el contrario'}],
-      its.slice(0,lim).map((it,i)=>{
-        const esp=nEsp.get(it) ? Motor.espejo(it,3) : [];
-        const nE=nEsp.get(it);
-        const row=[
-          `<b class="mono">${U.esc(it.lbl)}</b>`, U.esc(it.zona), U.esc(it.pasillo),
-          `<span class="tag ${it.pase===1?'b':it.pase===2?'a':'r'}">${it.pasePrim!==it.pase?it.pasePrim+'°→'+it.pase+'°':it.pase+'°'}</span>`+
-            (it.pase>it.pasePrim&&(it.qdUlt===0)?' <span class="st st-dif">confirmada</span>':''),
-          `<b class="mono">${U.esc(it.prod)}</b>`, U.esc(it.desc||'—'),
-          it.qt!==null?U.num(it.qt):'—', it.qc!==null?U.num(it.qc):'—',
-          signo(it.qd),
-          it.qdUlt===null?'<span class="cero">—</span>':signo(it.qdUlt),
-          U.esc(it.um||'—'),
-          mag(it)!==null?U.num(mag(it),0):'<span class="cero">—</span>',
-          nE
-            ? `<span class="esp">${esp.map(o=>'<b>'+U.esc(o.lbl)+'</b> '+signo(o.qd)).join(' · ')}${nE>esp.length?' <span class="rc-mini">+'+(nE-esp.length)+' más</span>':''}</span>`
-            : '<span class="esp none">sin espejo</span>'
-        ];
-        row._attr=` class="pick" data-i="${i}"`;
-        return row;
-      }));
-    difDetalle.className='rc-detalle';
+    /* encabezado de dos niveles: los tres recuentos agrupados */
+    const maxP=Math.max(1,Math.min(3,its.reduce((a,b)=>Math.max(a,b.pase||1),1)));
+    let h1='<tr><th rowspan="2">Ubicación</th><th rowspan="2">Zona</th><th rowspan="2">Pasillo</th>'+
+           '<th rowspan="2">Material</th><th rowspan="2">Descripción</th><th rowspan="2">UM</th>';
+    let h2='<tr>';
+    for(let k=1;k<=maxP;k++){
+      h1+=`<th class="grp p${k}" colspan="3">${k}° recuento</th>`;
+      h2+=`<th class="num">Teór.</th><th class="num">Cont.</th><th class="num">Dif.</th>`;
+    }
+    h1+='<th rowspan="2" class="num">RESULTADO</th><th rowspan="2" class="num">Magnitud</th>'+
+        '<th rowspan="2">Espejo</th></tr>';
+    h2+='</tr>';
+
+    const cel=(v,cls)=>`<td class="num ${cls||''}">${v===null||v===undefined?'<span class="cero">—</span>':U.num(v)}</td>`;
+    let body='';
+    its.slice(0,lim).forEach((it,i)=>{
+      let c='';
+      for(let k=1;k<=maxP;k++){
+        const ix=(k-1)*3;
+        const qt=it.pd?it.pd[ix]:undefined, qc=it.pd?it.pd[ix+1]:undefined, dd=it.pd?it.pd[ix+2]:undefined;
+        const hay = qt!==undefined || qc!==undefined || dd!==undefined;
+        c+= cel(hay?(qt===undefined?null:qt):null,'sep')
+          + cel(hay?(qc===undefined?null:qc):null)
+          + `<td class="num">${hay&&dd!==undefined&&dd!==null?signo(dd):'<span class="cero">—</span>'}</td>`;
+      }
+      const e=nEsp.get(it);
+      body+=`<tr class="pick" data-i="${i}">`+
+        `<td><b class="mono">${U.esc(it.lbl)}</b></td>`+
+        `<td>${U.esc(it.zona)}</td><td>${U.esc(it.pasillo)}</td>`+
+        `<td><b class="mono">${U.esc(it.prod)}</b></td>`+
+        `<td>${U.esc(it.desc||'—')}</td><td>${U.esc(it.um||'—')}</td>`+
+        c+
+        `<td class="num res">${signo(it.qd)}${it.confirmada?' <span class="st st-dif">confirmada</span>':''}</td>`+
+        `<td class="num">${mag(it)!==null?U.num(mag(it),0):'<span class="cero">—</span>'}</td>`+
+        `<td class="esp">${e?('<b>'+Motor.espejo(it,2).map(o=>U.esc(o.lbl)).join('</b> · <b>')+'</b>'+(e>2?' <span class="rc-mini">+'+(e-2)+'</span>':'')):'<span class="none">—</span>'}</td>`+
+        '</tr>';
+    });
+    if(!its.length) body=`<tr><td colspan="${7+maxP*3+2}" style="text-align:center;color:var(--gray-2);padding:18px">Sin datos para los filtros actuales</td></tr>`;
+    document.getElementById('tbDif').innerHTML='<thead>'+h1+h2+'</thead><tbody>'+body+'</tbody>';
   },
 
   detalleDif(i){
@@ -2343,33 +2588,39 @@ const Vista = {
     const esp=Motor.espejo(it);
     const p=Motor.M.precios.has(it.prodK)?Motor.M.precios.get(it.prodK):null;
     const fila=(k,v)=>`<div class="rc-map-row"><div>${k}</div><div><b>${v}</b></div></div>`;
-    difDetalle.className='rc-detalle on';
-    difDetalle.innerHTML=
-      `<h3 style="margin-bottom:8px">${U.esc(it.lbl)} · ${U.esc(it.prod)}</h3>`+
+    let pases='';
+    for(let k=1;k<=(it.pase||1);k++){
+      const ix=(k-1)*3;
+      const qt=it.pd?it.pd[ix]:undefined, qc=it.pd?it.pd[ix+1]:undefined, dd=it.pd?it.pd[ix+2]:undefined;
+      if(qt===undefined&&qc===undefined&&dd===undefined) continue;
+      pases+=fila(k+'° recuento'+(it.docs&&it.docs[k-1]?' · doc '+U.esc(it.docs[k-1]):''),
+        'teórico '+(qt==null?'—':U.num(qt))+' · contado '+(qc==null?'—':U.num(qc))+
+        ' · '+(dd==null?'—':signo(dd)));
+    }
+    detTitulo.textContent=it.lbl+' · '+it.prod;
+    detCuerpo.innerHTML=
       fila('Descripción',U.esc(it.desc||'—'))+
       fila('Zona · Pasillo',U.esc(it.zona)+' · '+U.esc(it.pasillo))+
       fila('Columna · Nivel · Pos.',[it.col,it.nivel,it.pos].map(x=>U.esc(x||'—')).join(' · '))+
-      fila('Pases de este material',it.pasePrim===it.pase?it.pase+'°':it.pasePrim+'° → '+it.pase+'°')+
-      fila('Documento del último pase',U.esc(it.doc))+
-      fila('Fecha y hora',(it.f?U.fmt(new Date(it.f)):'—')+' '+U.hhmm(it.h))+
-      fila('Contador',U.esc(it.usr||'—'))+
+      (it.statusUbi?fila('Status Ubi',U.esc(it.statusUbi)):'')+
+      fila('Contador',U.esc(it.usr||'—')+(Prod.nombre(it.usr)?' · '+U.esc(Prod.nombre(it.usr)):''))+
+      fila('Fecha y hora del último',(it.f?U.fmt(new Date(it.f)):'—')+' '+U.hhmm(it.h))+
       fila('Status Conteo',U.esc(it.st||'—'))+
       (it.stDoc?fila('Status del documento',U.esc(it.stDoc)):'')+
       (it.stInv||it.stInv2?fila('Veredicto de SAP',U.esc([it.stInv,it.stInv2].filter(Boolean).join(' · '))):'')+
-      fila('Teórico del 1° conteo',it.qt!==null?U.num(it.qt):'—')+
-      fila('Contado final',it.qc!==null?U.num(it.qc):'—')+
-      fila('<b>Diferencia de la auditoría</b>',signo(it.qd)+' '+U.esc(it.um||''))+
-      fila('Diferencia del último pase',it.qdUlt===null?'—':signo(it.qdUlt)+' '+U.esc(it.um||''))+
-      (it.pase>it.pasePrim && it.qdUlt===0
+      '<hr class="hr"><div class="rc-mini" style="margin-bottom:6px"><b>Recuentos</b></div>'+pases+
+      '<hr class="hr">'+
+      fila('<b>Resultado de la auditoría</b>',signo(it.qd)+' '+U.esc(it.um||''))+
+      fila('Precio unitario',p!==null?U.num(p,2):'sin precio en el maestro')+
+      fila('Magnitud referencial',(p!==null&&it.qd!==null)?U.num(Math.abs(it.qd*p),0):'—')+
+      (it.confirmada
         ? `<div class="note ok" style="margin:8px 0">El recuento <b>confirmó</b> la diferencia: el último pase ya
            cuadra porque el ajuste del conteo anterior se contabilizó y SAP actualizó el stock.</div>` : '')+
-      fila('Propietario',U.esc(it.prop||'—'))+
-      fila('Precio unitario',p!==null?U.num(p,2):'sin precio en el maestro')+
-      fila('Magnitud referencial',p!==null?U.num(Math.abs(it.qd*p),0):'—')+
       `<hr class="hr"><div class="rc-mini" style="margin-bottom:6px"><b>Espejo del material</b> — ubicaciones con el signo opuesto:</div>`+
       (esp.length
-        ? '<div class="esp">'+esp.map(o=>`<div><b>${U.esc(o.lbl)}</b> · ${U.esc(o.zona)} · ${signo(o.qd)}</div>`).join('')+'</div>'
-        : '<div class="esp none">No hay espejo: por ahora es diferencia neta real.</div>');
+        ? '<div class="esp">'+esp.slice(0,30).map(o=>`<div><b>${U.esc(o.lbl)}</b> · ${U.esc(o.zona)} · ${signo(o.qd)}</div>`).join('')+'</div>'
+        : '<div class="esp none">No hay espejo: es diferencia neta real.</div>');
+    UI.abrirDet();
   },
 
   /* ═══════════ CALIDAD E HISTORIAL ═══════════ */
@@ -2678,6 +2929,12 @@ const Export = {
       V.arr.map(o=>[o.lbl,o.zona,o.sector,o.pasillo,o.col,o.nivel,o.pos,o.estadoUbi,o.momu,
         o.enUniverso?'SI':'NO',LBL_EST[o.estado],o.confirmada?'SI':'NO',o.pases||0,
         o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),o.usr,o.st,o.items,o.difItems])];
+    if(cual==='productividad') return [
+      ['Usuario','Apellido y nombre','Ubicaciones','Ocupadas','Vacias','Sin clasificar','Documentos',
+       'Items','Items con diferencia','Horas activas','Ubicaciones por hora','Primer conteo','Ultimo conteo'],
+      Prod.filas().sort((a,b)=>b.ubis-a.ubis).map(x=>[x.usr,x.nombre,x.ubis,x.ocu,x.vac,x.sinClas,x.docs,
+        x.items,x.dif,x.horas,x.ritmo===null?'':+x.ritmo.toFixed(2),
+        x.min?U.fmt(new Date(x.min)):'',x.max?U.fmt(new Date(x.max)):''])];
     if(cual==='calidad') return [
       ['Criticidad','Tipo','Referencia','Detalle'],
       (Motor.M.cal||[]).map(c=>[c.crit,c.tipo,c.ref,c.detalle])];
@@ -2738,14 +2995,245 @@ const Export = {
     ];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),'Resumen');
 
-    [['Neto por material','neto'],['Diferencias','dif'],['Ubicaciones','ubis'],
-     ['Zonas','zonas'],['Pasillos','pasillos'],['Calidad de datos','calidad']].forEach(([hoja,cual])=>{
+    [['Resultado por material','neto'],['Recuentos','dif'],['Ubicaciones','ubis'],
+     ['Zonas','zonas'],['Pasillos','pasillos'],['Productividad','productividad'],
+     ['Calidad de datos','calidad']].forEach(([hoja,cual])=>{
       const [cols,rows]=Export.datos(cual);
       XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cols].concat(rows)),hoja);
     });
 
     XLSX.writeFile(wb,'w2w2026_tablero_'+U.stamp()+'.xlsx');
     U.toast('Excel generado','ok');
+  }
+};
+
+/* ==========================================================================
+   PRODUCTIVIDAD POR CONTADOR
+   ========================================================================== */
+const Prod = {
+  nombre(u){ return (Config.d.nombres||{})[u] || ''; },
+
+  filas(){
+    const L=(Motor.M&&Motor.M.prod)||[];
+    return L.map(P=>{
+      const horas=P.horas.size || (P.min!==null&&P.max!==null?Math.max(1,Math.round((P.max-P.min)/3600000)):0);
+      return {
+        usr:P.usr, nombre:Prod.nombre(P.usr),
+        ubis:P.ubis.size, ocu:P.ocu.size, vac:P.vac.size,
+        sinClas:Math.max(0,P.ubis.size-P.ocu.size-P.vac.size),
+        docs:P.docs, items:P.items, dif:P.dif,
+        horas, ritmo:horas?P.ubis.size/horas:null,
+        min:P.min, max:P.max
+      };
+    });
+  },
+
+  render(){
+    const L=Prod.filas();
+    if(!L.length){
+      document.getElementById('p5Empty').innerHTML=
+        `<div class="empty"><div class="big">👷</div><h2>Todavía no hay conteos cargados</h2>
+         <p>La productividad se calcula sobre la bajada de conteos: cada documento se le atribuye al contador que lo registró.</p>
+         <button class="btn lg" onclick="UI.ir('p6')">⬆ Ir a cargar archivos</button></div>`;
+      document.getElementById('p5Body').classList.add('hidden');
+      return;
+    }
+    document.getElementById('p5Empty').innerHTML='';
+    document.getElementById('p5Body').classList.remove('hidden');
+
+    const tot=L.reduce((a,b)=>({ubis:a.ubis+b.ubis,ocu:a.ocu+b.ocu,vac:a.vac+b.vac,
+      items:a.items+b.items,dif:a.dif+b.dif}),{ubis:0,ocu:0,vac:0,items:0,dif:0});
+    const ritmos=L.filter(x=>x.ritmo!==null).map(x=>x.ritmo);
+    const mejor=L.slice().sort((a,b)=>b.ubis-a.ubis)[0];
+    kpiProd.innerHTML=[
+      kpi('Contadores',U.num(L.length),'con al menos un documento','pur'),
+      kpi('Ubicaciones contadas',U.num(tot.ubis),'suma por contador; una ubicación recontada suma dos veces','info'),
+      kpi('Ocupadas',U.num(tot.ocu),tot.ubis?U.pct(tot.ocu/tot.ubis*100,1)+' del total':''),
+      kpi('Vacías',U.num(tot.vac),tot.ubis?U.pct(tot.vac/tot.ubis*100,1)+' del total':''),
+      kpi('Ritmo promedio',ritmos.length?U.num(ritmos.reduce((a,b)=>a+b,0)/ritmos.length,0):'—','ubicaciones por hora activa','info'),
+      kpi('Mayor volumen',mejor?(mejor.nombre||mejor.usr):'—',mejor?U.num(mejor.ubis)+' ubicaciones':'','ok')
+    ].join('');
+
+    const top=L.slice().sort((a,b)=>b.ubis-a.ubis).slice(0,18);
+    const et=x=>x.nombre||x.usr;
+    chart('chProdUbi',{type:'bar',
+      data:{labels:top.map(et),datasets:[{label:'Ubicaciones',data:top.map(x=>x.ubis),backgroundColor:'#0057B8'}]},
+      options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
+    chart('chProdOcu',{type:'bar',
+      data:{labels:top.map(et),datasets:[
+        {label:'Ocupadas',data:top.map(x=>x.ocu),backgroundColor:'#E8A33D',stack:'s'},
+        {label:'Vacías',data:top.map(x=>x.vac),backgroundColor:'#8A94A6',stack:'s'}]},
+      options:{indexAxis:'y',scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0}},y:{stacked:true}}}});
+
+    Prod.tabla(L);
+    Prod.editor(L);
+  },
+
+  tabla(L){
+    const ord=document.getElementById('prodOrden').value;
+    const F=L.slice();
+    if(ord==='ritmo')      F.sort((a,b)=>(b.ritmo||0)-(a.ritmo||0));
+    else if(ord==='dif')   F.sort((a,b)=>b.dif-a.dif);
+    else if(ord==='nombre')F.sort((a,b)=>U.natSort(a.nombre||a.usr,b.nombre||b.usr));
+    else                   F.sort((a,b)=>b.ubis-a.ubis);
+    document.getElementById('prodCount').textContent=U.num(F.length)+' contadores';
+    tabla('tbProd',
+      [{t:'Usuario'},{t:'Apellido y nombre'},{t:'Ubicaciones',num:true},{t:'Ocupadas',num:true},
+       {t:'Vacías',num:true},{t:'Sin clasificar',num:true},{t:'Documentos',num:true},{t:'Ítems',num:true},
+       {t:'Con diferencia',num:true},{t:'Horas activas',num:true},{t:'Ubic./hora',num:true},
+       {t:'Primer conteo'},{t:'Último conteo'}],
+      F.map(x=>[
+        `<b class="mono">${U.esc(x.usr)}</b>`, U.esc(x.nombre||'—'),
+        U.num(x.ubis), U.num(x.ocu), U.num(x.vac), x.sinClas?U.num(x.sinClas):'<span class="cero">0</span>',
+        U.num(x.docs), U.num(x.items),
+        x.dif?`<span class="falt">${U.num(x.dif)}</span>`:'<span class="cero">0</span>',
+        U.num(x.horas), x.ritmo!==null?U.num(x.ritmo,1):'—',
+        x.min?U.fmt(new Date(x.min))+' '+U.hhmm(new Date(x.min).getHours()*60+new Date(x.min).getMinutes()):'—',
+        x.max?U.fmt(new Date(x.max))+' '+U.hhmm(new Date(x.max).getHours()*60+new Date(x.max).getMinutes()):'—'
+      ]));
+  },
+
+  editor(L){
+    const nom=Config.d.nombres||{};
+    document.getElementById('nomGrid').innerHTML=L.slice()
+      .sort((a,b)=>U.natSort(a.usr,b.usr))
+      .map(x=>`<div class="u">${U.esc(x.usr)}</div>`+
+              `<div><input type="text" data-u="${U.esc(x.usr)}" value="${U.esc(nom[x.usr]||'')}" placeholder="Apellido, Nombre"></div>`)
+      .join('');
+  },
+
+  guardarNombres(){
+    const n={};
+    document.querySelectorAll('#nomGrid input').forEach(i=>{
+      const v=i.value.trim(); if(v) n[i.dataset.u]=v;
+    });
+    Config.d.nombres=n; Config.persistir();
+    Prod.render(); Vista.render();
+    U.toast('Nombres guardados: '+Object.keys(n).length,'ok');
+  },
+
+  pegarNombres(){
+    const txt=document.getElementById('nomPegar').value;
+    if(!txt.trim()){U.toast('Pegá la lista primero','err');return;}
+    const n=Object.assign({},Config.d.nombres||{});
+    let k=0;
+    txt.split(/\r?\n/).forEach(l=>{
+      if(!l.trim()) return;
+      /* El nombre casi siempre lleva coma ("Apellido, Nombre"), así que la
+         coma no sirve como separador salvo que no haya otro. */
+      let m = l.match(/^\s*([^\t;]+?)\s*[\t;]\s*(.+)$/)      // tabulación o punto y coma
+           || l.match(/^\s*(\S+)\s{2,}(.+)$/)                  // dos o más espacios
+           || l.match(/^\s*(\S+)\s*,\s*(.+)$/)                // usuario,Apellido Nombre
+           || l.match(/^\s*(\S+)\s+(.+)$/);                    // un espacio
+      if(!m) return;
+      const u=m[1].trim(), v=m[2].trim();
+      if(u&&v){ n[u]=v; k++; }
+    });
+    if(!k){U.toast('No se reconoció ninguna línea. Usá usuario, tabulación, nombre.','err');return;}
+    Config.d.nombres=n; Config.persistir();
+    document.getElementById('nomPegar').value='';
+    Prod.render(); Vista.render();
+    U.toast('Se aplicaron '+k+' nombres','ok');
+  },
+
+  borrarNombres(){
+    if(!confirm('Se borran todos los nombres cargados. ¿Continuar?')) return;
+    Config.d.nombres={}; Config.persistir(); Prod.render();
+    U.toast('Nombres borrados','ok');
+  }
+};
+
+/* ==========================================================================
+   REPORTE DE AVANCE · una hoja A4 horizontal, se imprime o se guarda en PDF
+   ========================================================================== */
+const Reporte = {
+  armar(){
+    if(!Motor.V){ return '<div class="empty">Sin datos cargados</div>'; }
+    const {m}=Motor.V, net=Motor.M.net;
+    const mon=net.moneda?' '+net.moneda:'';
+    const $=(v)=>net.hayPrecios?U.num(v,0)+mon:'—';
+    const d=new Date();
+    const fh=U.fmt(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    const logo=(typeof LOGOS!=='undefined'&&LOGOS.ceva)?`<img src="${LOGOS.ceva.d}" alt="">`:'';
+
+    const fun=[['PEND',m.pend],['C2',m.c2],['C3',m.c3],['OK',m.ok],['DIF',m.dif]].map(([k,v])=>{
+      const w=m.total?v/m.total*100:0;
+      return `<div>${LBL_EST[k]}</div><div class="b"><i style="width:${w}%;background:${COL_EST[k]}"></i></div>`+
+             `<div class="v">${U.num(v)} · ${U.pct(w,1)}</div>`;
+    }).join('');
+
+    const zs=m.porZona.slice().sort((a,b)=>(a.t?a.cerr/a.t:1)-(b.t?b.cerr/b.t:1));
+    const corte=zs.slice(0,12);
+    const resto=zs.slice(12);
+    let filas=corte.map(z=>`<tr><td>${U.esc(z.k)}</td><td class="n">${U.num(z.t)}</td>`+
+      `<td class="n">${U.num(z.cont)}</td><td class="n">${U.pct(z.t?z.cont/z.t*100:0,1)}</td>`+
+      `<td class="n">${U.num(z.cerr)}</td><td class="n">${U.pct(z.t?z.cerr/z.t*100:0,1)}</td>`+
+      `<td class="n">${U.num(z.pend)}</td><td class="n">${U.num(z.c2+z.c3)}</td></tr>`).join('');
+    if(resto.length){
+      const t=resto.reduce((a,b)=>({t:a.t+b.t,cont:a.cont+b.cont,cerr:a.cerr+b.cerr,
+        pend:a.pend+b.pend,r:a.r+b.c2+b.c3}),{t:0,cont:0,cerr:0,pend:0,r:0});
+      filas+=`<tr><td><i>Otras ${resto.length} zonas</i></td>`+
+        `<td class="n">${U.num(t.t)}</td><td class="n">${U.num(t.cont)}</td>`+
+        `<td class="n">${U.pct(t.t?t.cont/t.t*100:0,1)}</td>`+
+        `<td class="n">${U.num(t.cerr)}</td><td class="n">${U.pct(t.t?t.cerr/t.t*100:0,1)}</td>`+
+        `<td class="n">${U.num(t.pend)}</td><td class="n">${U.num(t.r)}</td></tr>`;
+    }
+    return `
+      <div class="rep-h">${logo}
+        <div><div class="t1">Wall to Wall 2026 — Avance del conteo</div>
+             <div class="t2">Auditoría de cliente · universo: ubicaciones físicas del maestro</div></div>
+        <div class="right">Emitido ${fh}<br>Ventana del conteo ${Config.d.ini} a ${Config.d.fin}</div>
+      </div>
+
+      <div class="rep-k">
+        <div><span>Universo físico</span><b>${U.num(m.total)}</b></div>
+        <div><span>Contadas</span><b>${U.num(m.contadas)}</b></div>
+        <div><span>Cerradas</span><b>${U.num(m.cerradas)}</b></div>
+        <div><span>Pendientes</span><b>${U.num(m.pend)}</b></div>
+        <div><span>En recuento</span><b>${U.num(m.c2+m.c3)}</b></div>
+        <div><span>Jornadas restantes</span><b>${m.diasRest!==null?U.num(m.diasRest):'—'}</b></div>
+      </div>
+
+      <div class="rep-cols">
+        <div>
+          <h4>Cobertura · ${U.pct(m.cobertura,1)}</h4>
+          <div class="rep-bar"><i style="width:${Math.min(100,m.cobertura)}%;background:${colorPct(m.cobertura)}"></i></div>
+          <h4>Cierre · ${U.pct(m.cierre,1)}</h4>
+          <div class="rep-bar"><i style="width:${Math.min(100,m.cierre)}%;background:${colorPct(m.cierre)}"></i></div>
+          <h4>Embudo de pases</h4>
+          <div class="rep-fun">${fun}</div>
+          <h4>Resultado del conteo</h4>
+          <table>
+            <tr><td>Ubicaciones con diferencia</td><td class="n">${U.num(net.ubisDif)}</td></tr>
+            <tr><td>Ítems con diferencia</td><td class="n">${U.num(net.itemsDif)}</td></tr>
+            <tr><td>Faltante</td><td class="n">${U.num(net.itemsFalt)} ítems · ${$(net.faltVal)}</td></tr>
+            <tr><td>Sobrante</td><td class="n">${U.num(net.itemsSobr)} ítems · ${$(net.sobrVal)}</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4>Avance por zona · de menor a mayor cierre</h4>
+          <table>
+            <thead><tr><th>Zona</th><th class="n">Total</th><th class="n">Contadas</th><th class="n">Cob.</th>
+            <th class="n">Cerradas</th><th class="n">Cierre</th><th class="n">Pend.</th><th class="n">Recuento</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rep-pie">
+        Auditoría de cliente: sólo conteo. El stock no se toca, no hay movimientos, traspasos ni ajustes.
+        Faltante y sobrante no se suman entre sí. Las unidades no se suman entre materiales distintos.
+        Los importes son referenciales, para priorizar la verificación.
+      </div>`;
+  },
+
+  imprimir(){
+    if(!Motor.V){ U.toast('Cargá los archivos antes de generar el reporte','err'); return; }
+    document.getElementById('reporte').innerHTML=Reporte.armar();
+    document.body.classList.add('imprimiendo');
+    const fin=()=>{ document.body.classList.remove('imprimiendo'); window.removeEventListener('afterprint',fin); };
+    window.addEventListener('afterprint',fin);
+    setTimeout(()=>{ window.print(); setTimeout(fin,1500); },60);
   }
 };
 
@@ -2757,12 +3245,15 @@ const UI = {
     document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
     document.getElementById(p).classList.add('active');
     document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
-    filterbar.style.display = (p==='p5') ? 'none' : '';
+    filterbar.style.display = (p==='p5'||p==='p6') ? 'none' : '';
     if(p==='p4') Mapa.render();
+    if(p==='p5') Prod.render();
     window.scrollTo(0,0);
   },
   open(id){ document.getElementById(id).classList.add('show'); },
   close(id){ document.getElementById(id).classList.remove('show'); },
+  abrirDet(){ document.getElementById('mdDet').classList.add('show'); },
+  cerrarDet(){ document.getElementById('mdDet').classList.remove('show'); },
   toggleTheme(){
     const n=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
     document.documentElement.setAttribute('data-theme',n);
@@ -2859,7 +3350,12 @@ const UI = {
   /* ---------- navegación ---------- */
   document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>UI.ir(b.dataset.p));
   document.querySelectorAll('.modal-bg').forEach(m=>m.onclick=e=>{ if(e.target===m) m.classList.remove('show'); });
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show')); });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){
+      document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
+      UI.cerrarDet();
+    }
+  });
 
   /* ---------- carga de archivos ---------- */
   const inputs={f1:'maestro',f2:'conteos',f3:'valor'};
@@ -2889,7 +3385,8 @@ const UI = {
 
   /* ---------- controles de las vistas ---------- */
   ['netFiltro','netOrden'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.tablaNeto()));
-  ['difOrden','difEspejo','difSigno','difLimit'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.diferencias()));
+  ['difOrden','difEspejo','difSigno','difLimit','difQue'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.diferencias()));
+  document.getElementById('prodOrden').addEventListener('change',()=>Prod.tabla(Prod.filas()));
   ['fCalTipo','fCalCrit'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.calidad()));
   ['mapVista','mapZona'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Mapa.render()));
 
@@ -2912,9 +3409,10 @@ const UI = {
   /* clic en una fila de diferencias */
   document.getElementById('tbDif').addEventListener('click',e=>{
     const tr=e.target.closest('tr.pick'); if(!tr) return;
-    document.querySelectorAll('#tbDif tr.pick').forEach(x=>x.classList.remove('on'));
-    tr.classList.add('on');
     Vista.detalleDif(+tr.dataset.i);
+  });
+  document.getElementById('mdDet').addEventListener('click',e=>{
+    if(e.target.id==='mdDet') UI.cerrarDet();
   });
 
   Motor.reconstruir();

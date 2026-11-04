@@ -75,20 +75,31 @@ archivo de precios el tablero cae a unidades y lo dice explícitamente.
 ### Pantallas
 
 1. **Avance del W2W** — cobertura, cierre, embudo de pases, ritmo y proyección.
-2. **Resultado Neto** — neto por material, % que netea, faltante y sobrante netos.
-3. **Diferencias a Verificar** — ítems del pase vigente con su **espejo**: dónde
-   aparece el mismo material con signo opuesto, para ir a verificar el conteo.
-   Haciendo clic en un material del Resultado Neto se baja directo acá,
-   filtrado por ese material.
+2. **Resultado** — ubicaciones e ítems con diferencia, faltante y sobrante en
+   dinero y en unidades, y el resultado por material. El bloque de neteo sólo
+   aparece cuando hay materiales que realmente se cancelan entre ubicaciones.
+3. **Recuentos y Diferencias** — una fila por ubicación y material con los tres
+   recuentos al lado: teórico, contado y diferencia de cada pase, el resultado
+   de la auditoría y el espejo. Clic en la fila para el detalle completo.
 4. **Mapa del Depósito** — estado por ubicación y concentración de diferencias.
-5. **Archivos y Configuración** — carga, Status Conteo, umbrales y control de
+5. **Productividad** — por contador: ubicaciones contadas, ocupadas y vacías,
+   documentos, ítems, ritmo por hora y franja horaria trabajada. Los nombres de
+   los contadores se cargan a mano o se pegan desde Excel.
+6. **Archivos y Configuración** — carga, Status Conteo, umbrales y control de
    calidad de datos.
 
-> El Resultado Neto agrega **por material sobre todo el depósito**; las
-> Diferencias listan **ítem por ubicación** y respetan los filtros y el límite
-> de filas en pantalla. Por eso las dos pantallas no muestran lo mismo: para
-> encontrar un material en el listado, buscalo por su código o entrá con el
-> clic desde el Resultado Neto.
+> El Resultado agrega **por material sobre todo el depósito**; los Recuentos
+> listan **ubicación por ubicación** y respetan los filtros y el límite de filas
+> en pantalla. Por eso las dos pantallas no muestran lo mismo: para encontrar un
+> material en el listado, buscalo por su código o entrá con el clic desde el
+> Resultado.
+
+### Reporte de avance
+
+El botón **🖨 Reporte** de la barra superior arma una hoja A4 horizontal con la
+cobertura, el cierre, el embudo, el avance por zona y las cifras del resultado,
+y abre el diálogo de impresión. Desde ahí se elige *Guardar como PDF* para
+mandarlo por mail. No necesita ninguna librería extra.
 
 ### Configuración que conviene revisar antes de empezar
 
