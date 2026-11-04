@@ -687,6 +687,12 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
             <option value="calc">Calcular siempre contado − teórico</option>
           </select>
         </div>
+        <div class="fl"><label>Diferencia de la auditoría</label>
+          <select id="cfgDifAud">
+            <option value="audit">Contado final − teórico del primer conteo</option>
+            <option value="ultimo">Diferencia del último pase</option>
+          </select>
+        </div>
         <div class="fl"><label>Neteo entre propietarios distintos</label>
           <select id="cfgProp">
             <option value="0">No netear entre propietarios</option>
@@ -702,6 +708,10 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
         <div class="fl"><label>Umbral verde de avance (%)</label><input type="number" id="cfgVerde" min="0" max="100"></div>
         <div class="fl"><label>Umbral amarillo de avance (%)</label><input type="number" id="cfgAmarillo" min="0" max="100"></div>
       </div>
+      <div class="note mt12">Cuando una diferencia se contabiliza, SAP actualiza el stock: el teórico del pase
+      siguiente ya trae el ajuste y su resta da cero. Por eso la diferencia de la auditoría se mide
+      <b>contra el teórico del primer conteo</b>. La otra opción sólo sirve si en tu operación no se contabiliza
+      entre pases.</div>
       <div class="flex mt12"><button class="btn" onclick="Config.guardar()">Guardar y recalcular</button></div>
     </div>
   </div>
@@ -963,6 +973,7 @@ const Config = {
     verde:90, amarillo:70, ventanaAuto:1,
     signo:0,            // 0 = negativo es faltante
     dif:'auto',         // 'auto' usa la columna de diferencia si existe
+    difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
     inter:0,            // las intermedias quedan fuera del universo
     ref:'',             // referencia del W2W; vacío = todas
@@ -980,14 +991,14 @@ const Config = {
     const c=Config.d;
     cfgIni.value=c.ini; cfgFin.value=c.fin;
     cfgVerde.value=c.verde; cfgAmarillo.value=c.amarillo;
-    cfgSigno.value=c.signo; cfgDif.value=c.dif;
+    cfgSigno.value=c.signo; cfgDif.value=c.dif; cfgDifAud.value=c.difAud;
     cfgProp.value=c.netProp; cfgInter.value=c.inter;
   },
   guardar(){
     const c=Config.d;
     c.ini=cfgIni.value||c.ini; c.fin=cfgFin.value||c.fin;
     c.verde=+cfgVerde.value; c.amarillo=+cfgAmarillo.value;
-    c.signo=+cfgSigno.value; c.dif=cfgDif.value;
+    c.signo=+cfgSigno.value; c.dif=cfgDif.value; c.difAud=cfgDifAud.value;
     c.netProp=+cfgProp.value; c.inter=+cfgInter.value;
     c.ventanaAuto=0;   // a partir de acá la ventana la fija el usuario
     Config.persistir(); Motor.reconstruir(); U.toast('Configuración guardada','ok');
@@ -1070,8 +1081,9 @@ const CAMPOS = {
     {k:'tipoAlm',   lbl:'Tipo almacén', alias:['TIPOALMACEN','TIPODEALMACEN','ALMACEN','WAREHOUSETYPE','TIPOALM']},
     {k:'areaAlm',   lbl:'Área almacenamiento', alias:['AREAALMACENAMIENTO','AREADEALMACENAMIENTO','AREAALM','STORAGEAREA','AREA']},
     {k:'areaAct',   lbl:'Área de actividad', alias:['AREADEACTIVIDAD','AREAACTIVIDAD','ACTIVIDAD','ACTIVITYAREA','AREAACT']},
-    {k:'stInv',     lbl:'Status Inv (INAC / ACTI / COUN / POST)', alias:['STATUSINV','STATUSINVENTARIO','ESTADOINV','STINV','STATUSDEINVENTARIO'], not:'INV2'},
-    {k:'stInv2',    lbl:'Status Inv2', alias:['STATUSINV2','STATUSINVENTARIO2','ESTADOINV2','STINV2']},
+    {k:'stDoc',     lbl:'Status de inventario (INAC / ACTI / COUN / POST)', alias:['STATUSDEINVENTARIO','ESTADODEINVENTARIO','STATUSDELINVENTARIO','STATUSDOCUMENTOINVENTARIO'], not:'INV2'},
+    {k:'stInv',     lbl:'Status Inv (veredicto: Ok / Desvío)', alias:['STATUSINV','STATUSINVENTARIO','ESTADOINV','STINV'], not:'INV2'},
+    {k:'stInv2',    lbl:'Status Inv2 (Faltante / Sobrante)', alias:['STATUSINV2','STATUSINVENTARIO2','ESTADOINV2','STINV2']},
     {k:'statusUbi', lbl:'Status Ubi', alias:['STATUSUBI','STATUSUBICACION','ESTADOUBICACION']}
   ],
   valor:[
@@ -1239,6 +1251,7 @@ const Datos = {
         tipoAlm:m.tipoAlm?String(r[m.tipoAlm]??'').trim():'',
         areaAlm:m.areaAlm?String(r[m.areaAlm]??'').trim():'',
         areaAct:m.areaAct?String(r[m.areaAct]??'').trim():'',
+        stDoc:m.stDoc?String(r[m.stDoc]??'').trim():'',
         stInv:m.stInv?String(r[m.stInv]??'').trim():'',
         stInv2:m.stInv2?String(r[m.stInv2]??'').trim():'',
         statusUbi:m.statusUbi?String(r[m.statusUbi]??'').trim():''
@@ -1374,7 +1387,7 @@ const Motor = {
   },
 
   /* El status que manda: si la bajada no trae Status Conteo se usa Status Inv. */
-  stEfectivo(c){ return c.st || c.stInv || ''; },
+  stEfectivo(c){ return c.st || c.stDoc || c.stInv || ''; },
 
   /* ---------- ¿este Status Conteo equivale a CONTADA? ---------- */
   statusEsContado(st){
@@ -1403,13 +1416,24 @@ const Motor = {
   },
 
   /* ---------- diferencia de un registro, con el signo configurado ---------- */
-  dif(c){
+  difRaw(c){
     let d=null;
     if(Config.d.dif!=='calc' && c.qd!==null && c.qd!==undefined) d=c.qd;
     else if(c.qc!==null && c.qt!==null) d=c.qc-c.qt;
     else if(c.qd!==null&&c.qd!==undefined) d=c.qd;
-    if(d===null||!isFinite(d)) return null;
-    return Config.d.signo ? -d : d;
+    return (d===null||!isFinite(d)) ? null : d;
+  },
+  dif(c){
+    const d=Motor.difRaw(c);
+    return d===null ? null : (Config.d.signo ? -d : d);
+  },
+
+  /* Pase declarado en la referencia ("1° CONTEO ...", "CONTEO 2"). Es más
+     confiable que inferirlo del orden de los documentos, cuando viene. */
+  paseDeRef(ref){
+    const k=U.refKey(ref);
+    let m=k.match(/\b([1-9])\s+CONTEO\b/) || k.match(/\bCONTEO\s+([1-9])\b/);
+    return m ? +m[1] : null;
   },
 
   /* ---------- clave de agrupación para el neteo ---------- */
@@ -1506,8 +1530,10 @@ const Motor = {
       const claveDoc = c.doc ? 'D'+c.doc : 'T'+(c.f||0)+'_'+(c.h===null?'':c.h);
       if(!porUbi.has(c.u)) porUbi.set(c.u,new Map());
       const docs=porUbi.get(c.u);
-      if(!docs.has(claveDoc)) docs.set(claveDoc,{doc:c.doc||'(sin documento)',f:c.f,h:c.h,st:c.st,usr:c.usr,items:[],conCant:false});
+      if(!docs.has(claveDoc)) docs.set(claveDoc,{doc:c.doc||'(sin documento)',f:c.f,h:c.h,st:c.st,usr:c.usr,
+        items:[],conCant:false,ord:Motor.paseDeRef(c.ref),ref:c.ref||''});
       const d=docs.get(claveDoc);
+      if(d.ord===null){ d.ord=Motor.paseDeRef(c.ref); if(!d.ref) d.ref=c.ref||''; }
       if(c.qc!==null || (c.qd!==null && c.qd!==undefined)) d.conCant=true;
       if(d.f===null&&c.f!==null) d.f=c.f;
       if(d.h===null&&c.h!==null) d.h=c.h;
@@ -1516,7 +1542,7 @@ const Motor = {
     }
 
     /* ---------- 3 · DERIVACIÓN DEL PASE Y ESTADO ---------- */
-    const items=[], vigentes=[];
+    const vigentes=[];
     /* Un documento sin ninguna cantidad informada es una ubicación activada
        pero no contada. Si se contara como pase, la ubicación cerraría "sin
        diferencia" sin que nadie la haya contado nunca. */
@@ -1533,7 +1559,7 @@ const Motor = {
     porUbi.forEach((docs,u)=>{
       const o=ubis.get(u);
       let lista=[...docs.values()].sort((a,b)=>
-        (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9) || U.natSort(a.doc,b.doc));
+        (a.ord??99)-(b.ord??99) || (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9) || U.natSort(a.doc,b.doc));
       if(filtrar){
         const conCant=lista.filter(d=>d.conCant);
         if(conCant.length<lista.length) o.docAbierto=true;
@@ -1541,25 +1567,50 @@ const Motor = {
       }
       if(!lista.length){ o.estado='PEND'; o.contada=false; o.docs=[]; return; }
 
+      /* Consolidación material por material a lo largo de los pases.
+         Cuando una diferencia se contabiliza, SAP actualiza el stock: el
+         teórico del pase siguiente ya trae el ajuste y su resta da cero.
+         Por eso la diferencia de la auditoría se mide contra el teórico del
+         PRIMER conteo, no contra el del último pase.                        */
+      const porMat=new Map();
+
       lista.forEach((d,idx)=>{
         d.pase=idx+1;
         d.dif=false; d.difItems=0; d.difUnid=0;
         d.items.forEach(c=>{
           const qd=Motor.dif(c);
-          const it={
-            u:o.u, lbl:o.lbl, zona:o.zona, pasillo:o.pasillo, pasilloFull:o.pasilloFull,
-            sector:o.sector, col:o.col, nivel:o.nivel, pos:o.pos,
-            estadoUbi:o.estadoUbi, momu:o.momu, enUniverso:o.enUniverso,
-            doc:d.doc, f:d.f, h:d.h, pase:d.pase,
-            prod:c.prod, prodK:U.matKey(c.prod), desc:c.desc,
-            qt:c.qt, qc:c.qc, qd:qd, um:c.um, prop:c.prop,
-            usr:c.usr||d.usr, st:c.st, tipoAlm:c.tipoAlm, areaAlm:c.areaAlm, areaAct:c.areaAct
-          };
           d.difItems += (qd!==null && qd!==0) ? 1 : 0;
           d.difUnid  += (qd!==null) ? Math.abs(qd) : 0;
           if(qd!==null && qd!==0) d.dif=true;
-          items.push(it);
-          d._its=(d._its||[]); d._its.push(it);
+
+          /* Sólo se guarda el consolidado por material: el detalle fila por
+             fila de cada pase no lo consume ninguna vista y, en un W2W real,
+             son cientos de miles de objetos retenidos sin motivo. */
+          const usr=c.usr||d.usr;
+          const k=U.matKey(c.prod);
+          if(!porMat.has(k)) porMat.set(k,{
+            prod:c.prod, prodK:k, desc:c.desc, um:c.um, prop:c.prop,
+            qtPrim:null, qcUlt:null, qdRawUlt:null,
+            pasePrim:d.pase, paseUlt:d.pase, docPrim:d.doc, docUlt:d.doc,
+            fUlt:d.f, hUlt:d.h, usr:usr, st:c.st, stDoc:'', stInv:'', stInv2:'',
+            tipoAlm:c.tipoAlm, areaAlm:c.areaAlm, areaAct:c.areaAct
+          });
+          const m=porMat.get(k);
+          if(m.qtPrim===null && c.qt!==null) m.qtPrim=c.qt;   // teórico del primer conteo
+          if(c.qc!==null) m.qcUlt=c.qc;                        // contado del último
+          const raw=Motor.difRaw(c); if(raw!==null) m.qdRawUlt=raw;
+          m.paseUlt=d.pase; m.docUlt=d.doc; m.fUlt=d.f; m.hUlt=d.h;
+          if(usr) m.usr=usr;
+          if(c.st) m.st=c.st;
+          if(c.stDoc) m.stDoc=c.stDoc;
+          if(c.stInv) m.stInv=c.stInv;
+          if(c.stInv2) m.stInv2=c.stInv2;
+          if(!m.desc && c.desc) m.desc=c.desc;
+          if(!m.um && c.um) m.um=c.um;
+          if(!m.prop && c.prop) m.prop=c.prop;
+          if(!m.tipoAlm && c.tipoAlm) m.tipoAlm=c.tipoAlm;
+          if(!m.areaAlm && c.areaAlm) m.areaAlm=c.areaAlm;
+          if(!m.areaAct && c.areaAct) m.areaAct=c.areaAct;
         });
       });
 
@@ -1567,20 +1618,48 @@ const Motor = {
       o.contada=lista.length>0;
       o.pases=lista.length;
       const ult=lista[lista.length-1];
-      if(!ult){ o.estado='PEND'; return; }
 
       o.pase=ult.pase; o.ultF=ult.f; o.ultH=ult.h; o.usr=ult.usr||''; o.st=ult.st||'';
-      o.difItems=ult.difItems; o.difUnid=ult.difUnid; o.items=ult.items.length;
+      o.items=porMat.size;
       const prim=ult.items[0]||{};
       o.tipoAlm=prim.tipoAlm||''; o.areaAlm=prim.areaAlm||''; o.areaAct=prim.areaAct||''; o.prop=prim.prop||'';
 
-      if(!ult.dif)            o.estado='OK';
-      else if(ult.pase===1)   o.estado='C2';
-      else if(ult.pase===2)   o.estado='C3';
-      else                    o.estado='DIF';
-      o.cerrada = (o.estado==='OK'||o.estado==='DIF');
+      /* diferencia de la auditoría por material */
+      let difAud=0, difAudUnid=0;
+      porMat.forEach(m=>{
+        let d=null;
+        if(Config.d.difAud!=='ultimo' && m.qtPrim!==null && m.qcUlt!==null) d=m.qcUlt-m.qtPrim;
+        else d=m.qdRawUlt;
+        m.difAud = (d===null||!isFinite(d)) ? null : (Config.d.signo ? -d : d);
+        if(m.difAud!==null && m.difAud!==0){ difAud++; difAudUnid+=Math.abs(m.difAud); }
 
-      (ult._its||[]).forEach(it=>vigentes.push(it));
+        vigentes.push({
+          u:o.u, lbl:o.lbl, zona:o.zona, pasillo:o.pasillo, pasilloFull:o.pasilloFull,
+          sector:o.sector, col:o.col, nivel:o.nivel, pos:o.pos,
+          estadoUbi:o.estadoUbi, momu:o.momu, enUniverso:o.enUniverso,
+          doc:m.docUlt, docPrim:m.docPrim, f:m.fUlt, h:m.hUlt,
+          pase:m.paseUlt, pasePrim:m.pasePrim, pases:lista.length,
+          prod:m.prod, prodK:m.prodK, desc:m.desc,
+          qt:m.qtPrim, qc:m.qcUlt, qd:m.difAud,
+          qdUlt:(m.qdRawUlt===null?null:(Config.d.signo?-m.qdRawUlt:m.qdRawUlt)),
+          um:m.um, prop:m.prop, usr:m.usr, st:m.st, stDoc:m.stDoc, stInv:m.stInv, stInv2:m.stInv2,
+          tipoAlm:m.tipoAlm, areaAlm:m.areaAlm, areaAct:m.areaAct
+        });
+      });
+      o.difItems=difAud; o.difUnid=difAudUnid;
+
+      /* Estado. El último pase con diferencia propia significa que todavía hay
+         desacuerdo y falta recontar. Si el último pase ya cuadra pero la
+         auditoría detectó diferencia, quedó CONFIRMADA y la ubicación cierra. */
+      if(ult.dif){
+        o.estado = ult.pase===1 ? 'C2' : ult.pase===2 ? 'C3' : 'DIF';
+        o.confirmada=false;
+      }else if(difAud>0){
+        o.estado='DIF'; o.confirmada=true;
+      }else{
+        o.estado='OK'; o.confirmada=false;
+      }
+      o.cerrada = (o.estado==='OK'||o.estado==='DIF');
 
       if(lista.length>3) cal.push({tipo:'Más de tres pases de conteo',crit:'Media',ref:o.lbl,
         detalle:'La ubicación tiene '+lista.length+' documentos de inventario. Se toma el último como pase vigente.'});
@@ -1630,6 +1709,35 @@ const Motor = {
       Config.persistir();
       try{ Config.aForm(); }catch(e){}
     }
+    /* Contraste contra el veredicto del propio SAP (Status Inv / Status Inv2).
+       Si SAP marca desvío y nuestro cálculo da cero, o al revés, hay que mirarlo. */
+    let sapDesvioSinDif=0, sapOkConDif=0, conSap=0;
+    const ejDesvio=[], ejOk=[];
+    for(const it of vigentes){
+      if(!it.stInv && !it.stInv2) continue;
+      conSap++;
+      const sap=U.hdr(it.stInv)+' '+U.hdr(it.stInv2);
+      if(sap==='OK OK' || sap===' OK' || sap==='OK ') { if(it.qd!==null&&it.qd!==0){ sapOkConDif++; if(ejOk.length<5) ejOk.push(it.lbl+' · '+it.prod); } continue; }
+      const dice=/DESVIO|DIFEREN|FALTANTE|SOBRANTE/.test(sap);
+      const hay=it.qd!==null && it.qd!==0;
+      if(dice&&!hay){ sapDesvioSinDif++; if(ejDesvio.length<5) ejDesvio.push(it.lbl+' · '+it.prod); }
+      else if(!dice&&hay){ sapOkConDif++; if(ejOk.length<5) ejOk.push(it.lbl+' · '+it.prod); }
+    }
+    if(sapDesvioSinDif) cal.push({tipo:'SAP marca desvío pero el cálculo da cero',crit:'Alta',
+      ref:U.num(sapDesvioSinDif)+' ítems',
+      detalle:'Status Inv dice desvío y la diferencia de la auditoría da cero. Revisá el mapeo de cantidades. Ejemplos: '+ejDesvio.join(', ')+'.'});
+    if(sapOkConDif) cal.push({tipo:'SAP marca OK pero el cálculo da diferencia',crit:'Alta',
+      ref:U.num(sapOkConDif)+' ítems',
+      detalle:'Status Inv dice OK y la auditoría detecta diferencia. Ejemplos: '+ejOk.join(', ')+'.'});
+
+    /* Si las referencias declaran el pase, filtrar por una sola los esconde. */
+    const refsOrd=[...refs.values()].filter(r=>Motor.paseDeRef(r.lbl)!==null);
+    if(refsOrd.length>1 && Config.d.ref) cal.push({tipo:'Referencia filtrada a un solo pase',crit:'Alta',
+      ref:Config.d.ref,
+      detalle:'El archivo trae '+refsOrd.length+' referencias que declaran el número de conteo ('+
+              refsOrd.map(r=>r.lbl).slice(0,4).join(', ')+'). Al filtrar por una sola se pierden los demás pases. '+
+              'Dejá "Todas las referencias" en la pantalla 5.'});
+
     const iniW=new Date(Config.d.ini+'T00:00:00').getTime(), finW=new Date(Config.d.fin+'T23:59:59').getTime();
     let fuera=0;
     ubis.forEach(o=>{ if(o.ultF!==null && (o.ultF<iniW||o.ultF>finW)) fuera++; });
@@ -1664,7 +1772,7 @@ const Motor = {
     const serieDia=[...dayMap.entries()].map(([iso,s])=>({iso,n:s.size})).sort((a,b)=>a.iso<b.iso?-1:1);
 
     Motor.M={
-      ubis, arr:[...ubis.values()], items, vigentes,
+      ubis, arr:[...ubis.values()], vigentes,
       refs, statusSet, props, precios, monedas,
       cal, serieDia, horaMap,
       st:{regTot,regValidos,regFueraRef,sinUbi,sinFecha,sinDoc,sinCant,
@@ -2085,7 +2193,7 @@ const Vista = {
          Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 5.</div>`;
 
     kpiBruto.innerHTML=[
-      kpi('Ítems con diferencia',U.num(net.itemsDif),'material · ubicación del pase vigente','bad'),
+      kpi('Ítems con diferencia',U.num(net.itemsDif),'un ítem es un material en una ubicación','bad'),
       kpi('Ubicaciones con diferencia',U.num(net.ubisDif),'sobre el universo físico','bad'),
       kpi('Faltante bruto',$(net.faltBrutoV),U.num(net.faltBrutoU,0)+' unidades, sin netear','bad'),
       kpi('Sobrante bruto',$(net.sobrBrutoV),U.num(net.sobrBrutoU,0)+' unidades, sin netear','ok')
@@ -2193,7 +2301,7 @@ const Vista = {
     const conE=its.filter(i=>nEsp.get(i)>0).length;
     const magTot=its.reduce((a,b)=>a+(mag(b)||0),0);
     kpiDif.innerHTML=[
-      kpi('Ítems listados',U.num(its.length),'del pase vigente, con los filtros aplicados','bad'),
+      kpi('Ítems listados',U.num(its.length),'diferencia de auditoría, con los filtros aplicados','bad'),
       kpi('Con espejo',U.num(conE),'el mismo material aparece con signo opuesto en otra ubicación','ok'),
       kpi('Sin espejo',U.num(its.length-conE),'candidatas a diferencia neta real','bad'),
       kpi('Magnitud listada',magTot?U.num(magTot,0):'—','suma del valor absoluto, sólo para priorizar','info')
@@ -2204,18 +2312,21 @@ const Vista = {
     difCount.textContent=U.num(its.length)+' ítems · se muestran '+U.num(Math.min(lim,its.length));
 
     tabla('tbDif',
-      [{t:'Ubicación'},{t:'Zona'},{t:'Pasillo'},{t:'Pase'},{t:'Material'},{t:'Descripción'},
-       {t:'Teórico',num:true},{t:'Contado',num:true},{t:'Diferencia',num:true},{t:'UM'},
-       {t:'Magnitud',num:true},{t:'Espejo — dónde está el contrario'}],
+      [{t:'Ubicación'},{t:'Zona'},{t:'Pasillo'},{t:'Pases'},{t:'Material'},{t:'Descripción'},
+       {t:'Teórico 1° conteo',num:true},{t:'Contado final',num:true},{t:'Diferencia auditoría',num:true},
+       {t:'Dif. último pase',num:true},{t:'UM'},{t:'Magnitud',num:true},{t:'Espejo — dónde está el contrario'}],
       its.slice(0,lim).map((it,i)=>{
         const esp=nEsp.get(it) ? Motor.espejo(it,3) : [];
         const nE=nEsp.get(it);
         const row=[
           `<b class="mono">${U.esc(it.lbl)}</b>`, U.esc(it.zona), U.esc(it.pasillo),
-          `<span class="tag ${it.pase===1?'b':it.pase===2?'a':'r'}">${it.pase}°</span>`,
+          `<span class="tag ${it.pase===1?'b':it.pase===2?'a':'r'}">${it.pasePrim!==it.pase?it.pasePrim+'°→'+it.pase+'°':it.pase+'°'}</span>`+
+            (it.pase>it.pasePrim&&(it.qdUlt===0)?' <span class="st st-dif">confirmada</span>':''),
           `<b class="mono">${U.esc(it.prod)}</b>`, U.esc(it.desc||'—'),
           it.qt!==null?U.num(it.qt):'—', it.qc!==null?U.num(it.qc):'—',
-          signo(it.qd), U.esc(it.um||'—'),
+          signo(it.qd),
+          it.qdUlt===null?'<span class="cero">—</span>':signo(it.qdUlt),
+          U.esc(it.um||'—'),
           mag(it)!==null?U.num(mag(it),0):'<span class="cero">—</span>',
           nE
             ? `<span class="esp">${esp.map(o=>'<b>'+U.esc(o.lbl)+'</b> '+signo(o.qd)).join(' · ')}${nE>esp.length?' <span class="rc-mini">+'+(nE-esp.length)+' más</span>':''}</span>`
@@ -2238,14 +2349,20 @@ const Vista = {
       fila('Descripción',U.esc(it.desc||'—'))+
       fila('Zona · Pasillo',U.esc(it.zona)+' · '+U.esc(it.pasillo))+
       fila('Columna · Nivel · Pos.',[it.col,it.nivel,it.pos].map(x=>U.esc(x||'—')).join(' · '))+
-      fila('Pase vigente',it.pase+'°')+
-      fila('Documento',U.esc(it.doc))+
+      fila('Pases de este material',it.pasePrim===it.pase?it.pase+'°':it.pasePrim+'° → '+it.pase+'°')+
+      fila('Documento del último pase',U.esc(it.doc))+
       fila('Fecha y hora',(it.f?U.fmt(new Date(it.f)):'—')+' '+U.hhmm(it.h))+
       fila('Contador',U.esc(it.usr||'—'))+
       fila('Status Conteo',U.esc(it.st||'—'))+
-      fila('Teórico',it.qt!==null?U.num(it.qt):'—')+
-      fila('Contado',it.qc!==null?U.num(it.qc):'—')+
-      fila('Diferencia',signo(it.qd)+' '+U.esc(it.um||''))+
+      (it.stDoc?fila('Status del documento',U.esc(it.stDoc)):'')+
+      (it.stInv||it.stInv2?fila('Veredicto de SAP',U.esc([it.stInv,it.stInv2].filter(Boolean).join(' · '))):'')+
+      fila('Teórico del 1° conteo',it.qt!==null?U.num(it.qt):'—')+
+      fila('Contado final',it.qc!==null?U.num(it.qc):'—')+
+      fila('<b>Diferencia de la auditoría</b>',signo(it.qd)+' '+U.esc(it.um||''))+
+      fila('Diferencia del último pase',it.qdUlt===null?'—':signo(it.qdUlt)+' '+U.esc(it.um||''))+
+      (it.pase>it.pasePrim && it.qdUlt===0
+        ? `<div class="note ok" style="margin:8px 0">El recuento <b>confirmó</b> la diferencia: el último pase ya
+           cuadra porque el ajuste del conteo anterior se contabilizó y SAP actualizó el stock.</div>` : '')+
       fila('Propietario',U.esc(it.prop||'—'))+
       fila('Precio unitario',p!==null?U.num(p,2):'sin precio en el maestro')+
       fila('Magnitud referencial',p!==null?U.num(Math.abs(it.qd*p),0):'—')+
@@ -2500,9 +2617,10 @@ const Mapa = {
           fila('Último conteo',(o.ultF?U.fmt(new Date(o.ultF)):'—')+' '+U.hhmm(o.ultH))+
           fila('Contador',U.esc(o.usr||'—'))+
           fila('Status Conteo',U.esc(o.st||'—'))+
-          fila('Ítems en el pase vigente',U.num(o.items))+
-          fila('Ítems con diferencia',U.num(o.difItems))+
-          (its.length?`<hr class="hr"><div class="rc-mini" style="margin-bottom:6px"><b>Ítems del pase vigente</b></div>`+
+          fila('Materiales en la ubicación',U.num(o.items))+
+          fila('Materiales con diferencia',U.num(o.difItems))+
+          (o.confirmada?fila('Diferencia','confirmada por recuento'):'')+
+          (its.length?`<hr class="hr"><div class="rc-mini" style="margin-bottom:6px"><b>Diferencia de auditoría por material</b></div>`+
             its.slice(0,40).map(i=>`<div class="rc-map-row"><div class="mono">${U.esc(i.prod)}</div><div>${signo(i.qd)}</div></div>`).join('')
           :'');
       };
@@ -2543,18 +2661,23 @@ const Export = {
       ['Material','Descripcion','Neto','Faltante bruto','Sobrante bruto'],
       net.sinPrecio.filter(g=>g.neto!==0).map(g=>[g.prod,g.desc,g.neto,g.falt,g.sobr])];
     if(cual==='dif') return [
-      ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Pase','Documento','Fecha','Hora',
-       'Material','Descripcion','Teorico','Contado','Diferencia','UM','Propietario','Contador',
-       'Status Conteo','Tipo almacen','Area almacenamiento','Ubicaciones espejo','Cantidad de espejos'],
-      (Vista._dif||[]).map(it=>[it.lbl,it.zona,it.sector,it.pasillo,it.col,it.nivel,it.pos,it.pase,it.doc,
-        it.f?U.fmt(new Date(it.f)):'',U.hhmm(it.h),it.prod,it.desc,it.qt,it.qc,it.qd,it.um,it.prop,it.usr,
-        it.st,it.tipoAlm,it.areaAlm,Motor.espejo(it,20).map(o=>o.lbl).join(' | '),Motor.espejoN(it)])];
+      ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Pase primero','Pase ultimo',
+       'Documento ultimo','Fecha','Hora','Material','Descripcion','Teorico 1er conteo','Contado final',
+       'Diferencia auditoria','Diferencia ultimo pase','Confirmada por recuento','UM','Propietario','Contador',
+       'Status Conteo','Status de inventario','Status Inv','Status Inv2','Tipo almacen','Area almacenamiento',
+       'Ubicaciones espejo','Cantidad de espejos'],
+      (Vista._dif||[]).map(it=>[it.lbl,it.zona,it.sector,it.pasillo,it.col,it.nivel,it.pos,it.pasePrim,it.pase,
+        it.doc,it.f?U.fmt(new Date(it.f)):'',U.hhmm(it.h),it.prod,it.desc,it.qt,it.qc,it.qd,it.qdUlt,
+        (it.pase>it.pasePrim&&it.qdUlt===0)?'SI':'NO',it.um,it.prop,it.usr,
+        it.st,it.stDoc,it.stInv,it.stInv2,it.tipoAlm,it.areaAlm,
+        Motor.espejo(it,20).map(o=>o.lbl).join(' | '),Motor.espejoN(it)])];
     if(cual==='ubis') return [
       ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Estado Ubi','MO/MU','En universo',
-       'Estado W2W','Pases','Ultimo conteo','Hora','Contador','Status Conteo','Items','Items con diferencia'],
+       'Estado W2W','Diferencia confirmada por recuento','Pases','Ultimo conteo','Hora','Contador',
+       'Status Conteo','Materiales','Materiales con diferencia'],
       V.arr.map(o=>[o.lbl,o.zona,o.sector,o.pasillo,o.col,o.nivel,o.pos,o.estadoUbi,o.momu,
-        o.enUniverso?'SI':'NO',LBL_EST[o.estado],o.pases||0,o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),
-        o.usr,o.st,o.items,o.difItems])];
+        o.enUniverso?'SI':'NO',LBL_EST[o.estado],o.confirmada?'SI':'NO',o.pases||0,
+        o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),o.usr,o.st,o.items,o.difItems])];
     if(cual==='calidad') return [
       ['Criticidad','Tipo','Referencia','Detalle'],
       (Motor.M.cal||[]).map(c=>[c.crit,c.tipo,c.ref,c.detalle])];

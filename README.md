@@ -33,6 +33,17 @@ PENDIENTE
                                            └─ 3° conteo ──→ CERRADA CON DIFERENCIA
 ```
 
+**La diferencia se mide contra el teórico del primer conteo.** Cuando una
+diferencia se contabiliza, SAP actualiza el stock: el teórico del pase siguiente
+ya trae el ajuste y su resta da cero. Si se mirara sólo el último pase, un
+hallazgo confirmado por el recuento desaparecería del resultado. Por eso la
+diferencia de la auditoría es **contado final − teórico del primer conteo**, y
+una ubicación cuyo último pase cuadra pero que arrastra una diferencia detectada
+cierra como **cerrada con diferencia, confirmada por recuento**.
+
+Si en tu operación no se contabiliza entre pases, la pantalla 5 permite volver a
+medir por la diferencia del último pase.
+
 Por eso hay **dos métricas de avance** y no una:
 
 - **Cobertura** — ubicaciones tocadas al menos una vez ÷ universo físico.
