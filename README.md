@@ -19,58 +19,32 @@ doble clic; funciona 100% offline y no envía datos a ningún servidor.
 Acepta `.xlsx .xls .xlsm .csv .txt`. Las columnas se detectan solas y se
 confirman en un modal; el mapeo queda guardado para las cargas siguientes.
 
+### El universo: lo define el cliente
+
+El alcance del W2W son las **ubicaciones a las que el cliente le generó documento
+de inventario**, no el maestro. El depósito completo es la intención, pero hay
+exclusiones deliberadas (unidades medibles, expo) y el cliente las decide al
+generar. Una ubicación con documento entra aunque no esté en el maestro: se
+completa con el Tipo almacén y el Área almacenamiento de la propia bajada.
+
+El maestro queda como fuente complementaria —zona, pasillo, columna, nivel,
+coordenadas— y es **opcional**: sin él hay avance y resultado, falta el mapa.
+La pantalla 1 muestra el **Alcance**: cuántas del maestro entraron, cuántas
+quedaron afuera y cuántas se contaron sin datos del maestro.
+
+En la pantalla 6 se puede volver al criterio anterior (físicas del maestro).
+
 ### Cómo decide los estados
 
-El número de pase **no viene en el archivo**: se deriva ordenando los documentos
-de inventario de cada ubicación por fecha, hora y número. De ahí sale el embudo:
+El cliente genera los documentos antes del conteo y los va activando. La app
+sigue esa secuencia por el status del documento:
 
-```
-PENDIENTE
-   └─ 1° conteo ─┬─ sin diferencia ──────────────→ CERRADA OK
-                 └─ con diferencia → EN 2° CONTEO
-                       └─ 2° conteo ─┬─ sin diferencia ──→ CERRADA OK
-                                     └─ con diferencia → EN 3° CONTEO
-                                           └─ 3° conteo ──→ CERRADA CON DIFERENCIA
-```
-
-**La diferencia se mide contra el teórico del primer conteo.** Cuando una
-diferencia se contabiliza, SAP actualiza el stock: el teórico del pase siguiente
-ya trae el ajuste y su resta da cero. Si se mirara sólo el último pase, un
-hallazgo confirmado por el recuento desaparecería del resultado. Por eso la
-diferencia de la auditoría es **contado final − teórico del primer conteo**, y
-una ubicación cuyo último pase cuadra pero que arrastra una diferencia detectada
-cierra como **cerrada con diferencia, confirmada por recuento**.
-
-Si en tu operación no se contabiliza entre pases, la pantalla 5 permite volver a
-medir por la diferencia del último pase.
-
-Por eso hay **dos métricas de avance** y no una:
-
-- **Cobertura** — ubicaciones tocadas al menos una vez ÷ universo físico.
-- **Cierre** — ubicaciones sin trabajo pendiente ÷ universo físico.
-
-Una ubicación contada con diferencia está contada pero **no** está cerrada.
-
-### El resultado: el neto por material
-
-Si un material falta en una ubicación y sobra en otra, la diferencia **netea**:
-el stock está en el depósito, está mal ubicado. El resultado de la auditoría es
-el neto por material; el bruto sólo describe cuánto stock está mal ubicado.
-Faltante y sobrante **nunca** se suman entre sí.
-
-El neteo es por material (+ propietario, si en el archivo hay más de uno) y se
-calcula siempre sobre **todo el depósito**: los filtros afectan el listado, no
-el neto. El KPI que resume el W2W es *de la diferencia bruta, cuánto netea*.
-
-**Los importes van en dinero, no en unidades.** Entre materiales distintos las
-unidades no se pueden sumar: un tornillo y un motor no son comparables. Por eso
-el faltante, el sobrante y el porcentaje que netea se calculan valorizados, con
-las unidades como dato secundario. En la tabla por material, donde la unidad sí
-tiene sentido, se muestran las dos cosas.
-
-Si faltan precios en el maestro de ítems, la pantalla avisa qué porcentaje de la
-diferencia bruta quedó sin valorizar y lista los materiales afectados. Sin
-archivo de precios el tablero cae a unidades y lo dice explícitamente.
+| Estado | Significado |
+|---|---|
+| `INAC` | Generado, sin activar |
+| `ACTI` | Activado, esperando que lo cuenten |
+| `COUN` | Contado |
+| `POST` | Contabilizado |
 
 ### Pantallas
 

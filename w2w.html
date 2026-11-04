@@ -322,6 +322,8 @@ table.dt td.num,table.dt th.num{text-align:right;font-variant-numeric:tabular-nu
 .st{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:700;
     letter-spacing:.3px;white-space:nowrap}
 .st-pend{background:var(--red-bg);color:var(--red)}
+.st-sin {background:#F7D9D7;color:#7A1611;border:1px solid #7A1611}
+.st-inac{background:var(--line);color:var(--gray)}
 .st-c2  {background:var(--amber-bg);color:var(--amber)}
 .st-c3  {background:#EDE7FA;color:var(--purple)}
 .st-ok  {background:var(--green-bg);color:var(--green)}
@@ -329,12 +331,15 @@ table.dt td.num,table.dt th.num{text-align:right;font-variant-numeric:tabular-nu
 html[data-theme="dark"] .st-c3{background:#2A2142;color:#B9A6F0}
 
 /* Celdas del mapa, estados propios del W2W */
+.cell.w-sin {background:#8C1A14}
+.cell.w-inac{background:#B7BEC9}
+.cell.w-acti{background:#D9453D}
 .cell.w-pend{background:#D9453D}
 .cell.w-ok  {background:#1E9E5A}
 .cell.w-c2  {background:#E8A33D}
 .cell.w-c3  {background:#6C4FBB}
-.cell.w-dif {background:#8C1A14}
-.cell.w-out {background:#B7BEC9}
+.cell.w-dif {background:#7A1611}
+.cell.w-out {background:#E1E6ED}
 
 /* Espejo de neteo */
 .esp{font-size:11px;line-height:1.5}
@@ -366,6 +371,9 @@ html[data-theme="dark"] .audit{background:#2E2410;border-color:#5C4A1C;color:#E8
 .xy-dot:hover{outline:2px solid var(--ceva-cyan);outline-offset:1px;z-index:5}
 
 /* ---- Tabla de trazabilidad de recuentos ---- */
+table.dt thead th.orden,table.dt thead th.dcol{cursor:pointer;user-select:none;white-space:nowrap}
+table.dt thead th.orden:hover,table.dt thead th.dcol:hover{background:var(--ceva-blue-2)}
+table.dt thead th .ord{opacity:.35;font-weight:400}
 table.dt thead th.grp{background:var(--ceva-blue-2);text-align:center;border-left:2px solid #fff}
 table.dt thead th.p1{background:#14407d} table.dt thead th.p2{background:#8a5a0a}
 table.dt thead th.p3{background:#4a3487}
@@ -466,7 +474,9 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   <div class="fl"><label>Estado W2W</label>
     <select id="fEstado">
       <option value="">Todos</option>
-      <option value="PEND">Pendiente de contar</option>
+      <option value="SIN">Sin documento generado</option>
+      <option value="INAC">Generado sin activar</option>
+      <option value="ACTI">Activado sin contar</option>
       <option value="C2">En 2° conteo</option>
       <option value="C3">En 3° conteo</option>
       <option value="OK">Cerrada sin diferencia</option>
@@ -486,8 +496,8 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   <div id="p1Empty" class="empty">
     <div class="big">📦</div>
     <h2>No hay datos cargados todavía</h2>
-    <p>Cargá el <b>Maestro de Ubicaciones</b> y la <b>Bajada de Conteos de SAP</b> desde la pantalla
-    <b>6 · Archivos y Configuración</b>.<br>
+    <p>Cargá la <b>Bajada de Conteos de SAP</b> desde la pantalla <b>6 · Archivos y Configuración</b>.
+    El <b>Maestro de Ubicaciones</b> es opcional: agrega el mapa, el pasillo y el nivel.<br>
     Todo se procesa en tu navegador: el tablero funciona 100% offline y no envía información a ningún servidor.</p>
     <button class="btn lg" onclick="UI.ir('p6')">⬆ Cargar archivos</button>
   </div>
@@ -495,9 +505,14 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   <div id="p1Body" class="hidden">
     <div class="grid kpis mb12" id="kpiAvance"></div>
 
-    <div class="grid c2 mb12">
+    <div class="grid c3 mb12">
       <div class="card">
-        <h3>Cobertura <span class="mini">ubicaciones físicas tocadas al menos una vez</span></h3>
+        <h3>Activación <span class="mini">el cliente va habilitando los documentos</span></h3>
+        <div class="progress-lg"><i id="pgAct" style="width:0%"></i><span id="pgActTxt">0%</span></div>
+        <div class="mini mt8" id="actTxt" style="color:var(--gray-2)"></div>
+      </div>
+      <div class="card">
+        <h3>Cobertura <span class="mini">ubicaciones tocadas al menos una vez</span></h3>
         <div class="progress-lg"><i id="pgCob" style="width:0%"></i><span id="pgCobTxt">0%</span></div>
         <div class="mini mt8" id="cobTxt" style="color:var(--gray-2)"></div>
       </div>
@@ -505,6 +520,15 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
         <h3>Cierre <span class="mini">ubicaciones que ya no tienen trabajo pendiente</span></h3>
         <div class="progress-lg"><i id="pgCie" style="width:0%"></i><span id="pgCieTxt">0%</span></div>
         <div class="mini mt8" id="cieTxt" style="color:var(--gray-2)"></div>
+      </div>
+    </div>
+
+    <div class="card mb12" id="cardAlcance">
+      <h3>Alcance del W2W <span class="mini">lo define el cliente al generar los documentos de inventario</span></h3>
+      <div class="grid c4" id="kpiAlcance"></div>
+      <div class="flex mt12 no-print">
+        <button class="btn sm ghost" onclick="Export.csv('alcance')">⤓ Ubicaciones fuera del alcance</button>
+        <span class="mini" id="alcTxt" style="color:var(--gray-2)"></span>
       </div>
     </div>
 
@@ -541,11 +565,6 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
 
 <!-- ══════════════ PÁGINA 2 · RESULTADO NETO ══════════════ -->
 <div class="page" id="p2">
-  <div class="audit">
-    <b>Auditoría de cliente · resultado de conteo.</b> El stock no se toca: no hay movimientos, traspasos ni ajustes.
-    Si un material falta en una ubicación y sobra en otra, la diferencia <b>netea</b>: el stock está en el depósito,
-    está mal ubicado. El resultado de la auditoría es el <b>neto por material</b>, nunca la suma de faltantes y sobrantes.
-  </div>
   <div id="p2Empty"></div>
   <div id="p2Body">
     <div id="avisoPrecio"></div>
@@ -665,12 +684,14 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
       <span class="mini right" style="color:var(--gray-2)" id="mapInfo"></span>
     </div>
     <div class="map-legend" id="mapLeyenda">
-      <span><i style="background:#D9453D"></i>Pendiente de contar</span>
+      <span><i style="background:#8C1A14"></i>Sin documento generado</span>
+      <span><i style="background:#B7BEC9"></i>Generado sin activar</span>
+      <span><i style="background:#D9453D"></i>Activado sin contar</span>
       <span><i style="background:#E8A33D"></i>En 2° conteo</span>
       <span><i style="background:#6C4FBB"></i>En 3° conteo</span>
       <span><i style="background:#1E9E5A"></i>Cerrada sin diferencia</span>
-      <span><i style="background:#8C1A14"></i>Cerrada con diferencia</span>
-      <span><i style="background:#B7BEC9"></i>Fuera del universo físico</span>
+      <span><i style="background:#7A1611"></i>Cerrada con diferencia</span>
+      <span><i style="background:#E1E6ED"></i>Fuera del alcance</span>
     </div>
     <div class="map-area" id="mapArea"></div>
   </div>
@@ -815,7 +836,16 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
             <option value="1">Netear ignorando el propietario</option>
           </select>
         </div>
-        <div class="fl"><label>Ubicaciones Intermedias</label>
+        <div class="fl"><label>Universo del W2W</label>
+          <select id="cfgUniverso">
+            <option value="doc">Ubicaciones con documento generado</option>
+            <option value="maestro">Ubicaciones físicas del maestro</option>
+          </select>
+        </div>
+        <div class="fl"><label>Moneda a mostrar</label>
+          <input type="text" id="cfgMoneda" maxlength="8" placeholder="la del archivo, o $">
+        </div>
+        <div class="fl"><label>Ubicaciones Intermedias <span class="rc-mini">sólo con universo = maestro</span></label>
           <select id="cfgInter">
             <option value="0">Fuera del universo (sólo físicas)</option>
             <option value="1">Dentro del universo</option>
@@ -1013,6 +1043,18 @@ const U = {
     if(!isFinite(r)) return null;
     return neg?-Math.abs(r):r;
   },
+  /* Moneda: la que fija la configuración, si no la del maestro de ítems, si no $.
+     Un símbolo va adelante ($ 1.234) y un código atrás (1.234 USD). */
+  moneda(){
+    if(Config.d.moneda) return Config.d.moneda;
+    try{ const m=Motor.M&&Motor.M.net?Motor.M.net.moneda:''; if(m) return m; }catch(e){}
+    return '$';
+  },
+  plata(v,d=0){
+    if(v===null||v===undefined||!isFinite(v)) return '—';
+    const s=U.moneda();
+    return /^[A-Za-z]/.test(s) ? U.num(v,d)+' '+s : s+' '+U.num(v,d);
+  },
   num(n,d=0){
     if(n===null||n===undefined||isNaN(n)) return '—';
     return Number(n).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -1101,6 +1143,8 @@ const Config = {
     verde:90, amarillo:70, ventanaAuto:1,
     signo:0,            // 0 = negativo es faltante
     dif:'auto',         // 'auto' usa la columna de diferencia si existe
+    universo:'doc',     // 'doc' = las que el cliente incluyó al generar documentos
+    moneda:'',          // vacío = la que traiga el maestro de ítems
     difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
     inter:0,            // las intermedias quedan fuera del universo
@@ -1120,6 +1164,7 @@ const Config = {
     cfgIni.value=c.ini; cfgFin.value=c.fin;
     cfgVerde.value=c.verde; cfgAmarillo.value=c.amarillo;
     cfgSigno.value=c.signo; cfgDif.value=c.dif; cfgDifAud.value=c.difAud;
+    cfgUniverso.value=c.universo; cfgMoneda.value=c.moneda;
     cfgProp.value=c.netProp; cfgInter.value=c.inter;
   },
   guardar(){
@@ -1127,6 +1172,7 @@ const Config = {
     c.ini=cfgIni.value||c.ini; c.fin=cfgFin.value||c.fin;
     c.verde=+cfgVerde.value; c.amarillo=+cfgAmarillo.value;
     c.signo=+cfgSigno.value; c.dif=cfgDif.value; c.difAud=cfgDifAud.value;
+    c.universo=cfgUniverso.value; c.moneda=cfgMoneda.value.trim();
     c.netProp=+cfgProp.value; c.inter=+cfgInter.value;
     c.ventanaAuto=0;   // a partir de acá la ventana la fija el usuario
     Config.persistir(); Motor.reconstruir(); U.toast('Configuración guardada','ok');
@@ -1312,7 +1358,7 @@ const Mapeo = {
    ========================================================================== */
 const Datos = {
   maestro:[], conteos:[], valor:[],
-  mapas:{}, hist:[],
+  mapas:{}, hist:[], dupDescartadas:0,
   meta:{maestro:null,conteos:null,valor:null},
 
   async init(){
@@ -1435,8 +1481,21 @@ const Datos = {
                  : tipo==='conteos' ? Datos.normConteos(acumulado,map)
                  : Datos.normValor(acumulado,map);
 
-      if(tipo==='conteos' && modoConteos.value==='add'){
-        Datos.conteos=Datos.conteos.concat(norm);
+      if(tipo==='conteos'){
+        const lista = modoConteos.value==='add' ? Datos.conteos.concat(norm) : norm;
+        /* Cada bajada es la base completa. Si se acumula sin deduplicar, las
+           filas se repiten dentro del documento y los ítems se cuentan dos
+           veces. La clave es ubicación + documento + material. */
+        const vistos=new Map();
+        for(const r of lista){
+          const k=r.u+'\u0001'+(r.doc||('T'+(r.f||0)+'_'+(r.h===null?'':r.h)))+'\u0001'+r.prod;
+          vistos.set(k,r);
+        }
+        Datos.dupDescartadas = lista.length - vistos.size;
+        Datos.conteos=[...vistos.values()];
+        if(Datos.dupDescartadas>0 && modoConteos.value==='add')
+          U.toast('Se descartaron '+U.num(Datos.dupDescartadas)+' filas repetidas. '+
+                  'Si cada bajada es la base completa, conviene usar Reemplazar.','err');
       }else{
         Datos[tipo]=norm;
       }
@@ -1543,6 +1602,17 @@ const Motor = {
     return false;
   },
 
+  /* Fase de un documento que todavía no se contó: generado o activado.
+     Importa el orden: INACTIVO contiene ACTIV, así que se prueba primero. */
+  FASES:{INAC:'INAC',NACT:'INAC',DEL:'INAC',ACTI:'ACTI',COUN:'COUN',POST:'COUN',CLOS:'COUN',CNTD:'COUN'},
+  faseDoc(st){
+    const x=U.hdr(st);
+    if(!x) return 'ACTI';                       // sin status, si no está contado se asume habilitado
+    if(Motor.FASES[x]) return Motor.FASES[x];
+    if(/INACTIV|NOACTIV|SINACTIV|CREAD|GENERAD|BORRAD|ANULAD/.test(x)) return 'INAC';
+    return 'ACTI';
+  },
+
   /* ---------- diferencia de un registro, con el signo configurado ---------- */
   difRaw(c){
     let d=null;
@@ -1603,18 +1673,13 @@ const Motor = {
         pasilloFull:(r.zona||r.sector||'(sin zona)')+' · '+(r.pasillo||'(sin pasillo)'),
         x:r.x, y:r.y, z:r.z,
         estadoUbi:est||'Física', momu:mm||'(sin clasificar)',
-        docs:[], docAbierto:false,
-        estado:'PEND', contada:false, cerrada:false, pase:0,
+        docs:[], docAbierto:false, conDoc:false, activado:false, generado:false, sinMaestro:false,
+        estado:'SIN', contada:false, cerrada:false, pase:0,
         ultF:null, ultH:null, usr:'', st:'', tipoAlm:'', areaAlm:'', areaAct:'', prop:'',
         difItems:0, difUnid:0, items:0
       });
     });
 
-    /* universo: físicas (las intermedias entran sólo si se configura) */
-    ubis.forEach(o=>{
-      o.fisica = o.estadoUbi==='Física';
-      o.enUniverso = o.fisica || (o.estadoUbi==='Intermedia' && Config.d.inter===1);
-    });
 
     /* ---------- 2 · BAJADA DE CONTEOS ---------- */
     const refKeyValida = Config.d.ref ? U.refKey(Config.d.ref) : null;
@@ -1635,15 +1700,36 @@ const Motor = {
       if(!statusSet.has(st)) statusSet.set(st,{st,n:0,contado:Motor.statusEsContado(st)});
       statusSet.get(st).n++;
 
-      const o=ubis.get(c.u);
+      /* El alcance lo define el cliente al generar los documentos, así que una
+         ubicación con documento entra aunque no esté en el maestro: se completa
+         con lo que trae la propia bajada y queda marcada para el panel de Alcance. */
+      let o=ubis.get(c.u);
       if(!o){
         if(!huerfanas.has(c.u)) huerfanas.set(c.u,{lbl:c.lbl||c.u,n:0});
         huerfanas.get(c.u).n++;
-        continue;
+        const zn=c.tipoAlm||'(sin maestro)', sc=c.areaAlm||'(sin maestro)';
+        o={
+          u:c.u, lbl:c.lbl||c.u,
+          pasillo:'(sin maestro)', col:'', nivel:'', pos:'',
+          sector:sc, zona:zn, pasilloFull:zn+' · (sin maestro)',
+          x:null, y:null, z:null,
+          estadoUbi:'(sin maestro)', momu:'(sin clasificar)',
+          docs:[], docAbierto:false, conDoc:false, activado:false, generado:false, sinMaestro:true,
+          estado:'SIN', contada:false, cerrada:false, pase:0,
+          ultF:null, ultH:null, usr:'', st:'', tipoAlm:'', areaAlm:'', areaAct:'', prop:'',
+          difItems:0, difUnid:0, items:0
+        };
+        ubis.set(c.u,o);
       }
       regValidos++;
+      o.conDoc=true;
 
-      if(!Motor.statusEsContado(Motor.stEfectivo(c))){ o.docAbierto=true; continue; }
+      if(!Motor.statusEsContado(Motor.stEfectivo(c))){
+        o.docAbierto=true;
+        if(Motor.faseDoc(Motor.stEfectivo(c))==='ACTI') o.activado=true; else o.generado=true;
+        continue;
+      }
+      o.activado=true;   // si se contó, antes se activó
       if(c.f===null) sinFecha++;
       if(!c.doc) sinDoc++;
       if(c.qt===null && c.qc===null && (c.qd===null||c.qd===undefined)) sinCant++;
@@ -1669,6 +1755,18 @@ const Motor = {
       d.items.push(c);
     }
 
+    /* ---------- universo ----------
+       Por defecto lo define el alcance que eligió el cliente al generar los
+       documentos. El criterio viejo (físicas del maestro) queda disponible. */
+    ubis.forEach(o=>{
+      o.fisica = o.estadoUbi==='Física';
+      o.enUniverso = Config.d.universo==='maestro'
+        ? (o.fisica || (o.estadoUbi==='Intermedia' && Config.d.inter===1))
+        : o.conDoc;
+      /* estado de arranque de las que no se contaron */
+      o.estado = !o.conDoc ? 'SIN' : (o.activado ? 'ACTI' : 'INAC');
+    });
+
     /* ---------- 3 · DERIVACIÓN DEL PASE Y ESTADO ---------- */
     const vigentes=[], prodMap=new Map();
     /* Un documento sin ninguna cantidad informada es una ubicación activada
@@ -1693,7 +1791,7 @@ const Motor = {
         if(conCant.length<lista.length) o.docAbierto=true;
         lista=conCant;
       }
-      if(!lista.length){ o.estado='PEND'; o.contada=false; o.docs=[]; return; }
+      if(!lista.length){ o.contada=false; o.docs=[]; return; }   // queda en SIN / INAC / ACTI
 
       /* Consolidación material por material a lo largo de los pases.
          Cuando una diferencia se contabiliza, SAP actualiza el stock: el
@@ -1831,16 +1929,24 @@ const Motor = {
     }
     if(huerfanas.size){
       let regH=0; huerfanas.forEach(h=>regH+=h.n);
-      cal.push({tipo:'Ubicaciones contadas que no están en el maestro',crit:'Alta',
+      cal.push({tipo:'Ubicaciones con documento que no están en el maestro',
+        crit: Config.d.universo==='maestro' ? 'Alta' : 'Media',
         ref:U.num(huerfanas.size)+' ubicaciones · '+U.num(regH)+' registros',
-        detalle:'Quedan fuera del avance Y del resultado, porque el universo lo define el maestro. '+
-                'Si el número es alto, el maestro no corresponde a esta bajada. Ejemplos: '+
-                [...huerfanas.values()].slice(0,5).map(h=>h.lbl).join(', ')+'.'});
+        detalle: Config.d.universo==='maestro'
+          ? 'Con el universo definido por el maestro quedan fuera del avance y del resultado. Ejemplos: '+
+            [...huerfanas.values()].slice(0,5).map(h=>h.lbl).join(', ')+'.'
+          : 'Entran al avance y al resultado porque el cliente les generó documento, pero sin zona, pasillo '+
+            'ni nivel del maestro no aparecen en el mapa. Ejemplos: '+
+            [...huerfanas.values()].slice(0,5).map(h=>h.lbl).join(', ')+'.'});
     }
     if(sinFecha) cal.push({tipo:'Conteos sin fecha de recuento',crit:'Alta',ref:U.num(sinFecha)+' registros',
       detalle:'Sin fecha no se puede ordenar el pase con precisión. Revisá el mapeo de columnas.'});
     if(sinDoc) cal.push({tipo:'Conteos sin número de documento',crit:'Alta',ref:U.num(sinDoc)+' registros',
       detalle:'El pase se deriva por fecha y hora, que es menos preciso. Si dos recuentos cayeron en el mismo minuto se mezclan.'});
+    if(Datos.dupDescartadas>0) cal.push({tipo:'Filas repetidas descartadas en la carga',crit:'Media',
+      ref:U.num(Datos.dupDescartadas)+' filas',
+      detalle:'Había más de una fila para la misma ubicación, documento y material. Se conservó la última. '+
+              'Si cargás la base completa en cada bajada, usá el modo Reemplazar.'});
     if(sinCant) cal.push({tipo:'Conteos sin cantidades',crit:'Media',ref:U.num(sinCant)+' registros',
       detalle:'Sin teórico, contado ni diferencia el registro cuenta para el avance pero no para el resultado.'});
     if(props.size>1 && Config.d.netProp===0) cal.push({tipo:'Más de un propietario de stock',crit:'Alta',
@@ -1919,14 +2025,26 @@ const Motor = {
         dayMap.get(iso).add(o.u);
         if(d.h!==null){
           const kh=iso+'|'+Math.floor(d.h/60);
-          horaMap.set(kh,(horaMap.get(kh)||0)+1);
+          if(!horaMap.has(kh)) horaMap.set(kh,new Set());
+          horaMap.get(kh).add(o.u);     // ubicaciones distintas, no documentos
         }
       });
     });
     const serieDia=[...dayMap.entries()].map(([iso,s])=>({iso,n:s.size})).sort((a,b)=>a.iso<b.iso?-1:1);
 
+    /* Alcance: qué incluyó el cliente al generar los documentos, contra el maestro. */
+    const alc={conAmbos:0,soloDoc:0,soloMaestro:0,ejSoloDoc:[],ejSoloMaestro:[],
+               totMaestro:0,totDoc:0};
+    ubis.forEach(o=>{
+      if(!o.sinMaestro) alc.totMaestro++;
+      if(o.conDoc) alc.totDoc++;
+      if(o.conDoc && !o.sinMaestro) alc.conAmbos++;
+      else if(o.conDoc && o.sinMaestro){ alc.soloDoc++; if(alc.ejSoloDoc.length<6) alc.ejSoloDoc.push(o.lbl); }
+      else if(!o.conDoc && !o.sinMaestro){ alc.soloMaestro++; if(alc.ejSoloMaestro.length<6) alc.ejSoloMaestro.push(o.lbl); }
+    });
+
     Motor.M={
-      ubis, arr:[...ubis.values()], vigentes, prod:[...prodMap.values()],
+      ubis, arr:[...ubis.values()], vigentes, prod:[...prodMap.values()], alcance:alc,
       refs, statusSet, props, precios, monedas,
       cal, serieDia, horaMap,
       st:{regTot,regValidos,regFueraRef,sinUbi,sinFecha,sinDoc,sinCant,
@@ -2107,15 +2225,20 @@ Motor.recalcular = function(){
   });
 
   /* conteo de estados sobre el universo filtrado */
-  let total=0,contadas=0,cerradas=0,pend=0,c2=0,c3=0,ok=0,dif=0,fuera=0,abiertas=0;
+  let total=0,contadas=0,cerradas=0,fuera=0;
+  const E={SIN:0,INAC:0,ACTI:0,C2:0,C3:0,OK:0,DIF:0};
+  let generadas=0, activadas=0, sinMaestro=0;
   const porZona=new Map(), porPasillo=new Map();
   const add=(map,k,o)=>{
     if(!map.has(k)) map.set(k,{k,t:0,cont:0,cerr:0,pend:0,c2:0,c3:0,ok:0,dif:0});
     const g=map.get(k); g.t++;
     if(o.contada) g.cont++;
     if(o.cerrada) g.cerr++;
-    if(o.estado==='PEND') g.pend++; else if(o.estado==='C2') g.c2++;
-    else if(o.estado==='C3') g.c3++; else if(o.estado==='OK') g.ok++; else g.dif++;
+    if(o.estado==='SIN'||o.estado==='INAC'||o.estado==='ACTI') g.pend++;
+    else if(o.estado==='C2') g.c2++;
+    else if(o.estado==='C3') g.c3++;
+    else if(o.estado==='OK') g.ok++;
+    else g.dif++;
   };
 
   arr.forEach(o=>{
@@ -2123,40 +2246,64 @@ Motor.recalcular = function(){
     total++;
     if(o.contada) contadas++;
     if(o.cerrada) cerradas++;
-    if(o.estado==='PEND'){ pend++; if(o.docAbierto) abiertas++; }
-    else if(o.estado==='C2') c2++;
-    else if(o.estado==='C3') c3++;
-    else if(o.estado==='OK') ok++;
-    else dif++;
+    if(o.conDoc) generadas++;
+    if(o.activado) activadas++;
+    if(o.sinMaestro) sinMaestro++;
+    E[o.estado]=(E[o.estado]||0)+1;
     add(porZona,o.zona,o); add(porPasillo,o.pasilloFull,o);
   });
 
+  const pend = E.SIN+E.INAC+E.ACTI;
   const cobertura = total?contadas/total*100:0;
   const cierre    = total?cerradas/total*100:0;
+  const pActiva   = generadas?activadas/generadas*100:0;
+  const pConteo   = activadas?contadas/activadas*100:0;
 
-  /* ritmo y proyección: se usan los días con actividad del rango visible */
+  /* ritmo y proyección: el W2W se hace en horas, no en jornadas */
   const dias=M.serieDia.filter(s=>{
     const t=new Date(s.iso+'T12:00:00').getTime();
     if(f.d1!==null&&t<f.d1) return false;
     if(f.d2!==null&&t>f.d2) return false;
     return true;
   });
-  const ritmoDia = dias.length ? dias.reduce((a,b)=>a+b.n,0)/dias.length : 0;
+  const setArr=new Set(arr.filter(o=>o.enUniverso).map(o=>o.u));
+  let horasAct=0, ubisEnHoras=0, ultimaAct=null;
+  M.horaMap.forEach((set,kh)=>{
+    const iso=kh.split('|')[0];
+    const t=new Date(iso+'T12:00:00').getTime();
+    if(f.d1!==null&&t<f.d1) return;
+    if(f.d2!==null&&t>f.d2) return;
+    let n=0; set.forEach(u=>{ if(setArr.has(u)) n++; });
+    if(!n) return;
+    horasAct++; ubisEnHoras+=n;
+    const h=+kh.split('|')[1];
+    const ts=new Date(iso+'T00:00:00').getTime()+h*3600000;
+    if(ultimaAct===null||ts>ultimaAct) ultimaAct=ts;
+  });
+  const ritmoHora = horasAct ? ubisEnHoras/horasAct : 0;
   const restantes = total-contadas;
-  const diasRest = ritmoDia>0 ? Math.ceil(restantes/ritmoDia) : null;
+  const horasRest = ritmoHora>0 ? restantes/ritmoHora : null;
+  const finEst = (horasRest!==null && ultimaAct!==null)
+    ? new Date(ultimaAct+3600000+horasRest*3600000) : null;
+  const ritmoDia = dias.length ? dias.reduce((a,b)=>a+b.n,0)/dias.length : 0;
 
   /* día con más actividad, para el gráfico por hora */
   let diaPico=null;
   dias.forEach(s=>{ if(!diaPico||s.n>diaPico.n) diaPico=s; });
   const horas=[];
   if(diaPico){
-    for(let h=0;h<24;h++) horas.push({h,n:M.horaMap.get(diaPico.iso+'|'+h)||0});
+    for(let h=0;h<24;h++){
+      const set=M.horaMap.get(diaPico.iso+'|'+h);
+      horas.push({h,n:set?set.size:0});
+    }
   }
 
   Motor.V={
     arr, set, vig,
-    m:{total,contadas,cerradas,pend,c2,c3,ok,dif,fuera,abiertas,
-       cobertura,cierre,ritmoDia,restantes,diasRest,dias,diaPico,horas,
+    m:{total,contadas,cerradas,pend,fuera,E,generadas,activadas,sinMaestro,
+       c2:E.C2,c3:E.C3,ok:E.OK,dif:E.DIF,
+       cobertura,cierre,pActiva,pConteo,
+       ritmoHora,horasAct,restantes,horasRest,finEst,ritmoDia,dias,diaPico,horas,
        porZona:[...porZona.values()],porPasillo:[...porPasillo.values()]}
   };
   Vista.render();
@@ -2174,10 +2321,14 @@ Motor.reconstruir = function(){
    VISTA · KPIs, gráficos y tablas
    ========================================================================== */
 const PAL = ['#0057B8','#00A3E0','#0A1E46','#1E9E5A','#E8A33D','#E8112D','#6C4FBB','#00857D','#B25E9D','#5A6474'];
-const COL_EST = {PEND:'#D9453D',C2:'#E8A33D',C3:'#6C4FBB',OK:'#1E9E5A',DIF:'#8C1A14'};
-const LBL_EST = {PEND:'Pendiente de contar',C2:'En 2° conteo',C3:'En 3° conteo',
+const ORD_EST = ['SIN','INAC','ACTI','C2','C3','OK','DIF'];
+const COL_EST = {SIN:'#8C1A14',INAC:'#B7BEC9',ACTI:'#D9453D',C2:'#E8A33D',C3:'#6C4FBB',
+                 OK:'#1E9E5A',DIF:'#7A1611'};
+const LBL_EST = {SIN:'Sin documento generado',INAC:'Generado sin activar',ACTI:'Activado sin contar',
+                 C2:'En 2° conteo',C3:'En 3° conteo',
                  OK:'Cerrada sin diferencia',DIF:'Cerrada con diferencia'};
-const CLS_EST = {PEND:'st-pend',C2:'st-c2',C3:'st-c3',OK:'st-ok',DIF:'st-dif'};
+const CLS_EST = {SIN:'st-sin',INAC:'st-inac',ACTI:'st-pend',C2:'st-c2',C3:'st-c3',
+                 OK:'st-ok',DIF:'st-dif'};
 const CH = {};
 
 /* Etiquetas dibujadas sobre el gráfico: sin esto los valores sólo se ven
@@ -2261,12 +2412,53 @@ function chart(id,cfg){
 function kpi(lbl,val,sub,cls){
   return `<div class="kpi ${cls||''}"><div class="lbl">${lbl}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
 }
-function tabla(id,cols,rows){
-  const el=document.getElementById(id); if(!el) return;
-  el.innerHTML='<thead><tr>'+cols.map(c=>`<th class="${c.num?'num':''}">${c.t}</th>`).join('')+'</tr></thead><tbody>'+
-    (rows.length?rows.map((r,ri)=>`<tr${r._attr||''}>`+cols.map((c,i)=>`<td class="${c.num?'num':''}">${r[i]??''}</td>`).join('')+'</tr>').join('')
-    :`<tr><td colspan="${cols.length}" style="text-align:center;color:var(--gray-2);padding:18px">Sin datos para los filtros actuales</td></tr>`)+'</tbody>';
+/* Las tablas se guardan para poder reordenarlas al clic sin recalcular nada.
+   El valor de orden se saca del texto que se ve: U.n() entiende el formato
+   local, así que números, porcentajes y cantidades con signo ordenan bien. */
+const TB={};
+function valOrden(celda){
+  const txt=String(celda===null||celda===undefined?'':celda).replace(/<[^>]*>/g,'').trim();
+  if(!txt||txt==='—') return {n:null,t:''};
+  const v=/\d/.test(txt)?U.n(txt):null;
+  return {n:(v===null||!isFinite(v))?null:v, t:txt.toUpperCase()};
 }
+function tabla(id,cols,rows){
+  const prev=TB[id];
+  const mismo = prev && prev.cols.length===cols.length &&
+                prev.cols.every((c,i)=>c.t===cols[i].t);
+  TB[id]={cols,rows,sort:mismo?prev.sort:null};
+  pintarTabla(id);
+}
+function pintarTabla(id){
+  const t=TB[id], el=document.getElementById(id);
+  if(!t||!el) return;
+  let rows=t.rows;
+  if(t.sort){
+    const i=t.sort.i, dir=t.sort.dir;
+    rows=rows.slice().sort((a,b)=>{
+      const va=valOrden(a[i]), vb=valOrden(b[i]);
+      if(va.n!==null && vb.n!==null) return (va.n-vb.n)*dir;
+      if(va.n!==null) return -1*dir;
+      if(vb.n!==null) return  1*dir;
+      return U.natSort(va.t,vb.t)*dir;
+    });
+  }
+  el.innerHTML='<thead><tr>'+t.cols.map((c,i)=>{
+    const act=t.sort&&t.sort.i===i;
+    const fl=act?(t.sort.dir===1?'▲':'▼'):'<span class="ord">↕</span>';
+    return `<th class="${c.num?'num ':''}orden" data-i="${i}" title="Ordenar por ${U.esc(c.t)}">${c.t} ${fl}</th>`;
+  }).join('')+'</tr></thead><tbody>'+
+    (rows.length?rows.map(r=>`<tr${r._attr||''}>`+t.cols.map((c,i)=>`<td class="${c.num?'num':''}">${r[i]??''}</td>`).join('')+'</tr>').join('')
+    :`<tr><td colspan="${t.cols.length}" style="text-align:center;color:var(--gray-2);padding:18px">Sin datos para los filtros actuales</td></tr>`)+'</tbody>';
+}
+/* un solo escucha para todas las tablas */
+document.addEventListener('click',e=>{
+  const th=e.target.closest('th.orden'); if(!th) return;
+  const tb=th.closest('table'); if(!tb||!TB[tb.id]) return;
+  const i=+th.dataset.i, t=TB[tb.id];
+  t.sort = (t.sort&&t.sort.i===i) ? {i,dir:-t.sort.dir} : {i,dir:1};
+  pintarTabla(tb.id);
+});
 function colorPct(p){ return p>=Config.d.verde?'#1E9E5A':p>=Config.d.amarillo?'#E8A33D':'#D9453D'; }
 function barMini(p){
   return `<span class="bar-mini"><i style="width:${Math.min(100,p)}%;background:${colorPct(p)}"></i></span> ${U.pct(p)}`;
@@ -2280,18 +2472,21 @@ function signo(v,d=0){
 }
 function dinero(v){
   if(v===null||v===undefined||!isFinite(v)) return '<span class="cero">—</span>';
-  return `<span class="${v<0?'falt':v>0?'sobr':'cero'}">${U.num(v,0)}</span>`;
+  return `<span class="${v<0?'falt':v>0?'sobr':'cero'}">${U.plata(v)}</span>`;
 }
 
 const Vista = {
-  hayDatos(){ return !!(Motor.M && Datos.maestro.length && Datos.conteos.length); },
+  /* El universo lo definen los documentos, así que alcanza con la bajada.
+     El maestro suma el mapa, el pasillo y el nivel. */
+  hayDatos(){ return !!(Motor.M && Datos.conteos.length); },
 
   render(){
     UI.pill();
     if(!Vista.hayDatos()){
       p1Empty.classList.remove('hidden'); p1Body.classList.add('hidden');
-      const msg=`<div class="empty"><div class="big">📦</div><h2>Todavía no hay datos suficientes</h2>
-        <p>Hacen falta el <b>Maestro de Ubicaciones</b> y la <b>Bajada de Conteos de SAP</b>.</p>
+      const msg=`<div class="empty"><div class="big">📦</div><h2>Todavía no hay conteos cargados</h2>
+        <p>Alcanza con la <b>Bajada de Conteos de SAP</b>: el alcance lo definen los documentos generados.<br>
+        El <b>Maestro de Ubicaciones</b> es opcional y agrega el mapa, el pasillo y el nivel.</p>
         <button class="btn lg" onclick="UI.ir('p6')">⬆ Ir a cargar archivos</button></div>`;
       p2Empty.innerHTML=msg; p2Body.classList.add('hidden');
       p3Empty.innerHTML=msg; p3Body.classList.add('hidden');
@@ -2318,31 +2513,60 @@ const Vista = {
   avance(){
     const {m}=Motor.V;
 
+    const porDoc = Config.d.universo!=='maestro';
     kpiAvance.innerHTML=[
-      kpi('Universo físico',U.num(m.total),'ubicaciones del maestro a contar','pur'),
+      kpi('Universo',U.num(m.total),
+          porDoc?'ubicaciones con documento generado':'ubicaciones físicas del maestro','pur'),
       kpi('Contadas',U.num(m.contadas),U.pct(m.cobertura,1)+' de cobertura',m.cobertura>=Config.d.verde?'ok':m.cobertura>=Config.d.amarillo?'warn':'bad'),
       kpi('Cerradas',U.num(m.cerradas),U.pct(m.cierre,1)+' de cierre',m.cierre>=Config.d.verde?'ok':m.cierre>=Config.d.amarillo?'warn':'bad'),
-      kpi('Pendientes de contar',U.num(m.pend),m.abiertas?U.num(m.abiertas)+' con documento abierto':'sin conteo registrado','bad'),
-      kpi('En 2° conteo',U.num(m.c2),'tuvieron diferencia en el 1°','warn'),
-      kpi('En 3° conteo',U.num(m.c3),'tuvieron diferencia en el 2°','warn'),
-      kpi('Ritmo diario',U.num(m.ritmoDia,0),'ubicaciones por día con actividad','info'),
-      kpi('Jornadas restantes',m.diasRest!==null?U.num(m.diasRest):'—',
-          m.diasRest!==null?U.num(m.restantes)+' ubicaciones por contar':'sin ritmo medible','info')
+      kpi('Activadas',U.num(m.activadas),U.pct(m.pActiva,1)+' de las generadas',
+          m.pActiva>=Config.d.verde?'ok':'warn'),
+      kpi('Listas para contar',U.num(m.E.ACTI),'activadas y todavía sin contar','bad'),
+      kpi('Sin activar',U.num(m.E.INAC),'documento generado, no habilitado'),
+      kpi('Ritmo por hora',U.num(m.ritmoHora,0),
+          m.horasAct?'ubicaciones por hora, sobre '+U.num(m.horasAct)+' horas con actividad':'sin ritmo medible','info'),
+      kpi('Fin estimado',
+          m.finEst?U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—',
+          m.finEst?U.fmt(m.finEst)+' · faltan '+U.num(m.restantes)+' ubicaciones'
+                  :(m.restantes?U.num(m.restantes)+' por contar, sin ritmo':'conteo terminado'),'info')
     ].join('');
 
     pgCob.style.width=Math.min(100,m.cobertura)+'%';
     pgCob.style.background=colorPct(m.cobertura);
     pgCobTxt.textContent=U.pct(m.cobertura,1);
-    cobTxt.textContent=U.num(m.contadas)+' de '+U.num(m.total)+' ubicaciones físicas tocadas al menos una vez.';
+    cobTxt.textContent=U.num(m.contadas)+' de '+U.num(m.total)+' ubicaciones del alcance tocadas al menos una vez.';
 
     pgCie.style.width=Math.min(100,m.cierre)+'%';
     pgCie.style.background=colorPct(m.cierre);
     pgCieTxt.textContent=U.pct(m.cierre,1);
     cieTxt.textContent=U.num(m.cerradas)+' de '+U.num(m.total)+' sin trabajo pendiente. Quedan '+
-      U.num(m.c2+m.c3)+' en recuento y '+U.num(m.pend)+' sin contar.';
+      U.num(m.E.C2+m.E.C3)+' en recuento y '+U.num(m.pend)+' sin contar.';
+
+    pgAct.style.width=Math.min(100,m.pActiva)+'%';
+    pgAct.style.background=colorPct(m.pActiva);
+    pgActTxt.textContent=U.pct(m.pActiva,1);
+    actTxt.textContent=U.num(m.activadas)+' de '+U.num(m.generadas)+' con documento generado. '+
+      U.pct(m.pConteo,1)+' de las activadas ya se contaron.';
+
+    /* alcance */
+    const A=Motor.M.alcance;
+    kpiAlcance.innerHTML=[
+      kpi('Ubicaciones en el maestro',U.num(A.totMaestro),'el depósito completo','pur'),
+      kpi('Con documento generado',U.num(A.totDoc),
+          A.totMaestro?U.pct(A.conAmbos/A.totMaestro*100,1)+' del maestro':'','info'),
+      kpi('En el maestro, fuera del alcance',U.num(A.soloMaestro),
+          A.soloMaestro?'el cliente decidió no incluirlas':'el alcance cubre todo el maestro',
+          A.soloMaestro?'warn':'ok'),
+      kpi('Contadas sin datos del maestro',U.num(A.soloDoc),
+          A.soloDoc?'entran al avance, sin pasillo ni nivel':'todas tienen maestro',
+          A.soloDoc?'warn':'ok')
+    ].join('');
+    alcTxt.textContent =
+      (A.soloMaestro?'Fuera del alcance, por ejemplo: '+A.ejSoloMaestro.join(', ')+'. ':'')+
+      (A.soloDoc?'Sin maestro, por ejemplo: '+A.ejSoloDoc.join(', ')+'.':'');
 
     /* embudo */
-    const fil=[['PEND',m.pend],['C2',m.c2],['C3',m.c3],['OK',m.ok],['DIF',m.dif]];
+    const fil=ORD_EST.map(k=>[k,m.E[k]||0]);
     embudo.innerHTML=fil.map(([k,v])=>{
       const w=m.total?v/m.total*100:0;
       return `<div class="fun-row">
@@ -2364,7 +2588,7 @@ const Vista = {
 
     chart('chHora',{type:'bar',
       data:{labels:m.horas.map(h=>String(h.h).padStart(2,'0')+'h'),
-            datasets:[{label:'Documentos',data:m.horas.map(h=>h.n),backgroundColor:'#00A3E0'}]},
+            datasets:[{label:'Ubicaciones',data:m.horas.map(h=>h.n),backgroundColor:'#00A3E0'}]},
       options:{plugins:{legend:{display:false},title:{display:!!m.diaPico,text:m.diaPico?'Día '+m.diaPico.iso:''}},
                scales:{y:{beginAtZero:true}}}});
 
@@ -2396,10 +2620,10 @@ const Vista = {
 
   /* ═══════════ PÁGINA 2 · RESULTADO NETO ═══════════ */
   neto(){
-    const net=Motor.M.net, mon=net.moneda?' '+net.moneda:'';
+    const net=Motor.M.net, mon=' '+U.moneda();
     /* El encabezado va en dinero: entre materiales distintos las unidades no
        se pueden sumar. Las unidades quedan como dato secundario.            */
-    const $=(v)=>net.hayPrecios ? U.num(v,0)+mon : '—';
+    const $=(v)=>net.hayPrecios ? U.plata(v) : '—';
 
     avisoPrecio.innerHTML = net.hayPrecios
       ? (net.cobPrecio<99.95
@@ -2413,7 +2637,7 @@ const Vista = {
 
     const nF=net.itemsFalt, nS=net.itemsSobr;
     kpiBruto.innerHTML=[
-      kpi('Ubicaciones con diferencia',U.num(net.ubisDif),'sobre el universo físico','bad'),
+      kpi('Ubicaciones con diferencia',U.num(net.ubisDif),'sobre el universo del W2W','bad'),
       kpi('Ítems con diferencia',U.num(net.itemsDif),'un ítem es un material en una ubicación','bad'),
       kpi('Faltante',U.num(nF)+(nF===1?' ítem':' ítems'),
           (net.hayPrecios?$(net.faltVal)+' · ':'')+U.num(net.faltBrutoU,0)+' unidades','bad'),
@@ -2494,8 +2718,8 @@ const Vista = {
         signo(x.neto),
         x.netea?'<span class="net-si">SÍ</span>':'<span class="net-no">NO</span>',
         x.precio!==null?U.num(x.precio,2):'<span class="cero">—</span>',
-        x.faltVal?`<span class="falt">${U.num(x.faltVal,0)}</span>`:'<span class="cero">—</span>',
-        x.sobrVal?`<span class="sobr">${U.num(x.sobrVal,0)}</span>`:'<span class="cero">—</span>',
+        x.faltVal?`<span class="falt">${U.plata(x.faltVal)}</span>`:'<span class="cero">—</span>',
+        x.sobrVal?`<span class="sobr">${U.plata(x.sobrVal)}</span>`:'<span class="cero">—</span>',
         `<b>${dinero(x.netoVal)}</b>`
       ];
       fila._attr=` class="pick" data-mat="${U.esc(x.prod)}" title="Ver en qué ubicaciones está esta diferencia"`;
@@ -2520,12 +2744,35 @@ const Vista = {
     const prec=m=>Motor.M.precios.has(m)?Motor.M.precios.get(m):null;
     const mag=it=>{const p=prec(it.prodK);return (p===null||it.qd===null)?null:Math.abs(it.qd*p);};
 
+    /* el clic en un encabezado manda sobre el selector "Ordenar por" */
+    const oc0=Vista._ordCol;
+    if(oc0){
+      const val=(it)=>{
+        const k=oc0.k;
+        if(k==='qd')  return it.qd;
+        if(k==='mag') return mag(it);
+        if(k==='esp') return nEsp.get(it);
+        const m2=k.match(/^p(\d)([tcd])$/);
+        if(m2){ const ix=(+m2[1]-1)*3+{t:0,c:1,d:2}[m2[2]]; const v=it.pd?it.pd[ix]:undefined;
+                return (v===undefined||v===null)?null:v; }
+        return it[k];
+      };
+      its.sort((a,b)=>{
+        const va=val(a), vb=val(b);
+        const na=typeof va==='number'&&isFinite(va), nb=typeof vb==='number'&&isFinite(vb);
+        if(na&&nb) return (va-vb)*oc0.dir;
+        if(na) return -1*oc0.dir;
+        if(nb) return  1*oc0.dir;
+        return U.natSort(va??'',vb??'')*oc0.dir;
+      });
+    } else {
     const ord=difOrden.value;
     if(ord==='val')      its.sort((a,b)=>(mag(b)??-1)-(mag(a)??-1)||Math.abs(b.qd||0)-Math.abs(a.qd||0));
     else if(ord==='abs') its.sort((a,b)=>Math.abs(b.qd||0)-Math.abs(a.qd||0));
     else if(ord==='mat') its.sort((a,b)=>U.natSort(a.prod,b.prod)||U.natSort(a.lbl,b.lbl));
     else its.sort((a,b)=>U.natSort(a.zona,b.zona)||U.natSort(a.pasillo,b.pasillo)
                         ||U.natSort(a.col,b.col)||U.natSort(a.nivel,b.nivel)||U.natSort(a.pos,b.pos));
+    }
 
     const conDif=its.filter(i=>i.qd!==null&&i.qd!==0);
     const conE=conDif.filter(i=>nEsp.get(i)>0).length;
@@ -2535,7 +2782,7 @@ const Vista = {
       kpi('Ítems listados',U.num(its.length),soloDif?'sólo los que tienen diferencia':'todos los recuentos','bad'),
       kpi('Confirmados por recuento',U.num(conf),'el último pase ya cuadra tras contabilizar','warn'),
       kpi('Con espejo',U.num(conE),'el mismo material con signo opuesto en otra ubicación','ok'),
-      kpi('Magnitud listada',magTot?U.num(magTot,0):'—','suma del valor absoluto, sólo para priorizar','info')
+      kpi('Magnitud listada',magTot?U.plata(magTot):'—','suma del valor absoluto, sólo para priorizar','info')
     ].join('');
 
     const lim=+difLimit.value;
@@ -2544,15 +2791,19 @@ const Vista = {
 
     /* encabezado de dos niveles: los tres recuentos agrupados */
     const maxP=Math.max(1,Math.min(3,its.reduce((a,b)=>Math.max(a,b.pase||1),1)));
-    let h1='<tr><th rowspan="2">Ubicación</th><th rowspan="2">Zona</th><th rowspan="2">Pasillo</th>'+
-           '<th rowspan="2">Material</th><th rowspan="2">Descripción</th><th rowspan="2">UM</th>';
+    const oc=Vista._ordCol;
+    const fl=k=>oc&&oc.k===k?(oc.dir===1?' ▲':' ▼'):' <span class="ord">↕</span>';
+    const th=(k,txt,extra)=>`<th rowspan="2" class="dcol ${extra||''}" data-k="${k}">${txt}${fl(k)}</th>`;
+    let h1='<tr>'+th('lbl','Ubicación')+th('zona','Zona')+th('pasillo','Pasillo')+
+           th('prod','Material')+th('desc','Descripción')+th('um','UM');
     let h2='<tr>';
     for(let k=1;k<=maxP;k++){
       h1+=`<th class="grp p${k}" colspan="3">${k}° recuento</th>`;
-      h2+=`<th class="num">Teór.</th><th class="num">Cont.</th><th class="num">Dif.</th>`;
+      h2+=`<th class="num dcol" data-k="p${k}t">Teór.${fl('p'+k+'t')}</th>`+
+          `<th class="num dcol" data-k="p${k}c">Cont.${fl('p'+k+'c')}</th>`+
+          `<th class="num dcol" data-k="p${k}d">Dif.${fl('p'+k+'d')}</th>`;
     }
-    h1+='<th rowspan="2" class="num">RESULTADO</th><th rowspan="2" class="num">Magnitud</th>'+
-        '<th rowspan="2">Espejo</th></tr>';
+    h1+=th('qd','RESULTADO','num')+th('mag','Magnitud','num')+th('esp','Espejo')+'</tr>';
     h2+='</tr>';
 
     const cel=(v,cls)=>`<td class="num ${cls||''}">${v===null||v===undefined?'<span class="cero">—</span>':U.num(v)}</td>`;
@@ -2575,7 +2826,7 @@ const Vista = {
         `<td>${U.esc(it.desc||'—')}</td><td>${U.esc(it.um||'—')}</td>`+
         c+
         `<td class="num res">${signo(it.qd)}${it.confirmada?' <span class="st st-dif">confirmada</span>':''}</td>`+
-        `<td class="num">${mag(it)!==null?U.num(mag(it),0):'<span class="cero">—</span>'}</td>`+
+        `<td class="num">${mag(it)!==null?U.plata(mag(it)):'<span class="cero">—</span>'}</td>`+
         `<td class="esp">${e?('<b>'+Motor.espejo(it,2).map(o=>U.esc(o.lbl)).join('</b> · <b>')+'</b>'+(e>2?' <span class="rc-mini">+'+(e-2)+'</span>':'')):'<span class="none">—</span>'}</td>`+
         '</tr>';
     });
@@ -2612,7 +2863,7 @@ const Vista = {
       '<hr class="hr">'+
       fila('<b>Resultado de la auditoría</b>',signo(it.qd)+' '+U.esc(it.um||''))+
       fila('Precio unitario',p!==null?U.num(p,2):'sin precio en el maestro')+
-      fila('Magnitud referencial',(p!==null&&it.qd!==null)?U.num(Math.abs(it.qd*p),0):'—')+
+      fila('Magnitud referencial',(p!==null&&it.qd!==null)?U.plata(Math.abs(it.qd*p)):'—')+
       (it.confirmada
         ? `<div class="note ok" style="margin:8px 0">El recuento <b>confirmó</b> la diferencia: el último pase ya
            cuadra porque el ajuste del conteo anterior se contabilizó y SAP actualizó el stock.</div>` : '')+
@@ -2690,7 +2941,7 @@ const Mapa = {
     mapZona.innerHTML='<option value="">— Todas (agregado) —</option>'+zs.map(z=>`<option>${U.esc(z)}</option>`).join('');
     if(prev&&zs.includes(prev)) mapZona.value=prev; else if(zs.length) mapZona.value=zs[0];
   },
-  clase(o){ return o.enUniverso ? 'w-'+o.estado.toLowerCase() : 'w-out'; },
+  clase(o){ return o.enUniverso ? 'w-'+String(o.estado).toLowerCase() : 'w-out'; },
   color(o){ return o.enUniverso ? COL_EST[o.estado] : '#B7BEC9'; },
   tip(o){
     if(!o.enUniverso) return o.lbl+' — fuera del universo ('+o.estadoUbi+')';
@@ -2929,6 +3180,11 @@ const Export = {
       V.arr.map(o=>[o.lbl,o.zona,o.sector,o.pasillo,o.col,o.nivel,o.pos,o.estadoUbi,o.momu,
         o.enUniverso?'SI':'NO',LBL_EST[o.estado],o.confirmada?'SI':'NO',o.pases||0,
         o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),o.usr,o.st,o.items,o.difItems])];
+    if(cual==='alcance') return [
+      ['Ubicacion','Zona','Sector','Pasillo','Estado Ubi','En el maestro','Con documento generado','Situacion'],
+      Motor.M.arr.filter(o=>!o.conDoc || o.sinMaestro).map(o=>[o.lbl,o.zona,o.sector,o.pasillo,o.estadoUbi,
+        o.sinMaestro?'NO':'SI', o.conDoc?'SI':'NO',
+        o.conDoc?'En el alcance, sin datos del maestro':'En el maestro, fuera del alcance'])];
     if(cual==='productividad') return [
       ['Usuario','Apellido y nombre','Ubicaciones','Ocupadas','Vacias','Sin clasificar','Documentos',
        'Items','Items con diferencia','Horas activas','Ubicaciones por hora','Primer conteo','Ultimo conteo'],
@@ -2996,7 +3252,7 @@ const Export = {
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),'Resumen');
 
     [['Resultado por material','neto'],['Recuentos','dif'],['Ubicaciones','ubis'],
-     ['Zonas','zonas'],['Pasillos','pasillos'],['Productividad','productividad'],
+     ['Zonas','zonas'],['Pasillos','pasillos'],['Alcance','alcance'],['Productividad','productividad'],
      ['Calidad de datos','calidad']].forEach(([hoja,cual])=>{
       const [cols,rows]=Export.datos(cual);
       XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cols].concat(rows)),hoja);
@@ -3047,7 +3303,7 @@ const Prod = {
     const mejor=L.slice().sort((a,b)=>b.ubis-a.ubis)[0];
     kpiProd.innerHTML=[
       kpi('Contadores',U.num(L.length),'con al menos un documento','pur'),
-      kpi('Ubicaciones contadas',U.num(tot.ubis),'suma por contador; una ubicación recontada suma dos veces','info'),
+      kpi('Ubicaciones contadas',U.num(tot.ubis),'suma por contador; si dos personas la recontaron, suma en las dos','info'),
       kpi('Ocupadas',U.num(tot.ocu),tot.ubis?U.pct(tot.ocu/tot.ubis*100,1)+' del total':''),
       kpi('Vacías',U.num(tot.vac),tot.ubis?U.pct(tot.vac/tot.ubis*100,1)+' del total':''),
       kpi('Ritmo promedio',ritmos.length?U.num(ritmos.reduce((a,b)=>a+b,0)/ritmos.length,0):'—','ubicaciones por hora activa','info'),
@@ -3150,13 +3406,12 @@ const Reporte = {
   armar(){
     if(!Motor.V){ return '<div class="empty">Sin datos cargados</div>'; }
     const {m}=Motor.V, net=Motor.M.net;
-    const mon=net.moneda?' '+net.moneda:'';
-    const $=(v)=>net.hayPrecios?U.num(v,0)+mon:'—';
+    const $=(v)=>net.hayPrecios?U.plata(v):'—';
     const d=new Date();
     const fh=U.fmt(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
     const logo=(typeof LOGOS!=='undefined'&&LOGOS.ceva)?`<img src="${LOGOS.ceva.d}" alt="">`:'';
 
-    const fun=[['PEND',m.pend],['C2',m.c2],['C3',m.c3],['OK',m.ok],['DIF',m.dif]].map(([k,v])=>{
+    const fun=ORD_EST.map(k=>[k,m.E[k]||0]).map(([k,v])=>{
       const w=m.total?v/m.total*100:0;
       return `<div>${LBL_EST[k]}</div><div class="b"><i style="width:${w}%;background:${COL_EST[k]}"></i></div>`+
              `<div class="v">${U.num(v)} · ${U.pct(w,1)}</div>`;
@@ -3186,16 +3441,18 @@ const Reporte = {
       </div>
 
       <div class="rep-k">
-        <div><span>Universo físico</span><b>${U.num(m.total)}</b></div>
+        <div><span>Universo</span><b>${U.num(m.total)}</b></div>
+        <div><span>Activadas</span><b>${U.num(m.activadas)}</b></div>
         <div><span>Contadas</span><b>${U.num(m.contadas)}</b></div>
         <div><span>Cerradas</span><b>${U.num(m.cerradas)}</b></div>
-        <div><span>Pendientes</span><b>${U.num(m.pend)}</b></div>
-        <div><span>En recuento</span><b>${U.num(m.c2+m.c3)}</b></div>
-        <div><span>Jornadas restantes</span><b>${m.diasRest!==null?U.num(m.diasRest):'—'}</b></div>
+        <div><span>En recuento</span><b>${U.num(m.E.C2+m.E.C3)}</b></div>
+        <div><span>Fin estimado</span><b>${m.finEst?U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—'}</b></div>
       </div>
 
       <div class="rep-cols">
         <div>
+          <h4>Activación · ${U.pct(m.pActiva,1)}</h4>
+          <div class="rep-bar"><i style="width:${Math.min(100,m.pActiva)}%;background:${colorPct(m.pActiva)}"></i></div>
           <h4>Cobertura · ${U.pct(m.cobertura,1)}</h4>
           <div class="rep-bar"><i style="width:${Math.min(100,m.cobertura)}%;background:${colorPct(m.cobertura)}"></i></div>
           <h4>Cierre · ${U.pct(m.cierre,1)}</h4>
@@ -3385,7 +3642,14 @@ const UI = {
 
   /* ---------- controles de las vistas ---------- */
   ['netFiltro','netOrden'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.tablaNeto()));
-  ['difOrden','difEspejo','difSigno','difLimit','difQue'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.diferencias()));
+  ['difEspejo','difSigno','difLimit','difQue'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.diferencias()));
+  document.getElementById('difOrden').addEventListener('change',()=>{ Vista._ordCol=null; Vista.diferencias(); });
+  document.getElementById('tbDif').addEventListener('click',e=>{
+    const th=e.target.closest('th.dcol'); if(!th) return;
+    const k=th.dataset.k, o=Vista._ordCol;
+    Vista._ordCol = (o&&o.k===k) ? {k,dir:-o.dir} : {k,dir:1};
+    Vista.diferencias();
+  });
   document.getElementById('prodOrden').addEventListener('change',()=>Prod.tabla(Prod.filas()));
   ['fCalTipo','fCalCrit'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.calidad()));
   ['mapVista','mapZona'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Mapa.render()));
