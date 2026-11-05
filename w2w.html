@@ -444,7 +444,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   <div class="tb-div"></div>
   <div class="tb-title">
     <div class="t1">Wall to Wall 2026 — Tablero de Conteo</div>
-    <div class="t2">Auditoría de cliente · avance y diferencias netas · universo: ubicaciones FÍSICAS</div>
+    <div class="t2">Auditoría de cliente · el alcance son las ubicaciones con documento de inventario generado</div>
   </div>
   <div class="spacer"></div>
   <div class="pill-status" id="statusPill">Sin datos cargados</div>
@@ -1176,7 +1176,8 @@ const Config = {
     signo:0,            // 0 = negativo es faltante
     dif:'auto',         // 'auto' usa la columna de diferencia si existe
     universo:'doc',     // 'doc' = las que el cliente incluyó al generar documentos
-    estr:{sep:'-', map:['zona','sector','pasillo','col','nivel','pos'], zonaOrigen:'cod'},
+    estr:{sep:'-', map:['zona','pasillo','col','col','nivel','pos'], zonaOrigen:'cod'},
+    estrV:2,            // sube cuando cambia el reparto por defecto, para reaplicarlo
     moneda:'',          // vacío = la que traiga el maestro de ítems
     difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
@@ -1190,6 +1191,13 @@ const Config = {
     let s={};
     try{ s=JSON.parse(localStorage.getItem('w2w26_cfg')||'{}'); }catch(e){}
     Config.d=Object.assign({},Config.def,s);
+    /* Si el reparto guardado viene de una versión anterior del valor por
+       defecto, se reemplaza: el usuario puede volver a ajustarlo a mano. */
+    if((Config.d.estrV||0) < Config.def.estrV){
+      Config.d.estr=JSON.parse(JSON.stringify(Config.def.estr));
+      Config.d.estrV=Config.def.estrV;
+      Config.persistir();
+    }
     document.documentElement.setAttribute('data-theme',Config.d.tema);
   },
   aForm(){
@@ -3412,6 +3420,7 @@ const Estructura = {
 
   guardar(){
     Config.d.estr=Estructura.leer();
+    Config.d.estrV=Config.def.estrV;
     Config.persistir();
     Motor.reconstruir();
     U.toast('Estructura aplicada','ok');
@@ -3591,7 +3600,7 @@ const Reporte = {
     return `
       <div class="rep-h">${logo}
         <div><div class="t1">Wall to Wall 2026 — Avance del conteo</div>
-             <div class="t2">Auditoría de cliente · universo: ubicaciones físicas del maestro</div></div>
+             <div class="t2">Auditoría de cliente · alcance: ubicaciones con documento de inventario generado</div></div>
         <div class="right">Emitido ${fh}<br>Ventana del conteo ${Config.d.ini} a ${Config.d.fin}</div>
       </div>
 
