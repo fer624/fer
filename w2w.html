@@ -474,9 +474,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   <div class="fl"><label>Estado W2W</label>
     <select id="fEstado">
       <option value="">Todos</option>
-      <option value="SIN">Sin documento generado</option>
-      <option value="INAC">Generado sin activar</option>
-      <option value="ACTI">Activado sin contar</option>
+      <option value="PEND">Pendiente de contar</option>
       <option value="C2">En 2° conteo</option>
       <option value="C3">En 3° conteo</option>
       <option value="OK">Cerrada sin diferencia</option>
@@ -506,12 +504,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
     <div id="avisoEstado"></div>
     <div class="grid kpis mb12" id="kpiAvance"></div>
 
-    <div class="grid c3 mb12">
-      <div class="card">
-        <h3>Activación <span class="mini">el cliente va habilitando los documentos</span></h3>
-        <div class="progress-lg"><i id="pgAct" style="width:0%"></i><span id="pgActTxt">0%</span></div>
-        <div class="mini mt8" id="actTxt" style="color:var(--gray-2)"></div>
-      </div>
+    <div class="grid c2 mb12">
       <div class="card">
         <h3>Cobertura <span class="mini">ubicaciones tocadas al menos una vez</span></h3>
         <div class="progress-lg"><i id="pgCob" style="width:0%"></i><span id="pgCobTxt">0%</span></div>
@@ -539,7 +532,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
     </div>
 
     <div class="grid c3 mb12">
-      <div class="card"><h3>Estado del universo físico</h3><div class="chart-wrap sm"><canvas id="chEstados"></canvas></div></div>
+      <div class="card"><h3>Estado de las ubicaciones</h3><div class="chart-wrap sm"><canvas id="chEstados"></canvas></div></div>
       <div class="card"><h3>Ubicaciones contadas por día</h3><div class="chart-wrap sm"><canvas id="chDia"></canvas></div></div>
       <div class="card"><h3>Ritmo por hora <span class="mini">del día con más actividad</span></h3><div class="chart-wrap sm"><canvas id="chHora"></canvas></div></div>
     </div>
@@ -685,9 +678,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
       <span class="mini right" style="color:var(--gray-2)" id="mapInfo"></span>
     </div>
     <div class="map-legend" id="mapLeyenda">
-      <span><i style="background:#8C1A14"></i>Sin documento generado</span>
-      <span><i style="background:#B7BEC9"></i>Generado sin activar</span>
-      <span><i style="background:#D9453D"></i>Activado sin contar</span>
+      <span><i style="background:#D9453D"></i>Pendiente de contar</span>
       <span><i style="background:#E8A33D"></i>En 2° conteo</span>
       <span><i style="background:#6C4FBB"></i>En 3° conteo</span>
       <span><i style="background:#1E9E5A"></i>Cerrada sin diferencia</span>
@@ -1830,8 +1821,9 @@ const Motor = {
       o.enUniverso = Config.d.universo==='maestro'
         ? (o.fisica || (o.estadoUbi==='Intermedia' && Config.d.inter===1))
         : o.conDoc;
-      /* estado de arranque de las que no se contaron */
-      o.estado = !o.conDoc ? 'SIN' : (o.activado ? 'ACTI' : 'INAC');
+      /* todas arrancan pendientes; la fase es sólo informativa */
+      o.estado = 'PEND';
+      o.fase   = !o.conDoc ? 'SIN' : (o.activado ? 'ACTI' : 'INAC');
     });
 
     /* ---------- 3 · DERIVACIÓN DEL PASE Y ESTADO ---------- */
@@ -1974,6 +1966,7 @@ const Motor = {
       /* Estado. El último pase con diferencia propia significa que todavía hay
          desacuerdo y falta recontar. Si el último pase ya cuadra pero la
          auditoría detectó diferencia, quedó CONFIRMADA y la ubicación cierra. */
+      o.fase='CONT';
       if(ult.dif){
         o.estado = ult.pase===1 ? 'C2' : ult.pase===2 ? 'C3' : 'DIF';
         o.confirmada=false;
@@ -2298,7 +2291,7 @@ Motor.recalcular = function(){
 
   /* conteo de estados sobre el universo filtrado */
   let total=0,contadas=0,cerradas=0,fuera=0;
-  const E={SIN:0,INAC:0,ACTI:0,C2:0,C3:0,OK:0,DIF:0};
+  const E={PEND:0,C2:0,C3:0,OK:0,DIF:0};
   let generadas=0, activadas=0, sinMaestro=0;
   const porZona=new Map(), porPasillo=new Map();
   const add=(map,k,o)=>{
@@ -2306,7 +2299,7 @@ Motor.recalcular = function(){
     const g=map.get(k); g.t++;
     if(o.contada) g.cont++;
     if(o.cerrada) g.cerr++;
-    if(o.estado==='SIN'||o.estado==='INAC'||o.estado==='ACTI') g.pend++;
+    if(o.estado==='PEND') g.pend++;
     else if(o.estado==='C2') g.c2++;
     else if(o.estado==='C3') g.c3++;
     else if(o.estado==='OK') g.ok++;
@@ -2325,7 +2318,7 @@ Motor.recalcular = function(){
     add(porZona,o.zona,o); add(porPasillo,o.pasilloFull,o);
   });
 
-  const pend = E.SIN+E.INAC+E.ACTI;
+  const pend = E.PEND;
   const cobertura = total?contadas/total*100:0;
   const cierre    = total?cerradas/total*100:0;
   const pActiva   = generadas?activadas/generadas*100:0;
@@ -2393,14 +2386,15 @@ Motor.reconstruir = function(){
    VISTA · KPIs, gráficos y tablas
    ========================================================================== */
 const PAL = ['#0057B8','#00A3E0','#0A1E46','#1E9E5A','#E8A33D','#E8112D','#6C4FBB','#00857D','#B25E9D','#5A6474'];
-const ORD_EST = ['SIN','INAC','ACTI','C2','C3','OK','DIF'];
-const COL_EST = {SIN:'#8C1A14',INAC:'#B7BEC9',ACTI:'#D9453D',C2:'#E8A33D',C3:'#6C4FBB',
-                 OK:'#1E9E5A',DIF:'#7A1611'};
-const LBL_EST = {SIN:'Sin documento generado',INAC:'Generado sin activar',ACTI:'Activado sin contar',
-                 C2:'En 2° conteo',C3:'En 3° conteo',
+const ORD_EST = ['PEND','C2','C3','OK','DIF'];
+const COL_EST = {PEND:'#D9453D',C2:'#E8A33D',C3:'#6C4FBB',OK:'#1E9E5A',DIF:'#7A1611'};
+const LBL_EST = {PEND:'Pendiente de contar',C2:'En 2° conteo',C3:'En 3° conteo',
                  OK:'Cerrada sin diferencia',DIF:'Cerrada con diferencia'};
-const CLS_EST = {SIN:'st-sin',INAC:'st-inac',ACTI:'st-pend',C2:'st-c2',C3:'st-c3',
-                 OK:'st-ok',DIF:'st-dif'};
+const CLS_EST = {PEND:'st-pend',C2:'st-c2',C3:'st-c3',OK:'st-ok',DIF:'st-dif'};
+/* La fase del documento no se muestra en el avance: sólo sirve para decidir
+   si la ubicación está contada, y queda disponible en el Excel. */
+const LBL_FASE = {SIN:'Sin documento',INAC:'Generado sin activar',ACTI:'Activado sin contar',
+                  CONT:'Contada'};
 const CH = {};
 
 /* Etiquetas dibujadas sobre el gráfico: sin esto los valores sólo se ven
@@ -2611,14 +2605,13 @@ const Vista = {
 
     const porDoc = Config.d.universo!=='maestro';
     kpiAvance.innerHTML=[
-      kpi('Universo',U.num(m.total),
-          porDoc?'ubicaciones con documento generado':'ubicaciones físicas del maestro','pur'),
+      kpi('Total de ubicaciones',U.num(m.total),
+          porDoc?'el alcance del W2W':'ubicaciones físicas del maestro','pur'),
       kpi('Contadas',U.num(m.contadas),U.pct(m.cobertura,1)+' de cobertura',m.cobertura>=Config.d.verde?'ok':m.cobertura>=Config.d.amarillo?'warn':'bad'),
+      kpi('Pendientes',U.num(m.pend),'todavía sin contar','bad'),
       kpi('Cerradas',U.num(m.cerradas),U.pct(m.cierre,1)+' de cierre',m.cierre>=Config.d.verde?'ok':m.cierre>=Config.d.amarillo?'warn':'bad'),
-      kpi('Activadas',U.num(m.activadas),U.pct(m.pActiva,1)+' de las generadas',
-          m.pActiva>=Config.d.verde?'ok':'warn'),
-      kpi('Listas para contar',U.num(m.E.ACTI),'activadas y todavía sin contar','bad'),
-      kpi('Sin activar',U.num(m.E.INAC),'documento generado, no habilitado'),
+      kpi('En 2° conteo',U.num(m.E.C2),'tuvieron diferencia en el 1°','warn'),
+      kpi('En 3° conteo',U.num(m.E.C3),'tuvieron diferencia en el 2°','warn'),
       kpi('Ritmo por hora',U.num(m.ritmoHora,0),
           m.horasAct?'ubicaciones por hora, sobre '+U.num(m.horasAct)+' horas con actividad':'sin ritmo medible','info'),
       kpi('Fin estimado',
@@ -2638,11 +2631,6 @@ const Vista = {
     cieTxt.textContent=U.num(m.cerradas)+' de '+U.num(m.total)+' sin trabajo pendiente. Quedan '+
       U.num(m.E.C2+m.E.C3)+' en recuento y '+U.num(m.pend)+' sin contar.';
 
-    pgAct.style.width=Math.min(100,m.pActiva)+'%';
-    pgAct.style.background=colorPct(m.pActiva);
-    pgActTxt.textContent=U.pct(m.pActiva,1);
-    actTxt.textContent=U.num(m.activadas)+' de '+U.num(m.generadas)+' con documento generado. '+
-      U.pct(m.pConteo,1)+' de las activadas ya se contaron.';
 
     /* alcance: sólo compara contra el maestro si hay maestro cargado */
     const A=Motor.M.alcance;
@@ -3284,10 +3272,10 @@ const Export = {
         Motor.espejo(it,20).map(o=>o.lbl).join(' | '),Motor.espejoN(it)])];
     if(cual==='ubis') return [
       ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Estado Ubi','MO/MU','En universo',
-       'Estado W2W','Diferencia confirmada por recuento','Pases','Ultimo conteo','Hora','Contador',
+       'Estado W2W','Fase del documento','Diferencia confirmada por recuento','Pases','Ultimo conteo','Hora','Contador',
        'Status Conteo','Materiales','Materiales con diferencia'],
       V.arr.map(o=>[o.lbl,o.zona,o.sector,o.pasillo,o.col,o.nivel,o.pos,o.estadoUbi,o.momu,
-        o.enUniverso?'SI':'NO',LBL_EST[o.estado],o.confirmada?'SI':'NO',o.pases||0,
+        o.enUniverso?'SI':'NO',LBL_EST[o.estado],LBL_FASE[o.fase]||'',o.confirmada?'SI':'NO',o.pases||0,
         o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),o.usr,o.st,o.items,o.difItems])];
     if(cual==='alcance') return [
       ['Ubicacion','Zona','Sector','Pasillo','Estado Ubi','En el maestro','Con documento generado','Situacion'],
@@ -3640,9 +3628,9 @@ const Reporte = {
       </div>
 
       <div class="rep-k">
-        <div><span>Universo</span><b>${U.num(m.total)}</b></div>
-        <div><span>Activadas</span><b>${U.num(m.activadas)}</b></div>
+        <div><span>Total ubicaciones</span><b>${U.num(m.total)}</b></div>
         <div><span>Contadas</span><b>${U.num(m.contadas)}</b></div>
+        <div><span>Pendientes</span><b>${U.num(m.pend)}</b></div>
         <div><span>Cerradas</span><b>${U.num(m.cerradas)}</b></div>
         <div><span>En recuento</span><b>${U.num(m.E.C2+m.E.C3)}</b></div>
         <div><span>Fin estimado</span><b>${m.finEst?U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—'}</b></div>
@@ -3650,8 +3638,6 @@ const Reporte = {
 
       <div class="rep-cols">
         <div>
-          <h4>Activación · ${U.pct(m.pActiva,1)}</h4>
-          <div class="rep-bar"><i style="width:${Math.min(100,m.pActiva)}%;background:${colorPct(m.pActiva)}"></i></div>
           <h4>Cobertura · ${U.pct(m.cobertura,1)}</h4>
           <div class="rep-bar"><i style="width:${Math.min(100,m.cobertura)}%;background:${colorPct(m.cobertura)}"></i></div>
           <h4>Cierre · ${U.pct(m.cierre,1)}</h4>

@@ -55,12 +55,20 @@ En la pantalla 6 se puede volver al criterio anterior (físicas del maestro).
 El cliente genera los documentos antes del conteo y los va activando. La app
 sigue esa secuencia por el status del documento:
 
-| Estado | Significado |
+| Status | Cuenta como |
 |---|---|
-| `INAC` | Generado, sin activar |
-| `ACTI` | Activado, esperando que lo cuenten |
-| `COUN` | Contado |
-| `POST` | Contabilizado |
+| `INAC` · Inactiva | Pendiente |
+| `ACTI` · Activa | Pendiente |
+| `COUN` · Contada | Contada |
+| `POST` · Contabilizada | Contada |
+
+El status decide si la ubicación está contada o pendiente, pero el avance se
+informa sólo por ubicación: **total, contadas y pendientes**. Un documento sin
+cantidad contada no es un conteo, aunque el status diga otra cosa. La fase del
+documento queda en el Excel para quien la necesite.
+
+La pantalla 1 avisa de qué columnas está leyendo el status y qué valores
+encontró, para que nunca pase inadvertido si no se está leyendo.
 
 ### Pantallas
 
