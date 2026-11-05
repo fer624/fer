@@ -10,14 +10,30 @@ doble clic; funciona 100% offline y no envía datos a ningún servidor.
 
 ### Archivos que consume
 
+Hacen falta **dos**:
+
 | Archivo | Para qué |
 |---|---|
-| Maestro de Ubicaciones | Define el universo: las ubicaciones **físicas** a contar |
-| Bajada de Conteos de SAP | Avance, pases y diferencias. Se puede acumular bajada tras bajada |
-| Maestro de Ítems Valorizados | Precio, para dar magnitud al neto y poder priorizar |
+| Bajada de Conteos de SAP | Trae todas las ubicaciones del alcance con su status, los pases y las diferencias |
+| Maestro de Ítems Valorizados | Precio, para dar magnitud al resultado y poder priorizar |
+
+El **Maestro de Ubicaciones es opcional** y está plegado al pie de la pantalla 6:
+sólo agrega las coordenadas X/Y del mapa y permite comparar el alcance contra el
+depósito completo.
 
 Acepta `.xlsx .xls .xlsm .csv .txt`. Las columnas se detectan solas y se
 confirman en un modal; el mapeo queda guardado para las cargas siguientes.
+Como cada bajada es la base completa, conviene cargarla en modo **Reemplazar**;
+si se acumula, las filas repetidas se descartan por ubicación, documento y material.
+
+### Estructura del código de ubicación
+
+Sin maestro, la zona, el pasillo, la columna y el nivel se leen del propio
+código partiéndolo por el separador. Cuál parte es cuál depende del depósito, así
+que se configura en la pantalla 6: muestra cuántos valores distintos tiene cada
+parte —la que tiene pocos suele ser la zona, la que tiene muchos la posición— y
+previsualiza el resultado antes de aplicar. La zona también puede tomarse del
+`Tipo almacén` o del `Área almacenamiento`.
 
 ### El universo: lo define el cliente
 

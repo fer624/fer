@@ -762,18 +762,11 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
 <div class="page" id="p6">
   <div class="card mb12">
     <h3>Carga y actualización de archivos</h3>
-    <div class="note">Formatos aceptados: <b>.xlsx .xls .xlsm .csv .txt</b>. Los archivos quedan guardados en el navegador.
-    La bajada de conteos se puede <b>acumular</b> durante el W2W (cargás cada bajada nueva y el tablero se actualiza) o
-    <b>reemplazar</b> por completo.</div>
-    <div class="grid c3">
-      <div>
-        <div class="dz" id="dz1" onclick="document.getElementById('f1').click()">
-          <div class="icon">🗺️</div><div class="tt">Maestro de Ubicaciones</div>
-          <div class="ss">Ubicación · Pasillo · Col. · Nivel · Pos. · Sector · Zona · Coord. X/Y/Z · Estado Ubi · Tipo MO/MU</div>
-        </div>
-        <input type="file" id="f1" class="hidden" accept=".xlsx,.xls,.xlsm,.csv,.txt">
-        <div class="mt8" id="st1" style="color:var(--gray-2);font-size:11px"></div>
-      </div>
+    <div class="note">Hacen falta <b>dos archivos</b>: la bajada de conteos, que trae todas las ubicaciones del
+    alcance con su status, y el maestro de ítems valorizados para los importes.
+    Formatos aceptados: <b>.xlsx .xls .xlsm .csv .txt</b>. Quedan guardados en el navegador.
+    Como cada bajada es la base completa, usá <b>Reemplazar</b>.</div>
+    <div class="grid c2">
       <div>
         <div class="dz" id="dz2" onclick="document.getElementById('f2').click()">
           <div class="icon">✅</div><div class="tt">Bajada de Conteos de SAP</div>
@@ -791,6 +784,25 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
         <div class="mt8" id="st3" style="color:var(--gray-2);font-size:11px"></div>
       </div>
     </div>
+
+    <details class="mt12">
+      <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--txt-2)">
+        Maestro de Ubicaciones <span class="rc-mini">· opcional · agrega coordenadas reales y los datos de ubicación que no estén en el código</span>
+      </summary>
+      <div class="grid c2 mt8">
+        <div>
+          <div class="dz" id="dz1" onclick="document.getElementById('f1').click()">
+            <div class="icon">🗺️</div><div class="tt">Maestro de Ubicaciones</div>
+            <div class="ss">Ubicación · Pasillo · Col. · Nivel · Pos. · Sector · Zona · Coord. X/Y/Z</div>
+          </div>
+          <input type="file" id="f1" class="hidden" accept=".xlsx,.xls,.xlsm,.csv,.txt">
+          <div class="mt8" id="st1" style="color:var(--gray-2);font-size:11px"></div>
+        </div>
+        <div class="note">El W2W se arma con la bajada de conteos sola: el alcance y las ubicaciones salen
+        de los documentos generados, y la estructura de pasillo, columna y nivel se lee del código de ubicación.
+        El maestro sólo suma las coordenadas X/Y del mapa y sirve para comparar el alcance contra el depósito completo.</div>
+      </div>
+    </details>
     <div class="flex mt12">
       <div class="fl"><label>Modo de carga de conteos</label>
         <select id="modoConteos"><option value="add">Acumular (agrega a lo ya cargado)</option><option value="rep">Reemplazar todo</option></select>
@@ -860,6 +872,26 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
       entre pases.</div>
       <div class="flex mt12"><button class="btn" onclick="Config.guardar()">Guardar y recalcular</button></div>
     </div>
+  </div>
+
+  <div class="card mb12">
+    <h3>Estructura del código de ubicación <span class="mini">de acá salen zona, pasillo, columna y nivel</span></h3>
+    <div class="note">Sin maestro, la ubicación se parte por el separador y cada parte se asigna a un nivel.
+    Mirá cuántos valores distintos tiene cada parte: la que tiene pocos suele ser la zona, la que tiene muchos
+    la posición.</div>
+    <div class="flex mb8">
+      <div class="fl"><label>Separador</label><input type="text" id="cfgSep" maxlength="3" style="width:70px"></div>
+      <div class="fl"><label>Zona</label>
+        <select id="cfgZonaOrigen">
+          <option value="cod">Del código de ubicación</option>
+          <option value="tipoAlm">Tipo almacén</option>
+          <option value="areaAlm">Área almacenamiento</option>
+        </select>
+      </div>
+      <button class="btn sm" style="margin-top:14px" onclick="Estructura.guardar()">Aplicar y recalcular</button>
+    </div>
+    <div id="estrGrid"></div>
+    <div class="mt8" id="estrPrev" style="font-size:12px"></div>
   </div>
 
   <div class="card mb12">
@@ -1144,6 +1176,7 @@ const Config = {
     signo:0,            // 0 = negativo es faltante
     dif:'auto',         // 'auto' usa la columna de diferencia si existe
     universo:'doc',     // 'doc' = las que el cliente incluyó al generar documentos
+    estr:{sep:'-', map:['zona','sector','pasillo','col','nivel','pos'], zonaOrigen:'cod'},
     moneda:'',          // vacío = la que traiga el maestro de ítems
     difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
@@ -1602,6 +1635,19 @@ const Motor = {
     return false;
   },
 
+  /* Sin maestro, la ubicación se parte por el separador y cada parte se asigna
+     a un nivel según la configuración. Varias partes al mismo nivel se unen. */
+  parseUbi(lbl){
+    const e=Config.d.estr||{}, sep=e.sep||'-', mapa=e.map||[];
+    const seg=String(lbl==null?'':lbl).split(sep);
+    const r={zona:'',sector:'',pasillo:'',col:'',nivel:'',pos:''};
+    for(let i=0;i<seg.length;i++){
+      const k=mapa[i];
+      if(k && r[k]!==undefined) r[k]= r[k] ? r[k]+sep+seg[i] : seg[i];
+    }
+    return r;
+  },
+
   /* Fase de un documento que todavía no se contó: generado o activado.
      Importa el orden: INACTIVO contiene ACTIV, así que se prueba primero. */
   FASES:{INAC:'INAC',NACT:'INAC',DEL:'INAC',ACTI:'ACTI',COUN:'COUN',POST:'COUN',CLOS:'COUN',CNTD:'COUN'},
@@ -1707,13 +1753,18 @@ const Motor = {
       if(!o){
         if(!huerfanas.has(c.u)) huerfanas.set(c.u,{lbl:c.lbl||c.u,n:0});
         huerfanas.get(c.u).n++;
-        const zn=c.tipoAlm||'(sin maestro)', sc=c.areaAlm||'(sin maestro)';
+        const pz=Motor.parseUbi(c.lbl||c.u), zo=(Config.d.estr||{}).zonaOrigen||'cod';
+        const zn = zo==='tipoAlm' ? (c.tipoAlm||'(sin zona)')
+                 : zo==='areaAlm' ? (c.areaAlm||'(sin zona)')
+                 : (pz.zona||c.tipoAlm||'(sin zona)');
+        const sc = pz.sector || c.areaAlm || '(sin sector)';
+        const pa = pz.pasillo || '(sin pasillo)';
         o={
           u:c.u, lbl:c.lbl||c.u,
-          pasillo:'(sin maestro)', col:'', nivel:'', pos:'',
-          sector:sc, zona:zn, pasilloFull:zn+' · (sin maestro)',
+          pasillo:pa, col:pz.col, nivel:pz.nivel, pos:pz.pos,
+          sector:sc, zona:zn, pasilloFull:zn+' · '+pa,
           x:null, y:null, z:null,
-          estadoUbi:'(sin maestro)', momu:'(sin clasificar)',
+          estadoUbi:'(del documento)', momu:'(sin clasificar)',
           docs:[], docAbierto:false, conDoc:false, activado:false, generado:false, sinMaestro:true,
           estado:'SIN', contada:false, cerrada:false, pase:0,
           ultF:null, ultH:null, usr:'', st:'', tipoAlm:'', areaAlm:'', areaAct:'', prop:'',
@@ -2492,6 +2543,7 @@ const Vista = {
       p3Empty.innerHTML=msg; p3Body.classList.add('hidden');
       Object.keys(CH).forEach(k=>{CH[k].destroy();delete CH[k];});
       Prod.render();
+      Estructura.render();
       Vista.calidad();
       Vista.historial();
       return;
@@ -2507,6 +2559,7 @@ const Vista = {
     Vista.calidad();
     Vista.historial();
     Vista.notaConteos();
+    Estructura.render();
   },
 
   /* ═══════════ PÁGINA 1 · AVANCE ═══════════ */
@@ -2548,8 +2601,13 @@ const Vista = {
     actTxt.textContent=U.num(m.activadas)+' de '+U.num(m.generadas)+' con documento generado. '+
       U.pct(m.pConteo,1)+' de las activadas ya se contaron.';
 
-    /* alcance */
+    /* alcance: sólo compara contra el maestro si hay maestro cargado */
     const A=Motor.M.alcance;
+    const cardA=document.getElementById('cardAlcance');
+    if(!Datos.maestro.length){
+      cardA.style.display='none';
+    }else{
+      cardA.style.display='';
     kpiAlcance.innerHTML=[
       kpi('Ubicaciones en el maestro',U.num(A.totMaestro),'el depósito completo','pur'),
       kpi('Con documento generado',U.num(A.totDoc),
@@ -2557,13 +2615,14 @@ const Vista = {
       kpi('En el maestro, fuera del alcance',U.num(A.soloMaestro),
           A.soloMaestro?'el cliente decidió no incluirlas':'el alcance cubre todo el maestro',
           A.soloMaestro?'warn':'ok'),
-      kpi('Contadas sin datos del maestro',U.num(A.soloDoc),
-          A.soloDoc?'entran al avance, sin pasillo ni nivel':'todas tienen maestro',
+      kpi('En el alcance, sin maestro',U.num(A.soloDoc),
+          A.soloDoc?'ubicación leída del código, sin coordenadas':'todas tienen maestro',
           A.soloDoc?'warn':'ok')
     ].join('');
     alcTxt.textContent =
       (A.soloMaestro?'Fuera del alcance, por ejemplo: '+A.ejSoloMaestro.join(', ')+'. ':'')+
       (A.soloDoc?'Sin maestro, por ejemplo: '+A.ejSoloDoc.join(', ')+'.':'');
+    }
 
     /* embudo */
     const fil=ORD_EST.map(k=>[k,m.E[k]||0]);
@@ -2936,6 +2995,13 @@ const Vista = {
 const Mapa = {
   poblarZonas(){
     if(!Motor.V) return;
+    const hayXY=Motor.M.arr.some(o=>o.x!==null&&o.y!==null&&isFinite(o.x)&&isFinite(o.y));
+    const opt=document.querySelector('#mapVista option[value="xy"]');
+    if(opt){
+      opt.disabled=!hayXY;
+      opt.textContent=hayXY?'Coordenadas reales X / Y':'Coordenadas X / Y (requiere maestro)';
+      if(!hayXY && mapVista.value==='xy') mapVista.value='det';
+    }
     const zs=[...new Set(Motor.V.arr.map(o=>o.zona))].sort(U.natSort);
     const prev=mapZona.value;
     mapZona.innerHTML='<option value="">— Todas (agregado) —</option>'+zs.map(z=>`<option>${U.esc(z)}</option>`).join('');
@@ -3264,6 +3330,95 @@ const Export = {
 };
 
 /* ==========================================================================
+   ESTRUCTURA DEL CÓDIGO DE UBICACIÓN
+   Sin maestro, zona / pasillo / columna / nivel salen de partir el código.
+   Cuál es cuál depende del depósito, así que se configura y se previsualiza.
+   ========================================================================== */
+const Estructura = {
+  NIVELES:[['','— no usar —'],['zona','Zona'],['sector','Sector'],['pasillo','Pasillo'],
+           ['col','Columna'],['nivel','Nivel'],['pos','Posición']],
+
+  muestra(){
+    const vistos=new Set(), out=[];
+    for(const c of Datos.conteos){
+      if(!c.lbl || vistos.has(c.lbl)) continue;
+      vistos.add(c.lbl); out.push(c.lbl);
+      if(out.length>=4000) break;
+    }
+    return out;
+  },
+
+  render(){
+    const el=document.getElementById('estrGrid');
+    if(!el) return;
+    const e=Config.d.estr||{};
+    document.getElementById('cfgSep').value=e.sep||'-';
+    document.getElementById('cfgZonaOrigen').value=e.zonaOrigen||'cod';
+
+    const L=Estructura.muestra();
+    if(!L.length){
+      el.innerHTML='<div class="rc-mini">Cargá la bajada de conteos para ver la estructura.</div>';
+      document.getElementById('estrPrev').innerHTML='';
+      return;
+    }
+    const sep=e.sep||'-';
+    const partes=L.map(x=>x.split(sep));
+    const maxS=Math.max(...partes.map(p=>p.length));
+    const distintos=[];
+    for(let i=0;i<maxS;i++){
+      const s2=new Set();
+      partes.forEach(p=>{ if(p[i]!==undefined) s2.add(p[i]); });
+      distintos.push(s2);
+    }
+    let h='<div style="display:grid;grid-template-columns:repeat('+maxS+',1fr);gap:8px">';
+    for(let i=0;i<maxS;i++){
+      const ej=[...distintos[i]].sort(U.natSort).slice(0,3).join(', ');
+      const sel=(e.map||[])[i]||'';
+      h+='<div style="border:1px solid var(--line);border-radius:8px;padding:8px">'+
+         '<div style="font-size:10.5px;font-weight:700;color:var(--gray-2);text-transform:uppercase">Parte '+(i+1)+'</div>'+
+         '<div class="mono" style="font-size:12px;margin:2px 0">'+U.esc(ej)+(distintos[i].size>3?'…':'')+'</div>'+
+         '<div class="rc-mini" style="margin-bottom:4px">'+U.num(distintos[i].size)+' valores distintos</div>'+
+         '<select data-s="'+i+'" style="width:100%">'+
+           Estructura.NIVELES.map(([v,t])=>`<option value="${v}"${sel===v?' selected':''}>${t}</option>`).join('')+
+         '</select></div>';
+    }
+    el.innerHTML=h+'</div>';
+    el.querySelectorAll('select').forEach(x=>x.onchange=Estructura.previsualizar);
+    document.getElementById('cfgSep').oninput=()=>Estructura.render();
+    Estructura.previsualizar();
+  },
+
+  leer(){
+    const mapa=[];
+    document.querySelectorAll('#estrGrid select').forEach(x=>mapa[+x.dataset.s]=x.value);
+    return {sep:document.getElementById('cfgSep').value||'-', map:mapa,
+            zonaOrigen:document.getElementById('cfgZonaOrigen').value};
+  },
+
+  previsualizar(){
+    const e=Estructura.leer(), L=Estructura.muestra().slice(0,3);
+    const guard=Config.d.estr; Config.d.estr=e;
+    const filas=L.map(lbl=>{
+      const r=Motor.parseUbi(lbl);
+      return `<tr><td class="mono"><b>${U.esc(lbl)}</b></td>`+
+        ['zona','sector','pasillo','col','nivel','pos'].map(k=>`<td>${U.esc(r[k]||'—')}</td>`).join('')+'</tr>';
+    }).join('');
+    Config.d.estr=guard;
+    document.getElementById('estrPrev').innerHTML=
+      '<table class="dt" style="margin-top:6px"><thead><tr><th>Ubicación</th><th>Zona</th>'+
+      '<th>Sector</th><th>Pasillo</th><th>Columna</th><th>Nivel</th><th>Posición</th></tr></thead>'+
+      '<tbody>'+(filas||'<tr><td colspan="7">—</td></tr>')+'</tbody></table>';
+  },
+
+  guardar(){
+    Config.d.estr=Estructura.leer();
+    Config.persistir();
+    Motor.reconstruir();
+    U.toast('Estructura aplicada','ok');
+  }
+};
+
+/* ==========================================================================
    PRODUCTIVIDAD POR CONTADOR
    ========================================================================== */
 const Prod = {
@@ -3505,6 +3660,7 @@ const UI = {
     filterbar.style.display = (p==='p5'||p==='p6') ? 'none' : '';
     if(p==='p4') Mapa.render();
     if(p==='p5') Prod.render();
+    if(p==='p6') Estructura.render();
     window.scrollTo(0,0);
   },
   open(id){ document.getElementById(id).classList.add('show'); },
@@ -3519,11 +3675,11 @@ const UI = {
   },
   pill(){
     const M=Motor.M;
-    if(!M||!Datos.maestro.length){ statusPill.textContent='Sin datos cargados'; return; }
+    if(!M||!Datos.conteos.length){ statusPill.textContent='Sin datos cargados'; return; }
     const m=Motor.V?Motor.V.m:null;
     statusPill.textContent = m
       ? U.num(m.total)+' ubicaciones · '+U.pct(m.cobertura,1)+' contadas · '+U.pct(m.cierre,1)+' cerradas'
-      : U.num(Datos.maestro.length)+' ubicaciones en el maestro';
+      : U.num(Datos.conteos.length)+' registros cargados';
   },
 
   poblarFiltros(){
