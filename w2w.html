@@ -503,6 +503,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   </div>
 
   <div id="p1Body" class="hidden">
+    <div id="avisoEstado"></div>
     <div class="grid kpis mb12" id="kpiAvance"></div>
 
     <div class="grid c3 mb12">
@@ -1559,6 +1560,13 @@ const Datos = {
   },
 
   /* ---------- volver a pedir el mapeo de un archivo ya cargado ---------- */
+  /* El mapeo que se está usando para el archivo cargado de ese tipo. */
+  mapaDe(tipo){
+    const meta=Datos.meta[tipo];
+    if(!meta||!meta.headers) return null;
+    return Datos.mapas[tipo+'::'+meta.headers.join('|')]||null;
+  },
+
   async remapear(tipo){
     const meta=Datos.meta[tipo];
     if(!meta||!meta.headers){U.toast('Primero cargá el archivo de '+Mapeo.titulos[tipo],'err');return;}
@@ -1828,28 +1836,25 @@ const Motor = {
 
     /* ---------- 3 · DERIVACIÓN DEL PASE Y ESTADO ---------- */
     const vigentes=[], prodMap=new Map();
-    /* Un documento sin ninguna cantidad informada es una ubicación activada
-       pero no contada. Si se contara como pase, la ubicación cerraría "sin
-       diferencia" sin que nadie la haya contado nunca. */
+    /* Un documento sólo es un conteo si trae cantidad contada o diferencia.
+       Sin eso es una ubicación con documento generado y nada más: contarla
+       como pase la cerraría "sin diferencia" sin que nadie la haya contado. */
     let docsTot=0, docsSinCant=0;
     porUbi.forEach(docs=>docs.forEach(d=>{ docsTot++; if(!d.conCant) docsSinCant++; }));
-    const filtrar = docsSinCant>0 && docsSinCant<docsTot;
-    if(docsSinCant>0 && docsSinCant===docsTot)
-      cal.push({tipo:'Ningún documento trae cantidades',crit:'Alta',ref:U.num(docsTot)+' documentos',
-        detalle:'No se pudo leer ninguna cantidad contada ni diferencia. Revisá el mapeo de columnas: el avance se muestra igual, pero el resultado va a estar vacío.'});
-    else if(docsSinCant>0)
-      cal.push({tipo:'Documentos activados sin cantidad informada',crit:'Alta',ref:U.num(docsSinCant)+' documentos',
-        detalle:'La ubicación tiene documento de inventario pero ninguna fila con cantidad contada ni diferencia: se cuenta como NO contada, no como cerrada sin diferencia.'});
+    if(docsSinCant>0)
+      cal.push({tipo:'Documentos sin cantidad informada',crit:docsSinCant===docsTot?'Alta':'Media',
+        ref:U.num(docsSinCant)+' de '+U.num(docsTot)+' documentos',
+        detalle:docsSinCant===docsTot
+          ? 'Ningún documento trae cantidad contada ni diferencia: todavía no se contó nada. Es lo esperable si el cliente recién generó los documentos.'
+          : 'Esas ubicaciones tienen documento pero nadie las contó todavía: quedan pendientes, no cerradas.'});
 
     porUbi.forEach((docs,u)=>{
       const o=ubis.get(u);
       let lista=[...docs.values()].sort((a,b)=>
         (a.ord??99)-(b.ord??99) || (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9) || U.natSort(a.doc,b.doc));
-      if(filtrar){
-        const conCant=lista.filter(d=>d.conCant);
-        if(conCant.length<lista.length) o.docAbierto=true;
-        lista=conCant;
-      }
+      const conCant=lista.filter(d=>d.conCant);
+      if(conCant.length<lista.length) o.docAbierto=true;
+      lista=conCant;
       if(!lista.length){ o.contada=false; o.docs=[]; return; }   // queda en SIN / INAC / ACTI
 
       /* Consolidación material por material a lo largo de los pases.
@@ -2106,6 +2111,7 @@ const Motor = {
       ubis, arr:[...ubis.values()], vigentes, prod:[...prodMap.values()], alcance:alc,
       refs, statusSet, props, precios, monedas,
       cal, serieDia, horaMap,
+      diag:{docsTot,docsSinCant,statusMapeado:!!(Datos.mapas&&Object.keys(Datos.mapas).length)},
       st:{regTot,regValidos,regFueraRef,sinUbi,sinFecha,sinDoc,sinCant,
           huerfanas:huerfanas.size, ms:Math.round(performance.now()-t0)}
     };
@@ -2573,6 +2579,28 @@ const Vista = {
   /* ═══════════ PÁGINA 1 · AVANCE ═══════════ */
   avance(){
     const {m}=Motor.V;
+
+    /* Aviso de lectura del status: si no se está leyendo, el tablero da
+       todo por contado y eso tiene que verse, no quedar escondido. */
+    const dg=Motor.M.diag||{}, mp=Datos.mapaDe('conteos')||{};
+    const colsSt=[['status','Status Conteo'],['stDoc','Status de inventario'],['stInv','Status Inv']]
+      .filter(([k])=>mp[k]).map(([k,t])=>t+' → «'+mp[k]+'»');
+    const sts=[...Motor.M.statusSet.values()].sort((a,b)=>b.n-a.n).slice(0,8)
+      .map(x=>`<b class="mono">${U.esc(x.st)}</b> ${x.contado?'contada':'no contada'} (${U.num(x.n)})`);
+    let aviso='';
+    if(!colsSt.length){
+      aviso='<div class="note bad"><b>No se está leyendo ningún status.</b> Sin eso el tablero no puede '+
+            'distinguir INAC, ACTI, COUN y POST. Asigná la columna en <b>6 · Archivos</b> → '+
+            '<i>Revisar mapeo de conteos</i>.</div>';
+    }else if(dg.docsTot && dg.docsSinCant===dg.docsTot){
+      aviso='<div class="note warn"><b>Todavía no se contó nada.</b> Los '+U.num(dg.docsTot)+
+            ' documentos están generados pero ninguno trae cantidad contada. '+
+            'Status leído de '+colsSt.join(' · ')+'.<br>Valores encontrados: '+sts.join(' · ')+'.</div>';
+    }else if(sts.length){
+      aviso='<div class="note">Status leído de '+colsSt.join(' · ')+'. '+
+            'Valores: '+sts.join(' · ')+'. Se ajustan en <b>6 · Archivos</b>.</div>';
+    }
+    document.getElementById('avisoEstado').innerHTML=aviso;
 
     const porDoc = Config.d.universo!=='maestro';
     kpiAvance.innerHTML=[
