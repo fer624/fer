@@ -674,6 +674,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
         </select>
       </div>
       <div class="fl"><label>Zona a graficar</label><select id="mapZona"></select></div>
+      <div class="fl"><label>Pasillo</label><select id="mapPasillo"></select></div>
       <button class="btn sm ghost" style="margin-top:14px" onclick="Mapa.render()">↻ Redibujar</button>
       <span class="mini right" style="color:var(--gray-2)" id="mapInfo"></span>
     </div>
@@ -1168,8 +1169,8 @@ const Config = {
     signo:0,            // 0 = negativo es faltante
     dif:'auto',         // 'auto' usa la columna de diferencia si existe
     universo:'doc',     // 'doc' = las que el cliente incluyó al generar documentos
-    estr:{sep:'-', map:['zona','pasillo','col','col','nivel','pos'], zonaOrigen:'cod'},
-    estrV:2,            // sube cuando cambia el reparto por defecto, para reaplicarlo
+    estr:{sep:'-', map:['zona','pasillo','col','nivel','pos','pos'], zonaOrigen:'cod'},
+    estrV:3,            // sube cuando cambia el reparto por defecto, para reaplicarlo
     moneda:'',          // vacío = la que traiga el maestro de ítems
     difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
@@ -1262,13 +1263,17 @@ const CAMPOS = {
     {k:'col',       lbl:'Col.',      alias:['COL','COLUMNA','RACK','ESTANTERIA','MODULO','CUERPO','BAY','COLUMN']},
     {k:'nivel',     lbl:'Nivel',     alias:['NIVEL','LEVEL','ALTURA','PISO','TIER']},
     {k:'pos',       lbl:'Pos.ubicación', alias:['POSUBICACION','POSICIONUBICACION','POSICION','POS','POSITION','GAVETA','SLOT']},
-    {k:'sector',    lbl:'Sector',    alias:['SECTOR','SECCION','NAVE','SUBZONA']},
+    {k:'sector',    lbl:'Sector',    alias:['SECTOR','SECCION','NAVE','SUBZONA'], not:'INCEND'},
     {k:'zona',      lbl:'Zona (si no hay, usa Sector)', alias:['ZONA','ZONE','AREAALMACENAMIENTO','AREADEALMACENAMIENTO','TIPOALMACEN','ALMACEN','DEPOSITO','WAREHOUSE']},
     {k:'x',         lbl:'Coordenada X', alias:['COORDENADAX','COORDX','X','POSX','EJEX']},
     {k:'y',         lbl:'Coordenada Y', alias:['COORDENADAY','COORDY','Y','POSY','EJEY']},
     {k:'z',         lbl:'Coordenada Z', alias:['COORDENADAZ','COORDZ','Z','POSZ','EJEZ']},
-    {k:'estadoUbi', lbl:'Estado Ubi (Física / Intermedia / Virtual)', clave:true, alias:['ESTADOUBI','ESTADOUBICACION','ESTADO','TIPOUBICACION','TIPOUBI','CLASEUBICACION']},
-    {k:'momu',      lbl:'Tipo MO/MU', alias:['TIPOMOMU','MOMU','TIPOMO','MOMULTI','TIPOPRODUCTO','MONOMULTI','TIPOMOUMU']}
+    {k:'estadoUbi', lbl:'Estado Ubi (Física / Intermedia / Virtual)',
+     alias:['ESTADOUBI','ESTADOUBICACION','ESTADODEUBICACION','TIPODEUBICACION','TIPOUBICACION','CLASEUBICACION'],
+     not:'FIJA', valida:v=>Motor.detEstadoUbi(v)!==null},
+    {k:'momu',      lbl:'Tipo MO/MU',
+     alias:['TIPOMOMU','MOMU','TIPOMO','MOMULTI','TIPOPRODUCTO','MONOMULTI','TIPOMOUMU','TIPODEUBICACION'],
+     valida:v=>Motor.detMOMU(v)!==null}
   ],
   conteos:[
     {k:'ubicacion', lbl:'Ubicación', req:true, alias:['UBICACION','UBIC','UBI','STORAGEBIN','BIN','LOCATION','LOC','UBICACIONORIGEN']},
@@ -1276,7 +1281,7 @@ const CAMPOS = {
     {k:'fecha',     lbl:'Fecha del recuento', clave:true, alias:['FERECUENTINVENT','FERECUENTOINVENT','FECHARECUENTO','FECHACONTEO','FECHAINVENTARIO','FECHA','FECHACONTABILIZACION','DATE','FERECUENT']},
     {k:'hora',      lbl:'Hora del recuento', clave:true, alias:['HORADERECUENTO','HORARECUENTO','HORACONTEO','HORARECUENTOINVENT','HORA','TIME']},
     {k:'refer',     lbl:'Refer. / nombre del inventario', alias:['REFER','REFERENCIA','REF','REFERENCE','NOMBREINVENTARIO','TEXTOCABECERA','REFERENCIAOK']},
-    {k:'status',    lbl:'Status Conteo', alias:['STATUSCONTEO','STATUSDECONTEO','ESTADOCONTEO','STATUS','ESTATUSCONTEO','SITUACIONCONTEO']},
+    {k:'status',    lbl:'Status Conteo', alias:['STATUSCONTEO','STATUSDECONTEO','ESTADOCONTEO','ESTATUSCONTEO','SITUACIONCONTEO'], not:'IMPRESION'},
     {k:'prod',      lbl:'Material', req:true, alias:['MATERIAL','PRODUCTO','SKU','CODIGOPRODUCTO','CODIGOMATERIAL','NUMEROMATERIAL','NROMATERIAL','ARTICULO','ITEM'], not:'DESCRIPCION'},
     {k:'desc',      lbl:'Descripción del material', alias:['DESCRIPCIONDEPRODUCTO','DESCRIPCIONPRODUCTO','DESCRIPCIONMATERIAL','TEXTOBREVEMATERIAL','DENOMINACION','DESCRIPCION','TEXTOMATERIAL']},
     {k:'qt',        lbl:'Ctd. teórica', clave:true, alias:['CTDTEORICA','CTDTEORICO','CANTIDADTEORICA','CANTTEORICA','STOCKTEORICO','TEORICA','CTDSISTEMA','CANTIDADSISTEMA','CTDTEOR']},
@@ -1291,7 +1296,8 @@ const CAMPOS = {
     {k:'stDoc',     lbl:'Status de inventario (INAC / ACTI / COUN / POST)', alias:['STATUSDEINVENTARIO','ESTADODEINVENTARIO','STATUSDELINVENTARIO','STATUSDOCUMENTOINVENTARIO'], not:'INV2'},
     {k:'stInv',     lbl:'Status Inv (veredicto: Ok / Desvío)', alias:['STATUSINV','STATUSINVENTARIO','ESTADOINV','STINV'], not:'INV2'},
     {k:'stInv2',    lbl:'Status Inv2 (Faltante / Sobrante)', alias:['STATUSINV2','STATUSINVENTARIO2','ESTADOINV2','STINV2']},
-    {k:'statusUbi', lbl:'Status Ubi', alias:['STATUSUBI','STATUSUBICACION','ESTADOUBICACION']}
+    {k:'statusUbi', lbl:'Status Ubi', alias:['STATUSUBI','STATUSUBICACION','ESTADOUBICACION']},
+    {k:'ubiVacia',  lbl:'Ubicación vacía', alias:['UBICACIONVACIA','INDUBICACIONVACIA','BINVACIO','VACIA']}
   ],
   valor:[
     {k:'mat',    lbl:'Material', req:true, alias:['MATERIAL','PRODUCTO','SKU','CODIGOMATERIAL','NUMEROMATERIAL','NROMATERIAL','ARTICULO'], not:'TEXTO'},
@@ -1327,22 +1333,48 @@ const Lector = {
       fr.readAsArrayBuffer(file);
     });
   },
-  /* Detección por alias con puntaje: 100 exacto · 70 prefijo · 55 contiene. */
-  detectar(headers,tipo){
+  /* Detección por alias con puntaje: 100 exacto · 70 prefijo · 55 contiene.
+     Las exportaciones de SAP traen columnas casi homónimas y muchas vacías
+     ("Pos." contra "Pos.ubicación"), así que a igual puntaje gana la que
+     realmente trae datos. */
+  detectar(headers,tipo,muestra){
     const defs=CAMPOS[tipo], map={}, usados=new Set();
     const H=headers.map(h=>({raw:h,n:U.hdr(h)}));
+    const N=Math.min((muestra||[]).length,300), lleno={};
+    H.forEach(h=>{
+      if(!N){ lleno[h.raw]=1; return; }
+      let c=0;
+      for(let i=0;i<N;i++){
+        const v=muestra[i][h.raw];
+        if(v!==undefined && v!==null && String(v).trim()!=='') c++;
+      }
+      lleno[h.raw]=c/N;
+    });
     defs.forEach(d=>{
       let best=null,bestScore=-1;
       H.forEach(h=>{
         if(usados.has(h.raw)) return;
         if(d.not && h.n.includes(d.not)) return;
+        /* Algunos campos sólo aceptan ciertos valores: dos columnas pueden
+           llamarse igual y traer cosas distintas, y el nombre no alcanza. */
+        if(d.valida && N){
+          let ok=0, hay=0;
+          for(let i=0;i<N;i++){
+            const v=muestra[i][h.raw];
+            if(v===undefined||v===null||String(v).trim()==='') continue;
+            hay++; try{ if(d.valida(v)) ok++; }catch(e){}
+          }
+          if(hay && ok/hay < 0.3) return;
+        }
         let sc=-1;
         d.alias.forEach(a=>{
           if(h.n===a) sc=Math.max(sc,100);
           else if(h.n.startsWith(a)&&a.length>=4) sc=Math.max(sc,70-(h.n.length-a.length));
           else if(h.n.includes(a)&&a.length>=5) sc=Math.max(sc,55-(h.n.length-a.length));
         });
-        if(sc>bestScore){bestScore=sc;best=h.raw;}
+        if(sc>bestScore || (sc===bestScore && sc>=50 && lleno[h.raw]>lleno[best])){
+          bestScore=sc; best=h.raw;
+        }
       });
       if(bestScore>=50){map[d.k]=best;usados.add(best);}
       else map[d.k]='';
@@ -1461,7 +1493,8 @@ const Datos = {
         stDoc:m.stDoc?String(r[m.stDoc]??'').trim():'',
         stInv:m.stInv?String(r[m.stInv]??'').trim():'',
         stInv2:m.stInv2?String(r[m.stInv2]??'').trim():'',
-        statusUbi:m.statusUbi?String(r[m.statusUbi]??'').trim():''
+        statusUbi:m.statusUbi?String(r[m.statusUbi]??'').trim():'',
+        ubiVacia:m.ubiVacia?String(r[m.ubiVacia]??'').trim():''
       });
     }
     return out;
@@ -1505,7 +1538,7 @@ const Datos = {
       const firma=headers.join('|');
       let map=Datos.mapas[tipo+'::'+firma];
       if(!map){
-        const pre=Lector.detectar(headers,tipo);
+        const pre=Lector.detectar(headers,tipo,acumulado);
         map=await Mapeo.pedir(tipo,headers,pre);
         Datos.mapas[tipo+'::'+firma]=map;
       }
@@ -1616,6 +1649,13 @@ const Motor = {
   /* El status que manda: si la bajada no trae Status Conteo se usa Status Inv. */
   stEfectivo(c){ return c.st || c.stDoc || c.stInv || ''; },
 
+  /* Como statusEsContado, pero un status vacío NO alcanza: hace falta que
+     el archivo diga explícitamente que se contó. */
+  esStatusContado(st){
+    if(!U.hdr(st)) return false;
+    return Motor.statusEsContado(st);
+  },
+
   /* ---------- ¿este Status Conteo equivale a CONTADA? ---------- */
   statusEsContado(st){
     const cfg=Config.d.statusOK;
@@ -1712,8 +1752,8 @@ const Motor = {
       }
       const est=Motor.detEstadoUbi(r.estadoUbi);
       const mm =Motor.detMOMU(r.momu);
-      if(!est){
-        const v=r.estadoUbi||'(vacío)';
+      if(!est && String(r.estadoUbi||'').trim()!==''){
+        const v=r.estadoUbi;
         if(!estNoRec.has(v)) estNoRec.set(v,{n:0,ej:[]});
         const x=estNoRec.get(v); x.n++;
         if(x.ej.length<5) x.ej.push(r.lbl||r.u);
@@ -1803,10 +1843,15 @@ const Motor = {
       if(!porUbi.has(c.u)) porUbi.set(c.u,new Map());
       const docs=porUbi.get(c.u);
       if(!docs.has(claveDoc)) docs.set(claveDoc,{doc:c.doc||'(sin documento)',f:c.f,h:c.h,st:c.st,usr:c.usr,
-        items:[],conCant:false,ord:Motor.paseDeRef(c.ref),ref:c.ref||''});
+        items:[],conCant:false,stContado:false,ord:Motor.paseDeRef(c.ref),ref:c.ref||''});
       const d=docs.get(claveDoc);
       if(d.ord===null){ d.ord=Motor.paseDeRef(c.ref); if(!d.ref) d.ref=c.ref||''; }
-      if(c.qc!==null || (c.qd!==null && c.qd!==undefined)) d.conCant=true;
+      /* Una base recién generada trae teórico, contado y diferencia en CERO
+         literal y el material vacío: eso no es un conteo. Sólo cuenta si hay
+         una cantidad distinta de cero o un material informado. */
+      if(c.prod || (c.qc!==null&&c.qc!==0) || (c.qd!==null&&c.qd!==undefined&&c.qd!==0)
+         || (c.qt!==null&&c.qt!==0)) d.conCant=true;
+      if(Motor.esStatusContado(Motor.stEfectivo(c))) d.stContado=true;
       if(d.f===null&&c.f!==null) d.f=c.f;
       if(d.h===null&&c.h!==null) d.h=c.h;
       if(!d.usr&&c.usr) d.usr=c.usr;
@@ -1851,7 +1896,8 @@ const Motor = {
       const o=ubis.get(u);
       let lista=[...docs.values()].sort((a,b)=>
         (a.ord??99)-(b.ord??99) || (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9) || U.natSort(a.doc,b.doc));
-      const conCant=lista.filter(d=>d.conCant);
+      /* el status explícito manda: una ubicación contada vacía no trae cantidad */
+      const conCant=lista.filter(d=>d.conCant||d.stContado);
       if(conCant.length<lista.length) o.docAbierto=true;
       lista=conCant;
       if(!lista.length){ o.contada=false; o.docs=[]; return; }   // queda en SIN / INAC / ACTI
@@ -1879,8 +1925,14 @@ const Motor = {
           if(P.max===null||ts>P.max) P.max=ts;
           if(d.h!==null) P.horas.add(U.iso(new Date(d.f))+'|'+Math.floor(d.h/60));
         }
-        const su=U.hdr((d.items[0]||{}).statusUbi||'');
-        if(su.includes('OCUP')) P.ocu.add(o.u); else if(su.includes('VAC')) P.vac.add(o.u);
+        const it0=d.items[0]||{};
+        const su=U.hdr(it0.statusUbi||'');
+        if(su.includes('OCUP'))      P.ocu.add(o.u);
+        else if(su.includes('VAC'))  P.vac.add(o.u);
+        else if(it0.ubiVacia!==undefined && it0.ubiVacia!==''){
+          /* el indicador de SAP: marcado = vacía */
+          if(/^(X|S|SI|TRUE|1)$/i.test(it0.ubiVacia)) P.vac.add(o.u); else P.ocu.add(o.u);
+        }
 
         d.items.forEach(c=>{
           const qd=Motor.dif(c);
@@ -1982,7 +2034,8 @@ const Motor = {
     });
 
     /* ---------- 4 · INCIDENCIAS DE CALIDAD ---------- */
-    estNoRec.forEach((x,v)=>cal.push({tipo:'Estado Ubi no reconocido',crit:'Alta',
+    estNoRec.forEach((x,v)=>cal.push({tipo:'Estado Ubi no reconocido',
+      crit:Config.d.universo==='maestro'?'Alta':'Media',
       ref:'valor "'+v+'" · '+U.num(x.n)+' ubicaciones',
       detalle:'No coincide con Física, Intermedia ni Virtual, así que se trata como Física para no dejarla fuera del conteo. Ejemplos: '+x.ej.join(', ')+'.'}));
     if(dupMaestro.size){
@@ -3037,6 +3090,19 @@ const Mapa = {
     const prev=mapZona.value;
     mapZona.innerHTML='<option value="">— Todas (agregado) —</option>'+zs.map(z=>`<option>${U.esc(z)}</option>`).join('');
     if(prev&&zs.includes(prev)) mapZona.value=prev; else if(zs.length) mapZona.value=zs[0];
+    Mapa.poblarPasillos();
+  },
+
+  /* Con decenas de miles de ubicaciones una zona entera no se puede dibujar
+     celda por celda, así que se elige el pasillo. */
+  poblarPasillos(){
+    if(!Motor.V) return;
+    const z=mapZona.value;
+    const ps=[...new Set(Motor.V.arr.filter(o=>!z||o.zona===z).map(o=>o.pasillo))].sort(U.natSort);
+    const prev=mapPasillo.value;
+    mapPasillo.innerHTML='<option value="">— Todos —</option>'+ps.map(x=>`<option>${U.esc(x)}</option>`).join('');
+    if(prev&&ps.includes(prev)) mapPasillo.value=prev;
+    mapPasillo.disabled=!ps.length;
   },
   clase(o){ return o.enUniverso ? 'w-'+String(o.estado).toLowerCase() : 'w-out'; },
   color(o){ return o.enUniverso ? COL_EST[o.estado] : '#B7BEC9'; },
@@ -3050,9 +3116,10 @@ const Mapa = {
 
   render(){
     if(!Motor.V){mapArea.innerHTML='<div class="empty">Sin datos</div>';return;}
-    const zona=mapZona.value, vista=mapVista.value;
+    const zona=mapZona.value, pas=mapPasillo.value, vista=mapVista.value;
     let arr=Motor.V.arr;
     if(zona) arr=arr.filter(o=>o.zona===zona);
+    if(pas)  arr=arr.filter(o=>o.pasillo===pas);
     if(vista==='dif') Mapa.heatDif(arr);
     else if(vista==='xy') Mapa.coordenadas(arr);
     else if(arr.length>12000) Mapa.agregado(arr,true);
@@ -3128,16 +3195,20 @@ const Mapa = {
       const x=g.get(k); x.t++; if(o.cerrada) x.c++;
     });
     const rows=[...g.entries()].filter(r=>r[1].t>0).sort((a,b)=>U.natSort(a[0],b[0]));
-    mapArea.innerHTML=(forzado?'<div class="note warn">Vista agregada automática: hay demasiadas ubicaciones para dibujarlas una a una. Elegí una zona para ver el detalle.</div>':'')+
+    mapArea.innerHTML=(forzado?'<div class="note warn">Son demasiadas ubicaciones para dibujarlas una a una. '+
+      'Elegí un <b>pasillo</b> arriba, o hacé clic en uno de abajo, para ver el detalle.</div>':'')+
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">'+
       rows.map(([k,v])=>{
         const p=v.t?v.c/v.t*100:0;
-        return `<div class="card" style="padding:8px 10px">
+        return `<div class="card" style="padding:8px 10px;cursor:pointer" data-pas="${U.esc(k.split(' · ').pop())}">
           <div style="font-size:11px;font-weight:700">${U.esc(k)}</div>
           <div style="font-size:10.5px;color:var(--gray-2)">${U.num(v.c)}/${U.num(v.t)} cerradas</div>
           <div style="margin-top:4px">${barMini(p)}</div></div>`;
       }).join('')+'</div>';
     mapInfo.textContent=U.num(rows.length)+' pasillos agregados';
+    mapArea.querySelectorAll('[data-pas]').forEach(c=>{
+      c.onclick=()=>{ mapPasillo.value=c.dataset.pas; Mapa.render(); };
+    });
   },
 
   /* concentración de diferencias por pasillo × nivel */
@@ -3838,7 +3909,8 @@ const UI = {
   });
   document.getElementById('prodOrden').addEventListener('change',()=>Prod.tabla(Prod.filas()));
   ['fCalTipo','fCalCrit'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.calidad()));
-  ['mapVista','mapZona'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Mapa.render()));
+  ['mapVista','mapPasillo'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Mapa.render()));
+  document.getElementById('mapZona').addEventListener('change',()=>{ Mapa.poblarPasillos(); Mapa.render(); });
 
   /* referencia del W2W */
   refSelect.addEventListener('change',()=>{
