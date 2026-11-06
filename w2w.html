@@ -755,11 +755,19 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
 <div class="page" id="p6">
   <div class="card mb12">
     <h3>Carga y actualización de archivos</h3>
-    <div class="note">Hacen falta <b>dos archivos</b>: la bajada de conteos, que trae todas las ubicaciones del
-    alcance con su status, y el maestro de ítems valorizados para los importes.
-    Formatos aceptados: <b>.xlsx .xls .xlsm .csv .txt</b>. Quedan guardados en el navegador.
-    Como cada bajada es la base completa, usá <b>Reemplazar</b>.</div>
-    <div class="grid c2">
+    <div class="note">Formatos aceptados: <b>.xlsx .xls .xlsm .csv .txt</b>. Quedan guardados en el navegador.
+    Como cada bajada de conteos es la base completa, cargala en modo <b>Reemplazar</b>.
+    El tablero funciona con la bajada sola; el maestro de ubicaciones agrega el pasillo, el nivel, las
+    coordenadas y la comparación del alcance contra el depósito completo.</div>
+    <div class="grid c3">
+      <div>
+        <div class="dz" id="dz1" onclick="document.getElementById('f1').click()">
+          <div class="icon">🗺️</div><div class="tt">Maestro de Ubicaciones</div>
+          <div class="ss">Ubicación · Pasillo · Col. · Nivel · Pos. · Zona · Coord. X/Y/Z</div>
+        </div>
+        <input type="file" id="f1" class="hidden" accept=".xlsx,.xls,.xlsm,.csv,.txt">
+        <div class="mt8" id="st1" style="color:var(--gray-2);font-size:11px"></div>
+      </div>
       <div>
         <div class="dz" id="dz2" onclick="document.getElementById('f2').click()">
           <div class="icon">✅</div><div class="tt">Bajada de Conteos de SAP</div>
@@ -778,24 +786,6 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
       </div>
     </div>
 
-    <details class="mt12">
-      <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--txt-2)">
-        Maestro de Ubicaciones <span class="rc-mini">· opcional · agrega coordenadas reales y los datos de ubicación que no estén en el código</span>
-      </summary>
-      <div class="grid c2 mt8">
-        <div>
-          <div class="dz" id="dz1" onclick="document.getElementById('f1').click()">
-            <div class="icon">🗺️</div><div class="tt">Maestro de Ubicaciones</div>
-            <div class="ss">Ubicación · Pasillo · Col. · Nivel · Pos. · Sector · Zona · Coord. X/Y/Z</div>
-          </div>
-          <input type="file" id="f1" class="hidden" accept=".xlsx,.xls,.xlsm,.csv,.txt">
-          <div class="mt8" id="st1" style="color:var(--gray-2);font-size:11px"></div>
-        </div>
-        <div class="note">El W2W se arma con la bajada de conteos sola: el alcance y las ubicaciones salen
-        de los documentos generados, y la estructura de pasillo, columna y nivel se lee del código de ubicación.
-        El maestro sólo suma las coordenadas X/Y del mapa y sirve para comparar el alcance contra el depósito completo.</div>
-      </div>
-    </details>
     <div class="flex mt12">
       <div class="fl"><label>Modo de carga de conteos</label>
         <select id="modoConteos"><option value="add">Acumular (agrega a lo ya cargado)</option><option value="rep">Reemplazar todo</option></select>
