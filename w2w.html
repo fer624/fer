@@ -570,7 +570,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
     <div class="rc-nivel rc-nivel-ubi">Diferencias encontradas</div>
     <div class="grid c4 mb12" id="kpiBruto"></div>
     <div class="rc-nivel rc-nivel-mat">Valor de la diferencia</div>
-    <div class="grid c4 mb12" id="kpiValor"></div>
+    <div class="grid kpis mb12" id="kpiValor"></div>
     <div id="bloqueNeteo"></div>
 
     <div class="grid c3 mb12">
@@ -3038,7 +3038,12 @@ const Vista = {
       kpi('Valor neto',$(net.vNeto),net.vNeto<0?'el faltante supera al sobrante':
           net.vNeto>0?'el sobrante supera al faltante':'faltante y sobrante se igualan',
           net.vNeto<0?'bad':net.vNeto>0?'ok':''),
-      kpi('Valor absoluto',$(net.vAbs),'faltante más sobrante, sin compensar','info')
+      kpi('Valor absoluto',$(net.vAbs),'faltante más sobrante, sin compensar','info'),
+      kpi('Absoluto compensado',$(net.netoAbsVal),
+          net.compensadoVal>0
+            ? 'se compensan '+$(net.compensadoVal)+' del mismo material entre ubicaciones'
+            : 'no hay nada que compensar entre ubicaciones',
+          net.compensadoVal>0?'ok':'info')
     ].join('');
 
     /* El neteo sólo se muestra cuando de verdad hay materiales que netean:
@@ -3756,7 +3761,9 @@ const Export = {
       ['Valor faltante',+net.vFalt.toFixed(2)],
       ['Valor sobrante',+net.vSobr.toFixed(2)],
       ['Valor neto',+net.vNeto.toFixed(2)],
-      ['Valor absoluto',+net.vAbs.toFixed(2)],
+      ['Valor absoluto (sin compensar)',+net.vAbs.toFixed(2)],
+      ['Valor absoluto compensado',+net.netoAbsVal.toFixed(2)],
+      ['Valor que se compensa entre ubicaciones',+net.compensadoVal.toFixed(2)],
       [''],
       ['EXACTITUD SOBRE LO CONTADO'],
       ['ILA (%)',+(Vista.agrupaExact(V.arr,()=>'T')[0]||{ila:0}).ila.toFixed(2)],
@@ -4076,7 +4083,8 @@ const Reporte = {
             <tr><td>Valor faltante</td><td class="n">${U.num(net.itemsFalt)} ítems · ${$(net.vFalt)}</td></tr>
             <tr><td>Valor sobrante</td><td class="n">${U.num(net.itemsSobr)} ítems · ${$(net.vSobr)}</td></tr>
             <tr><td><b>Valor neto</b></td><td class="n"><b>${$(net.vNeto)}</b></td></tr>
-            <tr><td>Valor absoluto</td><td class="n">${$(net.vAbs)}</td></tr>
+            <tr><td>Valor absoluto · sin compensar</td><td class="n">${$(net.vAbs)}</td></tr>
+            <tr><td><b>Valor absoluto compensado</b></td><td class="n"><b>${$(net.netoAbsVal)}</b></td></tr>
           </table>
           <h4>Exactitud sobre lo contado</h4>
           <table>
@@ -4098,6 +4106,8 @@ const Reporte = {
       <div class="rep-pie">
         Auditoría de cliente: sólo conteo. El stock no se toca, no hay movimientos, traspasos ni ajustes.
         Faltante y sobrante no se suman entre sí. Las unidades no se suman entre materiales distintos.
+        El absoluto compensado netea el mismo material entre ubicaciones: ese stock está en el depósito,
+        sólo que mal ubicado.
         Los importes son referenciales, para priorizar la verificación.
       </div>`;
   },
