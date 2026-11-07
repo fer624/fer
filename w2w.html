@@ -1749,6 +1749,21 @@ const Motor = {
     return r;
   },
 
+  /* El indicador "Ubicación vacía" de SAP. Devuelve true (vacía),
+     false (ocupada) o null (no dice nada). Sólo la marca positiva manda:
+     la casilla en blanco es el valor por defecto, así que no afirma nada y
+     la clasificación cae al contenido del conteo. */
+  VACIA_SI:/^(X|S|SI|SÍ|Y|J|T|TRUE|VERDADERO|1|VACIA|VACÍA|EMPTY)$/i,
+  VACIA_NO:/^(N|NO|F|FALSE|FALSO|0|OCUPADA|OCUPADO)$/i,
+  esVacia(v){
+    if(v===undefined||v===null) return null;
+    const t=String(v).trim();
+    if(t==='') return null;                 // casilla en blanco: no afirma nada
+    if(Motor.VACIA_SI.test(t)) return true;
+    if(Motor.VACIA_NO.test(t)) return false;
+    return null;
+  },
+
   /* Fase de un documento que todavía no se contó: generado o activado.
      Importa el orden: INACTIVO contiene ACTIV, así que se prueba primero. */
   FASES:{INAC:'INAC',NACT:'INAC',DEL:'INAC',ACTI:'ACTI',COUN:'COUN',POST:'COUN',CLOS:'COUN',CNTD:'COUN'},
@@ -1829,6 +1844,8 @@ const Motor = {
 
 
     /* ---------- 2 · BAJADA DE CONTEOS ---------- */
+    let vaciaEnUso=false; const valVacia=new Map();
+    let clasMarca=0, clasContenido=0;
     const refKeyValida = Config.d.ref ? U.refKey(Config.d.ref) : null;
     const refs=new Map(), statusSet=new Map(), props=new Set();
     const huerfanas=new Map();
@@ -1905,6 +1922,10 @@ const Motor = {
          una cantidad distinta de cero o un material informado. */
       if(c.prod || (c.qc!==null&&c.qc!==0) || (c.qd!==null&&c.qd!==undefined&&c.qd!==0)
          || (c.qt!==null&&c.qt!==0)) d.conCant=true;
+      if(c.ubiVacia!==undefined && String(c.ubiVacia).trim()!==''){
+        vaciaEnUso=true;
+        valVacia.set(String(c.ubiVacia).trim(),(valVacia.get(String(c.ubiVacia).trim())||0)+1);
+      }
       if(Motor.esStatusContado(Motor.stEfectivo(c))) d.stContado=true;
       if(d.f===null&&c.f!==null) d.f=c.f;
       if(d.h===null&&c.h!==null) d.h=c.h;
@@ -1936,7 +1957,9 @@ const Motor = {
     porUbi.forEach(docs=>{
       ubisConDoc++;
       let alguna=false;
-      docs.forEach(d=>{ if(d.conCant) alguna=true; });
+      /* una ubicación contada vacía no trae cantidad, pero el status la
+         declara contada: no va en el conteo de "sin conteo" */
+      docs.forEach(d=>{ if(d.conCant||d.stContado) alguna=true; });
       if(!alguna) ubisSinConteo++;
     });
     if(ubisSinConteo>0)
@@ -2081,12 +2104,20 @@ const Motor = {
       o.fase='CONT';
       /* Ocupada o vacía: lo dice el indicador de SAP si viene; si no, lo
          resuelve el propio conteo (hay material o cantidad contada). */
-      const marca=(ult.items.find(c=>c.ubiVacia!==undefined&&c.ubiVacia!=='')||{}).ubiVacia;
       const su=U.hdr((ult.items.find(c=>c.statusUbi)||{}).statusUbi||'');
-      if(su.includes('OCUP'))      o.ocupada=true;
-      else if(su.includes('VAC'))  o.ocupada=false;
-      else if(marca!==undefined)   o.ocupada=!/^(X|S|SI|TRUE|1)$/i.test(marca);
-      else                         o.ocupada=[...porMat.values()].some(m=>m.conMat);
+      let vac=null;
+      if(su.includes('OCUP'))     vac=false;
+      else if(su.includes('VAC')) vac=true;
+      if(vac===null){
+        /* basta con que una fila del pase vigente marque la ubicación como vacía */
+        for(const c of ult.items){
+          const r=Motor.esVacia(c.ubiVacia);
+          if(r===true){ vac=true; break; }
+          if(r===false) vac=false;
+        }
+      }
+      if(vac!==null){ o.ocupada=!vac; clasMarca++; }
+      else { o.ocupada=[...porMat.values()].some(m=>m.conMat); clasContenido++; }
       if(ult.dif){
         o.estado = ult.pase===1 ? 'C2' : ult.pase===2 ? 'C3' : 'DIF';
         o.confirmada=false;
@@ -2128,6 +2159,15 @@ const Motor = {
       detalle:'Sin fecha no se puede ordenar el pase con precisión. Revisá el mapeo de columnas.'});
     if(sinDoc) cal.push({tipo:'Conteos sin número de documento',crit:'Alta',ref:U.num(sinDoc)+' registros',
       detalle:'El pase se deriva por fecha y hora, que es menos preciso. Si dos recuentos cayeron en el mismo minuto se mezclan.'});
+    if(clasMarca+clasContenido>0) cal.push({tipo:'Cómo se clasificó ocupada o vacía',crit:'Baja',
+      ref:U.num(clasMarca)+' por indicador · '+U.num(clasContenido)+' por el conteo',
+      detalle: vaciaEnUso
+        ? 'La columna "Ubicación vacía" trae datos: '+
+          [...valVacia.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6)
+            .map(([v,k])=>'"'+v+'" ('+U.num(k)+')').join(' · ')+
+          '. Las que no la traen se resuelven por el conteo: vacía si no registró ningún material.'
+        : 'La columna "Ubicación vacía" viene en blanco en todo el archivo, así que no informa nada. '+
+          'La clasificación sale del propio conteo: vacía si no registró ningún material.'});
     if(Datos.dupDescartadas>0) cal.push({tipo:'Filas repetidas descartadas en la carga',crit:'Media',
       ref:U.num(Datos.dupDescartadas)+' filas',
       detalle:'Había más de una fila para la misma ubicación, documento y material. Se conservó la última. '+
