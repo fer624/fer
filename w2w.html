@@ -897,6 +897,12 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
         <div class="fl"><label>Moneda a mostrar</label>
           <input type="text" id="cfgMoneda" maxlength="8" placeholder="la del archivo, o $">
         </div>
+        <div class="fl"><label>Origen del importe</label>
+          <select id="cfgOrigenVal">
+            <option value="maestro">Precio del maestro de ítems × cantidad</option>
+            <option value="sap">Valor de diferencia de la bajada de SAP</option>
+          </select>
+        </div>
         <div class="fl"><label>Ubicaciones Intermedias <span class="rc-mini">sólo con universo = maestro</span></label>
           <select id="cfgInter">
             <option value="0">Fuera del universo (sólo físicas)</option>
@@ -1220,6 +1226,7 @@ const Config = {
     estr:{sep:'-', map:['zona','pasillo','col','nivel','pos','pos'], zonaOrigen:'cod'},
     estrV:3,            // sube cuando cambia el reparto por defecto, para reaplicarlo
     moneda:'',          // vacío = la que traiga el maestro de ítems
+    origenVal:'maestro',// de dónde sale el importe: 'maestro' o 'sap'
     difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
     inter:0,            // las intermedias quedan fuera del universo
@@ -1263,6 +1270,7 @@ const Config = {
     cfgSigno.value=c.signo; cfgDif.value=c.dif; cfgDifAud.value=c.difAud;
     cfgUniverso.value=c.universo; cfgMoneda.value=c.moneda;
     cfgMetaIla.value=c.metaIla; cfgMetaIra.value=c.metaIra;
+    cfgOrigenVal.value=c.origenVal;
     cfgProp.value=c.netProp; cfgInter.value=c.inter;
   },
   guardar(){
@@ -1272,6 +1280,7 @@ const Config = {
     c.signo=+cfgSigno.value; c.dif=cfgDif.value; c.difAud=cfgDifAud.value;
     c.universo=cfgUniverso.value; c.moneda=cfgMoneda.value.trim();
     c.metaIla=+cfgMetaIla.value||95; c.metaIra=+cfgMetaIra.value||98;
+    c.origenVal=cfgOrigenVal.value;
     c.netProp=+cfgProp.value; c.inter=+cfgInter.value;
     c.ventanaAuto=0;   // a partir de acá la ventana la fija el usuario
     Config.persistir(); Motor.reconstruir(); U.toast('Configuración guardada','ok');
@@ -1827,6 +1836,19 @@ const Motor = {
     return m ? +m[1] : null;
   },
 
+  /* El importe de un ítem, de una sola fuente para toda la app. Mezclar el
+     valor de SAP en una pantalla y precio por cantidad en otra daba números
+     distintos para el mismo ítem. */
+  valorItem(it){
+    if(it.qd===null||it.qd===undefined) return null;
+    const pr = Motor.M.precios.has(it.prodK) ? Motor.M.precios.get(it.prodK) : null;
+    const vMaestro = pr===null ? null : it.qd*pr;
+    const vSap = (it.val===null||it.val===undefined) ? null : it.val;
+    return Config.d.origenVal==='sap'
+      ? (vSap!==null ? vSap : vMaestro)
+      : (vMaestro!==null ? vMaestro : vSap);
+  },
+
   /* ---------- clave de agrupación para el neteo ---------- */
   claveNeteo(it,variosProp){
     return (Config.d.netProp===0 && variosProp) ? it.prodK+'\u0001'+U.norm(it.prop) : it.prodK;
@@ -2331,6 +2353,7 @@ Motor.neteo = function(){
   const grupos=new Map();
   let brutoUnid=0, itemsDif=0, itemsFalt=0, itemsSobr=0;
   let vFalt=0, vSobr=0, vNeto=0, vAbs=0, sinVal=0;
+  let cmpMaestro=0, cmpSap=0, cmpN=0;
   const ubisDif=new Set(), porZona=new Map();
 
   for(const it of M.vigentes){
@@ -2348,11 +2371,13 @@ Motor.neteo = function(){
     if(!g.desc && it.desc) g.desc=it.desc;
     if(!g.um && it.um) g.um=it.um;
     g.neto+=it.qd;
-    /* Valor: el que trae la bajada de SAP; si no viene, precio por cantidad. */
     const pr=M.precios.has(it.prodK)?M.precios.get(it.prodK):null;
-    const v = it.val!==null && it.val!==undefined ? it.val
-            : (pr===null ? null : it.qd*pr);
+    const v = Motor.valorItem(it);
     it.valor = v;
+    /* se contrastan las dos fuentes para detectar monedas distintas */
+    if(pr!==null && it.val!==null && it.val!==undefined && it.qd!==0){
+      cmpMaestro += Math.abs(it.qd*pr); cmpSap += Math.abs(it.val); cmpN++;
+    }
     if(v!==null){
       vAbs += Math.abs(v); vNeto += v;
       if(v<0) vFalt += -v; else vSobr += v;
@@ -2412,6 +2437,8 @@ Motor.neteo = function(){
     pctNeteaVal: brutoVal ? compensadoVal/brutoVal*100 : 0,
     unidSinPrecio, sinVal,
     vFalt, vSobr, vNeto, vAbs,
+    cmpMaestro, cmpSap, cmpN,
+    ratio: (cmpN && cmpMaestro) ? cmpSap/cmpMaestro : null,
     cobPrecio: brutoUnid ? (brutoUnid-unidSinPrecio)/brutoUnid*100 : 100,
     hayPrecios: brutoVal>0 || vAbs>0,
     itemsDif, ubisDif:ubisDif.size, itemsFalt, itemsSobr, porZona:[...porZona.entries()],
@@ -2419,8 +2446,9 @@ Motor.neteo = function(){
     matDif:grupos.size, matNeto, matNetea,
     faltNeto, sobrNeto, faltNetoVal, sobrNetoVal,
     sinPrecio,
-    moneda:(Datos.valor.find(v=>v.moneda)||{}).moneda
-           || (M.vigentes.find(i=>i.mon)||{}).mon || '',
+    moneda: Config.d.origenVal==='sap'
+      ? ((M.vigentes.find(i=>i.mon)||{}).mon || (Datos.valor.find(v=>v.moneda)||{}).moneda || '')
+      : ((Datos.valor.find(v=>v.moneda)||{}).moneda || (M.vigentes.find(i=>i.mon)||{}).mon || ''),
     variosProp
   };
 };
@@ -2429,6 +2457,22 @@ Motor.neteo = function(){
    El grupo se busca por Map y la muestra corta apenas junta las que pide
    quien llama: con decenas de miles de diferencias, recorrer la lista
    entera para cada ítem hace inusable la pantalla.                        */
+/* Contraste de las dos fuentes de importe: si no coinciden, lo más común es
+   que estén en monedas distintas y hay que elegir una. */
+Motor.avisarValor = function(){
+  const M=Motor.M, net=M.net;
+  if(!net || net.cmpN<20 || !net.cmpMaestro) return;
+  const r=net.ratio;
+  if(r>0.95 && r<1.05) return;
+  M.cal.push({tipo:'El valor de SAP no coincide con el precio del maestro',crit:'Alta',
+    ref:'relación '+U.num(r,2)+' a 1',
+    detalle:'Sobre '+U.num(net.cmpN)+' ítems donde existen las dos fuentes, el "Valor de diferencia" '+
+      'de la bajada suma '+U.num(net.cmpSap,0)+' y el precio del maestro por la cantidad suma '+
+      U.num(net.cmpMaestro,0)+'. Casi siempre es que están en monedas distintas. '+
+      'El tablero está usando '+(Config.d.origenVal==='sap'?'el valor de SAP':'el precio del maestro')+
+      '; se cambia en 7 · Archivos y Configuración.'});
+};
+
 Motor.espejo = function(it,max){
   const net=Motor.M.net; if(!net) return [];
   const g=net.mapa.get(Motor.claveNeteo(it,net.variosProp));
@@ -2603,6 +2647,7 @@ Motor.recalcular = function(){
 Motor.reconstruir = function(){
   Motor.construir();
   Motor.neteo();
+  Motor.avisarValor();
   UI.poblarFiltros();
   UI.pintarStatusCfg();
   Motor.recalcular();
@@ -2959,7 +3004,15 @@ const Vista = {
        se pueden sumar. Las unidades quedan como dato secundario.            */
     const $=(v)=>net.hayPrecios ? U.plata(v) : '—';
 
-    avisoPrecio.innerHTML = net.hayPrecios
+    const fuente = Config.d.origenVal==='sap'
+      ? 'el <b>Valor de diferencia</b> de la bajada de SAP'
+      : 'el <b>precio del maestro de ítems</b> por la cantidad';
+    const desvio = net.ratio!==null && (net.ratio>1.05||net.ratio<0.95)
+      ? `<div class="note bad">Las dos fuentes de importe no coinciden: el valor de SAP es
+         <b>${U.num(net.ratio,2)} veces</b> el precio del maestro por la cantidad. Suele ser que están
+         en monedas distintas. Estás viendo ${fuente}; se cambia en <b>7 · Archivos</b>.</div>`
+      : `<div class="rc-mini mb12">Los importes salen de ${fuente}.</div>`;
+    avisoPrecio.innerHTML = desvio + (net.hayPrecios
       ? (net.cobPrecio<99.95
           ? `<div class="note warn">Cobertura de precios: <b>${U.pct(net.cobPrecio,1)}</b> de la diferencia bruta
              tiene precio en el maestro de ítems. Las <b>${U.num(net.unidSinPrecio,0)}</b> unidades sin precio
@@ -2967,7 +3020,7 @@ const Vista = {
           : '')
       : `<div class="note bad">No hay precios cargados. Los importes aparecen vacíos y el porcentaje que netea
          se calcula en unidades, que entre materiales distintos no es comparable.
-         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 7.</div>`;
+         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 7.</div>`);
 
     const nF=net.itemsFalt, nS=net.itemsSobr;
     kpiBruto.innerHTML=[
@@ -3085,7 +3138,7 @@ const Vista = {
     if(difEspejo.value==='no') its=its.filter(i=>nEsp.get(i)===0);
 
     const prec=m=>Motor.M.precios.has(m)?Motor.M.precios.get(m):null;
-    const mag=it=>{const p=prec(it.prodK);return (p===null||it.qd===null)?null:Math.abs(it.qd*p);};
+    const mag=it=>{const v=Motor.valorItem(it); return v===null?null:Math.abs(v);};
 
     /* el clic en un encabezado manda sobre el selector "Ordenar por" */
     const oc0=Vista._ordCol;
