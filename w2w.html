@@ -938,9 +938,10 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
     <h3>Columnas detectadas en la bajada de conteos</h3>
     <div class="note" id="notaConteos"></div>
     <div class="flex no-print">
-      <button class="btn ghost sm" onclick="Datos.remapear('conteos')">✎ Revisar mapeo de conteos</button>
-      <button class="btn ghost sm" onclick="Datos.remapear('maestro')">✎ Revisar mapeo del maestro</button>
-      <button class="btn ghost sm" onclick="Datos.remapear('valor')">✎ Revisar mapeo de valorización</button>
+      <button class="btn ghost sm" onclick="Datos.remapear('conteos')">↻ Detectar columnas de conteos</button>
+      <button class="btn ghost sm" onclick="Datos.remapear('maestro')">↻ Detectar columnas del maestro</button>
+      <button class="btn ghost sm" onclick="Datos.remapear('valor')">↻ Detectar columnas de valorización</button>
+      <span class="rc-mini" style="align-self:center">Arranca de una detección nueva, no del mapeo guardado.</span>
     </div>
   </div>
 
@@ -1224,20 +1225,35 @@ const Config = {
     inter:0,            // las intermedias quedan fuera del universo
     ref:'',             // referencia del W2W; vacío = todas
     tema:'light', nombres:{},
-    statusOK:null       // null = auto-detección por el texto del Status Conteo
+    statusOK:null,      // null = auto-detección por el texto del Status Conteo
+    statusV:2           // sube cuando cambia la tabla de códigos: descarta la selección vieja
   },
   d:{},
+  statusReseteado:false,   // sólo para avisar en pantalla; no se guarda
   cargar(){
     let s={};
     try{ s=JSON.parse(localStorage.getItem('w2w26_cfg')||'{}'); }catch(e){}
     Config.d=Object.assign({},Config.def,s);
     /* Si el reparto guardado viene de una versión anterior del valor por
        defecto, se reemplaza: el usuario puede volver a ajustarlo a mano. */
-    if((Config.d.estrV||0) < Config.def.estrV){
+    /* Las versiones se comparan contra lo que estaba GUARDADO, no contra el
+       objeto ya fusionado: si la clave no existe, el valor por defecto la
+       tapa y el descarte nunca se dispara. */
+    let cambio=false;
+    if((s.statusV||0) < Config.def.statusV){
+      /* una selección manual vieja puede clasificar mal, por ejemplo ACTI
+         como contada: se descarta y vuelve la detección automática */
+      Config.d.statusOK=null;
+      Config.d.statusV=Config.def.statusV;
+      Config.statusReseteado = s.statusOK!==undefined && s.statusOK!==null;
+      cambio=true;
+    }
+    if((s.estrV||0) < Config.def.estrV){
       Config.d.estr=JSON.parse(JSON.stringify(Config.def.estr));
       Config.d.estrV=Config.def.estrV;
-      Config.persistir();
+      cambio=true;
     }
+    if(cambio) Config.persistir();
     document.documentElement.setAttribute('data-theme',Config.d.tema);
   },
   aForm(){
@@ -1474,8 +1490,9 @@ const Mapeo = {
    DATOS · normalización, persistencia y carga de archivos
    ========================================================================== */
 const Datos = {
+  MAPAS_V:3,            // versión de los alias y reglas de detección de columnas
   maestro:[], conteos:[], valor:[],
-  mapas:{}, hist:[], dupDescartadas:0,
+  mapas:{}, hist:[], dupDescartadas:0, mapasReseteado:false, recargados:new Set(),
   meta:{maestro:null,conteos:null,valor:null},
 
   async init(){
@@ -1483,6 +1500,15 @@ const Datos = {
     Datos.conteos=(await DB.get('conteos'))||[];
     Datos.valor  =(await DB.get('valor'))||[];
     Datos.mapas  =(await DB.get('mapas'))||{};
+    /* El mapeo guardado se descarta cuando cambian los alias o las reglas de
+       detección: si no, una asignación vieja y equivocada sobrevive para
+       siempre y ninguna corrección llega a aplicarse. */
+    const mv=(await DB.get('mapasV'))||0;
+    if(mv < Datos.MAPAS_V){
+      Datos.mapas={};
+      try{ await DB.set('mapas',{}); await DB.set('mapasV',Datos.MAPAS_V); }catch(e){}
+      Datos.mapasReseteado = mv>0;
+    }
     Datos.hist   =(await DB.get('hist'))||[];
     Datos.meta   =(await DB.get('meta'))||{maestro:null,conteos:null,valor:null};
   },
@@ -1492,6 +1518,7 @@ const Datos = {
       if(que==='conteos'||!que) await DB.set('conteos',Datos.conteos);
       if(que==='valor'  ||!que) await DB.set('valor',  Datos.valor);
       await DB.set('mapas',Datos.mapas);
+      await DB.set('mapasV',Datos.MAPAS_V);
       await DB.set('hist',Datos.hist);
       await DB.set('meta',Datos.meta);
     }catch(e){
@@ -1620,12 +1647,14 @@ const Datos = {
         Datos[tipo]=norm;
       }
 
-      Datos.meta[tipo]={archivo:nombres.join(', '),fecha:Date.now(),filas:filasTot,headers};
+      Datos.meta[tipo]={archivo:nombres.join(', '),fecha:Date.now(),filas:filasTot,headers,
+                        muestra:acumulado.slice(0,200)};
       Datos.hist.unshift({tipo,archivo:nombres.join(', '),fecha:Date.now(),filas:filasTot,
         modo:(tipo==='conteos'?(modoConteos.value==='add'?'Acumular':'Reemplazar'):'Reemplazar'),
         total:Datos[tipo].length});
       if(Datos.hist.length>200) Datos.hist.length=200;
 
+      Datos.recargados.add(tipo);
       await Datos.persistir(tipo);
       document.getElementById(dzId).classList.add('loaded');
       Motor.reconstruir();
@@ -1649,11 +1678,13 @@ const Datos = {
     const meta=Datos.meta[tipo];
     if(!meta||!meta.headers){U.toast('Primero cargá el archivo de '+Mapeo.titulos[tipo],'err');return;}
     const firma=meta.headers.join('|');
-    const pre=Datos.mapas[tipo+'::'+firma]||Lector.detectar(meta.headers,tipo);
+    /* Siempre se parte de una detección nueva: si alguien viene a revisar el
+       mapeo es porque algo quedó mal, y arrancar del guardado repite el error. */
+    const pre=Lector.detectar(meta.headers,tipo,meta.muestra);
     const map=await Mapeo.pedir(tipo,meta.headers,pre);
     Datos.mapas[tipo+'::'+firma]=map;
     await Datos.persistir();
-    U.toast('Mapeo actualizado. Volvé a cargar el archivo para aplicarlo.','ok');
+    U.toast('Mapeo guardado. Volvé a cargar el archivo para que se aplique.','ok');
   },
 
   async borrarTodo(){
@@ -2785,16 +2816,33 @@ const Vista = {
     const sts=[...Motor.M.statusSet.values()].sort((a,b)=>b.n-a.n).slice(0,8)
       .map(x=>`<b class="mono">${U.esc(x.st)}</b> ${x.contado?'contada':'no contada'} (${U.num(x.n)})`);
     let aviso='';
+    const NOM={maestro:'Maestro de Ubicaciones',conteos:'Bajada de Conteos',valor:'Maestro de Ítems'};
+    const faltan=['maestro','conteos','valor']
+      .filter(t=>Datos.meta[t] && !Datos.recargados.has(t)).map(t=>NOM[t]);
+    if(Datos.mapasReseteado && faltan.length){
+      aviso+='<div class="note bad"><b>Se actualizaron las reglas de lectura de columnas.</b> '+
+             'Estos archivos se leyeron con el mapeo anterior, así que sus números pueden estar mal: '+
+             '<b>'+faltan.join('</b>, <b>')+'</b>. Volvé a cargarlos en '+
+             '<b>7 · Archivos y Configuración</b>.</div>';
+    }
+    if(Config.statusReseteado){
+      aviso+='<div class="note warn"><b>Se descartó una selección manual de Status Conteo</b> guardada con '+
+             'una versión anterior, porque podía clasificar mal. Volvió la detección automática; '+
+             'si necesitás ajustarla, está en <b>7 · Archivos</b>.</div>';
+    }else if(Array.isArray(Config.d.statusOK)){
+      aviso+='<div class="note warn"><b>Hay una selección manual de Status Conteo activa.</b> '+
+             'Si los números no cierran, revisala en <b>7 · Archivos</b> o volvé a la detección automática.</div>';
+    }
     if(!colsSt.length){
-      aviso='<div class="note bad"><b>No se está leyendo ningún status.</b> Sin eso el tablero no puede '+
+      aviso+='<div class="note bad"><b>No se está leyendo ningún status.</b> Sin eso el tablero no puede '+
             'distinguir INAC, ACTI, COUN y POST. Asigná la columna en <b>7 · Archivos</b> → '+
             '<i>Revisar mapeo de conteos</i>.</div>';
     }else if(dg.ubisConDoc && dg.ubisSinConteo===dg.ubisConDoc){
-      aviso='<div class="note warn"><b>Todavía no se contó nada.</b> Las '+U.num(dg.ubisConDoc)+
+      aviso+='<div class="note warn"><b>Todavía no se contó nada.</b> Las '+U.num(dg.ubisConDoc)+
             ' ubicaciones tienen documento generado, pero ninguna trae cantidad contada. '+
             'Status leído de '+colsSt.join(' · ')+'.<br>Valores encontrados: '+sts.join(' · ')+'.</div>';
     }else if(sts.length){
-      aviso='<div class="note">Status leído de '+colsSt.join(' · ')+'. '+
+      aviso+='<div class="note">Status leído de '+colsSt.join(' · ')+'. '+
             'Valores: '+sts.join(' · ')+'. Se ajustan en <b>7 · Archivos</b>.</div>';
     }
     document.getElementById('avisoEstado').innerHTML=aviso;
@@ -4088,7 +4136,8 @@ const UI = {
   },
   guardarStatus(){
     const sel=[...statusCfg.querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).map(c=>c.dataset.st);
-    Config.d.statusOK=sel; Config.persistir(); Motor.reconstruir();
+    Config.d.statusOK=sel; Config.d.statusV=Config.def.statusV;
+    Config.persistir(); Motor.reconstruir();
     U.toast('Status aplicados: '+sel.length+' equivalen a contada','ok');
   },
   autoStatus(){
