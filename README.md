@@ -83,8 +83,32 @@ encontró, para que nunca pase inadvertido si no se está leyendo.
 5. **Productividad** — por contador: ubicaciones contadas, ocupadas y vacías,
    documentos, ítems, ritmo por hora y franja horaria trabajada. Los nombres de
    los contadores se cargan a mano o se pegan desde Excel.
-6. **Archivos y Configuración** — carga, Status Conteo, umbrales y control de
+6. **Exactitud** — ILA e IRA sobre lo contado, con metas, desglose por zona,
+   pasillo, tipo de almacén y contador.
+7. **Archivos y Configuración** — carga, Status Conteo, umbrales y control de
    calidad de datos.
+
+### ILA e IRA
+
+- **ILA** = ubicaciones correctas ÷ ubicaciones contadas. Una ubicación es
+  correcta cuando no tiene ninguna diferencia.
+- **IRA** = ítems correctos ÷ ítems contados. Un ítem es cada material dentro
+  de una ubicación; una ubicación contada **vacía** no aporta ítems.
+
+Se calculan sobre lo contado, no sobre el universo, así que suben y bajan a
+medida que avanza el conteo.
+
+### Valor de la diferencia
+
+Si la bajada trae `Valor de diferencia`, los importes salen de ahí, que es la
+valuación del propio SAP. Si no, se calculan con el precio del maestro de
+ítems. El resultado muestra **valor faltante, sobrante, neto y absoluto**.
+
+### Ocupadas y vacías
+
+Una ubicación contada es vacía si lo dice el indicador de SAP (`Ubicación
+vacía` o `Status Ubi`), y si no viene, cuando el conteo no registró ningún
+material. Hay un filtro de ocupación en la barra superior.
 
 > El Resultado agrega **por material sobre todo el depósito**; los Recuentos
 > listan **ubicación por ubicación** y respetan los filtros y el límite de filas
