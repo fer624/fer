@@ -429,7 +429,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
 .rep-h .t1{font-size:15px;font-weight:700;color:var(--ceva-blue)}
 .rep-h .t2{font-size:10px;color:var(--gray)}
 .rep-h .right{margin-left:auto;text-align:right;font-size:10px;color:var(--gray)}
-.rep-k{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:8px}
+.rep-k{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
 .rep-k div{border:1px solid var(--line);border-left:3px solid var(--ceva-blue-2);border-radius:5px;padding:5px 7px}
 .rep-k b{display:block;font-size:17px;line-height:1.1}
 .rep-k span{font-size:8.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--gray-2);font-weight:700}
@@ -4696,8 +4696,12 @@ const Reporte = {
     }).join('');
 
     const zs=m.porZona.slice().sort((a,b)=>(a.t?a.cerr/a.t:1)-(b.t?b.cerr/b.t:1));
-    const corte=zs.slice(0,12);
-    const resto=zs.slice(12);
+    /* Entran todas las zonas: agrupar las últimas en "otras 3" escondía justo
+       las que van mejor, y el reporte se mira para saber qué falta en cada una.
+       Con muchas más que las de este depósito, el resto se sigue agregando. */
+    const TOPE=20;
+    const corte=zs.slice(0,TOPE);
+    const resto=zs.slice(TOPE);
     let filas=corte.map(z=>`<tr><td>${U.esc(z.k)}</td><td class="n">${U.num(z.t)}</td>`+
       `<td class="n">${U.num(z.cont)}</td><td class="n">${U.pct(z.t?z.cont/z.t*100:0,1)}</td>`+
       `<td class="n">${U.num(z.cerr)}</td><td class="n">${U.pct(z.t?z.cerr/z.t*100:0,1)}</td>`+
@@ -4724,7 +4728,6 @@ const Reporte = {
         <div><span>Pendientes</span><b>${U.num(m.pend)}</b></div>
         <div><span>Cerradas</span><b>${U.num(m.cerradas)}</b></div>
         <div><span>En recuento</span><b>${U.num(m.E.C2+m.E.C3)}</b></div>
-        <div><span>Fin estimado</span><b>${m.finEst?U.fmt(m.finEst)+' '+U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—'}</b></div>
       </div>
 
       <div class="rep-cols">
@@ -4745,15 +4748,6 @@ const Reporte = {
             <tr><td>Valor absoluto · sin compensar</td><td class="n">${$(net.vAbs)}</td></tr>
             <tr><td><b>Valor absoluto compensado</b></td><td class="n"><b>${$(net.netoAbsVal)}</b></td></tr>
             ${net.stkUn?`<tr><td>Diferencias por tipo de stock</td><td class="n">${U.num(net.stkIt)} ítems · ${U.num(net.stkUn,0)} u · no son stock a buscar</td></tr>`:''}
-            ${net.matSinPrecio?`<tr><td>Materiales sin precio en el maestro</td><td class="n">${U.num(net.matSinPrecio)} · ${U.num(net.unidSinPrecio,0)} u fuera de los importes</td></tr>`:''}
-          </table>
-          <h4>Proyección del cierre</h4>
-          <table>
-            <tr><td>Fechas y horario</td><td class="n">${U.esc(Motor.jornada.texto())}</td></tr>
-            <tr><td>Ritmo actual · faltan</td><td class="n">${U.num(m.ritmoHora,0)} ubic/hora · ${U.num(m.restantes)} ubicaciones${m.jornadasRest!==null?' · '+U.num(m.jornadasRest,1)+' jornadas':''}</td></tr>
-            <tr><td><b>Fin estimado</b></td><td class="n"><b>${m.finEst?U.fmt(m.finEst)+' '+U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes())
-                 :(m.faltanHoras?'no entra en las fechas · faltan '+U.num(m.faltanHoras,1)+' h':'—')}</b></td></tr>
-            ${m.ritmoNecesario!==null?`<tr><td>Para cerrar el ${m.cierreJor?U.fmt(m.cierreJor):Config.d.fin} hace falta</td><td class="n">${U.num(m.ritmoNecesario,0)} ubic/hora · quedan ${U.num(m.horasHastaCierre,1)} h de conteo</td></tr>`:''}
           </table>
           <h4>Exactitud sobre lo contado</h4>
           <table>

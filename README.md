@@ -209,8 +209,9 @@ material. Hay un filtro de ocupación en la barra superior.
 ### Reporte de avance y hoja de verificación
 
 El botón **🖨 Reporte** de la barra superior arma una hoja A4 horizontal con la
-cobertura, el cierre, el embudo, la proyección del cierre, el avance por zona y
-las cifras del resultado, y abre el diálogo de impresión. Desde ahí se elige
+cobertura, el cierre, el embudo, el resultado, la exactitud y el avance de
+**todas** las zonas, y abre el diálogo de impresión. La proyección del cierre
+queda en la pantalla 1: el reporte es para informar cómo viene el conteo. Desde ahí se elige
 *Guardar como PDF* para mandarlo por mail. No necesita ninguna librería extra.
 
 El botón **🖨 Hoja de verificación** de la pantalla 3 imprime el listado de
