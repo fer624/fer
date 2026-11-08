@@ -30,6 +30,10 @@ y una clave sin el tipo se comía una de las dos filas.
 
 ### Estructura del código de ubicación
 
+Esta tarjeta **sólo aparece cuando hace falta**: con el maestro cargado, la
+zona, el pasillo, la columna y el nivel salen de ahí y no hay nada que
+configurar. Queda un enlace por si se la quiere abrir igual.
+
 Sin maestro, la zona, el pasillo, la columna y el nivel se leen del propio
 código partiéndolo por el separador. Cuál parte es cuál depende del depósito, así
 que se configura en la pantalla 7: muestra cuántos valores distintos tiene cada
@@ -83,6 +87,12 @@ encontró, para que nunca pase inadvertido si no se está leyendo.
    recuentos al lado: teórico, contado y diferencia de cada pase, el resultado
    de la auditoría y el espejo. Clic en la fila para el detalle completo.
 4. **Mapa del Depósito** — estado por ubicación y concentración de diferencias.
+   Cada cuadrado es **una columna del rack**: junta las ubicaciones que comparten
+   columna y nivel y toma el estado del que más trabajo da, así el pasillo se ve
+   como una grilla llena y no salpicada. El selector *Cada cuadrado es* permite
+   bajar al detalle por columna y subdivisión. `Pos.` del maestro de SAP no se
+   usa para dibujar: suele ser un correlativo de todo el depósito —541 valores
+   distintos en este W2W— y abría una columna por valor.
 5. **Productividad** — por contador: ubicaciones contadas, ocupadas y vacías,
    documentos, ítems, ritmo por hora y franja horaria trabajada. Los nombres de
    los contadores se cargan a mano o se pegan desde Excel.
@@ -106,28 +116,25 @@ cantidad. Por defecto cuenta como error; en la pantalla 7 se puede excluir, y
 entonces una ubicación cuyo único problema fue el tipo pasa a contar como
 correcta.
 
-### Jornada del conteo y previsibilidad
+### Fechas del conteo y previsibilidad
 
-La proyección del cierre sólo sirve si avanza por **horas de conteo reales**.
-Sumando horas corridas, un W2W que para a las 17 y vuelve a las 7 termina «a
-las 3 de la madrugada de un domingo».
+Los días del W2W son **fechas concretas acordadas con el cliente** —07/11,
+08/11, 09/11 y 14/11—, no una semana que se repite. En la pantalla 7 se cargan
+esas fechas una por una, más los dos turnos del día. El botón **Tomar fechas y
+horario del archivo** trae las fechas en que ya se contó y el horario con
+actividad, detectando el corte del mediodía; las fechas que todavía faltan se
+agregan a mano, porque el archivo no puede saber que también se cuenta el 14.
 
-En la pantalla 7 se carga la jornada: dos turnos y los días en que se cuenta.
-El botón **Tomar el horario del archivo** lee en qué horas hubo actividad y
-arma los turnos solo, detectando el corte del mediodía; los **días no los
-toca**, porque son una decisión y no un dato: si el conteo arrancó un viernes,
-el archivo sólo vio viernes y sábado.
+Con eso la pantalla 1 responde las dos preguntas que importan:
 
-Con eso la pantalla 1 muestra:
+- **Fin estimado** — fecha y hora, avanzando sólo por las horas de esas fechas,
+  y cuántas jornadas faltan. Si las fechas **no alcanzan**, lo dice: *«no
+  entra · faltan 4,0 h de conteo»*.
+- **Ritmo necesario** — las ubicaciones por hora que harían falta para terminar
+  en la última fecha cargada, contra el ritmo actual. En rojo cuando no alcanza.
 
-- **Fin estimado** con fecha y hora, avanzando sólo por horas de jornada, y
-  cuántas jornadas faltan.
-- **Ritmo para cerrar en fecha** — las ubicaciones por hora que harían falta
-  para llegar a la fecha de cierre configurada, contra el ritmo actual. Se
-  pone en rojo cuando el ritmo de hoy no alcanza.
-
-Si la jornada se apaga o queda vacía, la proyección vuelve a sumar horas
-corridas. El reporte en PDF incluye el mismo bloque.
+Sin fechas cargadas, la proyección vuelve a sumar horas corridas. El reporte en
+PDF incluye el mismo bloque.
 
 ### Referencias y pases
 
@@ -199,12 +206,17 @@ material. Hay un filtro de ocupación en la barra superior.
 > material en el listado, buscalo por su código o entrá con el clic desde el
 > Resultado.
 
-### Reporte de avance
+### Reporte de avance y hoja de verificación
 
 El botón **🖨 Reporte** de la barra superior arma una hoja A4 horizontal con la
-cobertura, el cierre, el embudo, el avance por zona y las cifras del resultado,
-y abre el diálogo de impresión. Desde ahí se elige *Guardar como PDF* para
-mandarlo por mail. No necesita ninguna librería extra.
+cobertura, el cierre, el embudo, la proyección del cierre, el avance por zona y
+las cifras del resultado, y abre el diálogo de impresión. Desde ahí se elige
+*Guardar como PDF* para mandarlo por mail. No necesita ninguna librería extra.
+
+El botón **🖨 Hoja de verificación** de la pantalla 3 imprime el listado de
+recuentos tal como está filtrado y ordenado, para caminarlo por el depósito:
+encabezado con la fecha, los filtros aplicados y renglones para firmar, el
+encabezado de la tabla repetido en cada carilla, y sin gráficos ni controles.
 
 ### Configuración que conviene revisar antes de empezar
 
@@ -222,7 +234,8 @@ mandarlo por mail. No necesita ninguna librería extra.
 - **Neteo entre propietarios** — por defecto no netea entre propietarios distintos.
 - **Diferencia por tipo de stock en el ILA / IRA** — por defecto cuenta como
   error de registro.
-- **Jornada del conteo** — turnos y días. De ahí sale el fin estimado.
+- **Fechas del conteo** — las fechas acordadas y los turnos. De ahí sale el fin
+  estimado y el aviso de si esas fechas alcanzan.
 - **Ventana del conteo** — se ajusta sola a las fechas del archivo hasta que
   guardes la configuración a mano; a partir de ahí manda lo que fijaste. Sirve
   para probar bajadas de otros años sin tocar nada.
