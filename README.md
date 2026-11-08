@@ -17,20 +17,22 @@ Hacen falta **dos**:
 | Bajada de Conteos de SAP | Trae todas las ubicaciones del alcance con su status, los pases y las diferencias |
 | Maestro de Ítems Valorizados | Precio, para dar magnitud al resultado y poder priorizar |
 
-El **Maestro de Ubicaciones es opcional** y está plegado al pie de la pantalla 6:
+El **Maestro de Ubicaciones es opcional** y está plegado al pie de la pantalla 7:
 sólo agrega las coordenadas X/Y del mapa y permite comparar el alcance contra el
 depósito completo.
 
 Acepta `.xlsx .xls .xlsm .csv .txt`. Las columnas se detectan solas y se
 confirman en un modal; el mapeo queda guardado para las cargas siguientes.
 Como cada bajada es la base completa, conviene cargarla en modo **Reemplazar**;
-si se acumula, las filas repetidas se descartan por ubicación, documento y material.
+si se acumula, las filas repetidas se descartan por ubicación, documento, material
+y **tipo de stock**: el mismo material en `0F` y en `1F` son dos quants distintos
+y una clave sin el tipo se comía una de las dos filas.
 
 ### Estructura del código de ubicación
 
 Sin maestro, la zona, el pasillo, la columna y el nivel se leen del propio
 código partiéndolo por el separador. Cuál parte es cuál depende del depósito, así
-que se configura en la pantalla 6: muestra cuántos valores distintos tiene cada
+que se configura en la pantalla 7: muestra cuántos valores distintos tiene cada
 parte —la que tiene pocos suele ser la zona, la que tiene muchos la posición— y
 previsualiza el resultado antes de aplicar. La zona también puede tomarse del
 `Tipo almacén` o del `Área almacenamiento`.
@@ -48,7 +50,7 @@ coordenadas— y es **opcional**: sin él hay avance y resultado, falta el mapa.
 La pantalla 1 muestra el **Alcance**: cuántas del maestro entraron, cuántas
 quedaron afuera y cuántas se contaron sin datos del maestro.
 
-En la pantalla 6 se puede volver al criterio anterior (físicas del maestro).
+En la pantalla 7 se puede volver al criterio anterior (físicas del maestro).
 
 ### Cómo decide los estados
 
@@ -85,8 +87,8 @@ encontró, para que nunca pase inadvertido si no se está leyendo.
    los contadores se cargan a mano o se pegan desde Excel.
 6. **Exactitud** — ILA e IRA sobre lo contado, con metas, desglose por zona,
    pasillo, tipo de almacén y contador.
-7. **Archivos y Configuración** — carga, Status Conteo, umbrales y control de
-   calidad de datos.
+7. **Archivos y Configuración** — carga, panel de referencias, Status Conteo,
+   umbrales y control de calidad de datos.
 
 ### ILA e IRA
 
@@ -98,11 +100,61 @@ encontró, para que nunca pase inadvertido si no se está leyendo.
 Se calculan sobre lo contado, no sobre el universo, así que suben y bajan a
 medida que avanza el conteo.
 
+Una diferencia que sólo es **tipo de stock** es un error de registro, no de
+cantidad. Por defecto cuenta como error; en la pantalla 7 se puede excluir, y
+entonces una ubicación cuyo único problema fue el tipo pasa a contar como
+correcta.
+
+### Referencias y pases
+
+Cada referencia identifica un conteo: el **1° conteo** usa siempre la misma y el
+**2°** otra. El panel **Referencias del archivo** de la pantalla 7 lista las que
+trae la bajada —con sus registros, ubicaciones, documentos y fechas— y para cada
+una se elige a qué conteo pertenece, o **No incluir en el W2W** si es de otro
+inventario. Esa asignación es la que ordena los pases.
+
+Si el texto de la referencia declara el número (`1ER CONTEO …`) se precarga
+solo, pero la asignación manual manda. Una referencia sin asignar deja el pase
+a merced del orden y la app lo avisa con criticidad alta.
+
+Dentro de un mismo conteo el desempate es por **número de documento**, no por
+fecha ni hora: la bajada de SAP puede traer un único valor de relleno en
+`FeRecuentInvent` y en `Hora de recuento` —en la base del W2W vienen `46331` y
+`23:59:59` en las 34.281 filas— y ordenar por ahí invierte los pases al azar.
+
 ### Valor de la diferencia
 
-Si la bajada trae `Valor de diferencia`, los importes salen de ahí, que es la
-valuación del propio SAP. Si no, se calculan con el precio del maestro de
-ítems. El resultado muestra **valor faltante, sobrante, neto y absoluto**.
+Los importes salen **únicamente del maestro de ítems valorizados**: precio del
+maestro × cantidad de la diferencia. El `Valor de diferencia` de SAP queda como
+dato informativo en el detalle del ítem y **no entra en ningún total**, porque
+viene en otra moneda y mezclarlo daba números distintos para el mismo ítem.
+
+El resultado muestra **valor faltante, sobrante, neto, absoluto y absoluto
+compensado**. Un material con diferencia y sin precio en el maestro queda
+**fuera de todos esos importes**: la pantalla 2 lo dice arriba, hay un KPI con
+la cuenta, una incidencia de calidad de criticidad alta y la lista completa al
+pie, exportable a CSV para ir a buscar los precios.
+
+### Tipo de stock · 1F y 0F
+
+El documento pide un ítem en una ubicación con un tipo de stock y a veces se
+carga con otro: la cantidad física está bien, pero SAP informa **faltante en un
+tipo y sobrante en el otro**. No hay stock que buscar; hay que corregir la carga.
+
+La app lo detecta dentro de la **misma ubicación** y el **mismo material**,
+cruzando tipos distintos, y compensa hasta la cantidad que coincide:
+
+| Caso | Cómo queda |
+|---|---|
+| Faltante 10 en `0F` + sobrante 10 en `1F` | Diferencia por tipo de stock, cantidad correcta |
+| Faltante 10 en `0F` + sobrante 7 en `1F` | 7 por tipo de stock + 3 de faltante real |
+| Faltante 10 en `0F`, sin contrapartida | Faltante real |
+
+Dónde se ve: un bloque propio en la pantalla 2 —ubicaciones afectadas, ítems,
+unidades y cuánto del valor absoluto es sólo tipo de stock—, la columna **Tipo
+stk** y la marca `tipo stk` / `parc. tipo stk` en los Recuentos, un filtro para
+excluirlas o aislarlas, el detalle del ítem con la contrapartida, y una
+incidencia de calidad de criticidad media con los cruces más frecuentes.
 
 ### Ocupadas y vacías
 
@@ -125,6 +177,8 @@ mandarlo por mail. No necesita ninguna librería extra.
 
 ### Configuración que conviene revisar antes de empezar
 
+- **Referencias → a qué conteo pertenece cada una** — es lo primero que conviene
+  cargar: de ahí sale el orden de los pases.
 - **Status Conteo que equivalen a CONTADA** — se detectan solos y se pueden
   marcar a mano. Los códigos de SAP se resuelven por tabla: `COUN` y `POST`
   son contada, `INAC` y `ACTI` no. Si la bajada no trae Status Conteo se usa
@@ -135,6 +189,8 @@ mandarlo por mail. No necesita ninguna librería extra.
   documento activado pero que nadie contó todavía está pendiente.
 - **Signo de la diferencia** — por defecto negativo = faltante.
 - **Neteo entre propietarios** — por defecto no netea entre propietarios distintos.
+- **Diferencia por tipo de stock en el ILA / IRA** — por defecto cuenta como
+  error de registro.
 - **Ventana del conteo** — se ajusta sola a las fechas del archivo hasta que
   guardes la configuración a mano; a partir de ahí manda lo que fijaste. Sirve
   para probar bajadas de otros años sin tocar nada.
@@ -142,8 +198,8 @@ mandarlo por mail. No necesita ninguna librería extra.
 ### Volumen
 
 Probado con 60.000 ubicaciones y 247.682 filas de conteo (31 MB de CSV): la
-carga tarda unos 14 segundos, recargar la página 2,4 segundos y el navegador
-usa unos 230 MB. Para trabajar cómodo conviene dejar el listado de diferencias
+carga tarda unos 16 segundos, recargar la página entre 2 y 4 segundos y el
+navegador retiene unos 275 MB. Para trabajar cómodo conviene dejar el listado de diferencias
 en 500 o 2.000 filas; con 10.000 la tabla tarda varios segundos en dibujarse.
 El CSV y el Excel bajan todo igual, sin el límite de pantalla.
 

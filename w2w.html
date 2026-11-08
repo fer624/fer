@@ -329,6 +329,9 @@ table.dt td.num,table.dt th.num{text-align:right;font-variant-numeric:tabular-nu
 .st-ok  {background:var(--green-bg);color:var(--green)}
 .st-dif {background:var(--red-bg);color:var(--red);border:1px solid var(--red)}
 html[data-theme="dark"] .st-c3{background:#2A2142;color:#B9A6F0}
+/* Fila que reclama una decisión del usuario: referencia sin conteo asignado */
+.dt tbody tr.warn-row>td{background:var(--amber-bg)}
+.dt tbody tr.warn-row>td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
 
 /* Celdas del mapa, estados propios del W2W */
 .cell.w-sin {background:#8C1A14}
@@ -572,6 +575,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
     <div class="rc-nivel rc-nivel-mat">Valor de la diferencia</div>
     <div class="grid kpis mb12" id="kpiValor"></div>
     <div id="bloqueNeteo"></div>
+    <div id="bloqueStk"></div>
 
     <div class="grid c3 mb12">
       <div class="card"><h3>Faltantes y sobrantes <span class="mini">cantidad de ítems</span></h3><div class="chart-wrap"><canvas id="chFaltSobr"></canvas></div></div>
@@ -618,6 +622,7 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
     contra el teórico del primer conteo. La columna <b>Espejo</b> indica si el mismo material aparece con signo
     opuesto en otra ubicación. Nada de esto implica mover ni ajustar: es sólo conteo.
   </div>
+  <div class="note warn" id="avisoStk" style="display:none"></div>
   <div id="p3Empty"></div>
   <div id="p3Body">
     <div class="card mb12">
@@ -651,6 +656,13 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
           <select id="difQue">
             <option value="dif">Sólo con diferencia</option>
             <option value="todas">Todos los recuentos</option>
+          </select>
+        </div>
+        <div class="fl"><label>Tipo de stock</label>
+          <select id="difStk">
+            <option value="">Todas las diferencias</option>
+            <option value="no">Excluir las que son sólo tipo de stock</option>
+            <option value="si">Sólo las que son tipo de stock</option>
           </select>
         </div>
         <div class="flex right no-print">
@@ -847,8 +859,21 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
       <div class="fl"><label>Modo de carga de conteos</label>
         <select id="modoConteos"><option value="add">Acumular (agrega a lo ya cargado)</option><option value="rep">Reemplazar todo</option></select>
       </div>
-      <div class="fl" style="flex:1;min-width:280px"><label>Referencia del W2W</label><select id="refSelect"></select></div>
       <button class="btn ghost sm" style="margin-top:14px" onclick="Datos.borrarTodo()">🗑 Borrar todos los datos</button>
+    </div>
+  </div>
+
+  <div class="card mb12">
+    <h3>Referencias del archivo <span class="mini" id="refCount"></span></h3>
+    <div class="note">Cada referencia identifica un conteo. El <b>1° conteo</b> usa siempre la misma referencia y
+    el <b>2°</b> otra: deciles abajo a qué conteo pertenece cada una y el tablero ordena los pases por ahí, en
+    lugar de adivinarlos por fecha y hora. Dentro de un mismo conteo el desempate es por <b>número de documento</b>.
+    Si una referencia no corresponde al W2W, marcala como <b>No incluir</b> y sus registros quedan fuera.</div>
+    <div class="tbl-scroll" style="max-height:340px"><table class="dt" id="tbRefs"></table></div>
+    <div class="flex mt8">
+      <button class="btn sm" onclick="UI.guardarRefs()">Aplicar y recalcular</button>
+      <button class="btn sm ghost" onclick="Export.csv('refs')">⤓ CSV</button>
+      <button class="btn sm ghost" onclick="UI.autoRefs()">Volver a la detección automática</button>
     </div>
   </div>
 
@@ -897,10 +922,10 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
         <div class="fl"><label>Moneda a mostrar</label>
           <input type="text" id="cfgMoneda" maxlength="8" placeholder="la del archivo, o $">
         </div>
-        <div class="fl"><label>Origen del importe</label>
-          <select id="cfgOrigenVal">
-            <option value="maestro">Precio del maestro de ítems × cantidad</option>
-            <option value="sap">Valor de diferencia de la bajada de SAP</option>
+        <div class="fl"><label>Diferencia por tipo de stock en el ILA / IRA</label>
+          <select id="cfgStkIla">
+            <option value="1">Cuenta como error de registro</option>
+            <option value="0">No cuenta: la cantidad estaba bien</option>
           </select>
         </div>
         <div class="fl"><label>Ubicaciones Intermedias <span class="rc-mini">sólo con universo = maestro</span></label>
@@ -1097,6 +1122,10 @@ const U = {
   hdr(s){
     return String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   },
+  /* Tipo de stock de SAP (1F, 0F, Q, ...). El blanco es un valor propio, no
+     un comodín: una fila sin tipo no se mezcla con una que lo declara. */
+  stkKey(s){ return String(s??'').toUpperCase().replace(/\s+/g,''); },
+  stkLbl(s){ return U.stkKey(s)||'(sin tipo)'; },
   /* Número tolerante al formato: 1.234,56 · 1,234.56 · 1 234,56 · (123) · 123- */
   n(v){
     if(v===null||v===undefined||v==='') return null;
@@ -1226,11 +1255,12 @@ const Config = {
     estr:{sep:'-', map:['zona','pasillo','col','nivel','pos','pos'], zonaOrigen:'cod'},
     estrV:3,            // sube cuando cambia el reparto por defecto, para reaplicarlo
     moneda:'',          // vacío = la que traiga el maestro de ítems
-    origenVal:'maestro',// de dónde sale el importe: 'maestro' o 'sap'
     difAud:'audit',     // 'audit' = contado final menos teórico del primer conteo
     netProp:0,          // 0 = no netear entre propietarios distintos
     inter:0,            // las intermedias quedan fuera del universo
-    ref:'',             // referencia del W2W; vacío = todas
+    refPase:{},         // referencia → pase declarado por el usuario (0 = no incluir)
+    refPaseV:1,
+    stkIla:1,           // 1 = una diferencia por tipo de stock cuenta como error en ILA/IRA
     tema:'light', nombres:{},
     statusOK:null,      // null = auto-detección por el texto del Status Conteo
     statusV:2           // sube cuando cambia la tabla de códigos: descarta la selección vieja
@@ -1260,6 +1290,11 @@ const Config = {
       Config.d.estrV=Config.def.estrV;
       cambio=true;
     }
+    /* El filtro viejo "una sola referencia" escondía los demás pases. Se
+       descarta y su lugar lo toma la asignación de pase por referencia. */
+    if(s.ref!==undefined){ delete Config.d.ref; cambio=true; }
+    if(s.origenVal!==undefined){ delete Config.d.origenVal; cambio=true; }
+    if(!Config.d.refPase || typeof Config.d.refPase!=='object') Config.d.refPase={};
     if(cambio) Config.persistir();
     document.documentElement.setAttribute('data-theme',Config.d.tema);
   },
@@ -1270,7 +1305,7 @@ const Config = {
     cfgSigno.value=c.signo; cfgDif.value=c.dif; cfgDifAud.value=c.difAud;
     cfgUniverso.value=c.universo; cfgMoneda.value=c.moneda;
     cfgMetaIla.value=c.metaIla; cfgMetaIra.value=c.metaIra;
-    cfgOrigenVal.value=c.origenVal;
+    cfgStkIla.value=c.stkIla;
     cfgProp.value=c.netProp; cfgInter.value=c.inter;
   },
   guardar(){
@@ -1280,7 +1315,7 @@ const Config = {
     c.signo=+cfgSigno.value; c.dif=cfgDif.value; c.difAud=cfgDifAud.value;
     c.universo=cfgUniverso.value; c.moneda=cfgMoneda.value.trim();
     c.metaIla=+cfgMetaIla.value||95; c.metaIra=+cfgMetaIra.value||98;
-    c.origenVal=cfgOrigenVal.value;
+    c.stkIla=+cfgStkIla.value;
     c.netProp=+cfgProp.value; c.inter=+cfgInter.value;
     c.ventanaAuto=0;   // a partir de acá la ventana la fija el usuario
     Config.persistir(); Motor.reconstruir(); U.toast('Configuración guardada','ok');
@@ -1357,6 +1392,11 @@ const CAMPOS = {
     {k:'refer',     lbl:'Refer. / nombre del inventario', alias:['REFER','REFERENCIA','REF','REFERENCE','NOMBREINVENTARIO','TEXTOCABECERA','REFERENCIAOK']},
     {k:'status',    lbl:'Status Conteo', alias:['STATUSCONTEO','STATUSDECONTEO','ESTADOCONTEO','ESTATUSCONTEO','SITUACIONCONTEO'], not:'IMPRESION'},
     {k:'prod',      lbl:'Material', req:true, alias:['MATERIAL','PRODUCTO','SKU','CODIGOPRODUCTO','CODIGOMATERIAL','NUMEROMATERIAL','NROMATERIAL','ARTICULO','ITEM'], not:'DESCRIPCION'},
+    {k:'tipoStk',   lbl:'Tipo de stock (1F / 0F)',
+     alias:['TIPODESTOCK','TIPOSTOCK','TIPOSTK','CATEGORIADESTOCK','CATEGORIASTOCK','CLASEDESTOCK','STOCKTYPE'],
+     not:'DENOMINACION'},
+    {k:'tipoStkTxt',lbl:'Denominación del tipo de stock',
+     alias:['DENOMINACIONTIPOSTOCKS','DENOMINACIONTIPOSTOCK','DENOMINACIONDELTIPODESTOCK','DENOMTIPOSTOCK','TEXTOTIPOSTOCK']},
     {k:'desc',      lbl:'Descripción del material', alias:['DESCRIPCIONDEPRODUCTO','DESCRIPCIONPRODUCTO','DESCRIPCIONMATERIAL','TEXTOBREVEMATERIAL','DENOMINACION','DESCRIPCION','TEXTOMATERIAL']},
     {k:'qt',        lbl:'Ctd. teórica', clave:true, alias:['CTDTEORICA','CTDTEORICO','CANTIDADTEORICA','CANTTEORICA','STOCKTEORICO','TEORICA','CTDSISTEMA','CANTIDADSISTEMA','CTDTEOR']},
     {k:'qc',        lbl:'Cantidad contada', clave:true, alias:['CANTIDADCONTADA','CTDCONTADA','CANTCONTADA','CONTADA','CANTIDADFISICA','CTDRECUENTO','CANTIDADRECUENTO','CTDCONTAJE']},
@@ -1499,7 +1539,7 @@ const Mapeo = {
    DATOS · normalización, persistencia y carga de archivos
    ========================================================================== */
 const Datos = {
-  MAPAS_V:3,            // versión de los alias y reglas de detección de columnas
+  MAPAS_V:4,            // versión de los alias y reglas de detección de columnas
   maestro:[], conteos:[], valor:[],
   mapas:{}, hist:[], dupDescartadas:0, mapasReseteado:false, recargados:new Set(),
   meta:{maestro:null,conteos:null,valor:null},
@@ -1574,6 +1614,8 @@ const Datos = {
         qd:m.qd?U.n(r[m.qd]):null,
         vd:m.qdVal?U.n(r[m.qdVal]):null,
         um:m.um?String(r[m.um]??'').trim():'',
+        stk:m.tipoStk?U.stkKey(r[m.tipoStk]):'',
+        stkTxt:m.tipoStkTxt?String(r[m.tipoStkTxt]??'').trim():'',
         mon:m.moneda?String(r[m.moneda]??'').trim():'',
         prop:m.prop?String(r[m.prop]??'').trim():'',
         usr:m.contador?String(r[m.contador]??'').trim():'',
@@ -1641,10 +1683,12 @@ const Datos = {
         const lista = modoConteos.value==='add' ? Datos.conteos.concat(norm) : norm;
         /* Cada bajada es la base completa. Si se acumula sin deduplicar, las
            filas se repiten dentro del documento y los ítems se cuentan dos
-           veces. La clave es ubicación + documento + material. */
+           veces. La clave es ubicación + documento + material + tipo de stock:
+           el mismo material en 0F y en 1F son dos quants distintos y una clave
+           sin el tipo se comía una de las dos filas. */
         const vistos=new Map();
         for(const r of lista){
-          const k=r.u+'\u0001'+(r.doc||('T'+(r.f||0)+'_'+(r.h===null?'':r.h)))+'\u0001'+r.prod;
+          const k=r.u+'\u0001'+(r.doc||('T'+(r.f||0)+'_'+(r.h===null?'':r.h)))+'\u0001'+r.prod+'\u0001'+(r.stk||'');
           vistos.set(k,r);
         }
         Datos.dupDescartadas = lista.length - vistos.size;
@@ -1828,25 +1872,34 @@ const Motor = {
     return d===null ? null : (Config.d.signo ? -d : d);
   },
 
-  /* Pase declarado en la referencia ("1° CONTEO ...", "CONTEO 2"). Es más
-     confiable que inferirlo del orden de los documentos, cuando viene. */
+  /* Pase que el texto de la referencia declara ("1° CONTEO ...", "CONTEO 2").
+     Sólo sirve para precargar el panel: el pase que vale es el que asigna
+     el usuario, porque las referencias reales no siempre lo dicen. */
   paseDeRef(ref){
     const k=U.refKey(ref);
     let m=k.match(/\b([1-9])\s+CONTEO\b/) || k.match(/\bCONTEO\s+([1-9])\b/);
     return m ? +m[1] : null;
   },
+  /* Pase efectivo de una referencia: 1..9 el conteo al que pertenece,
+     0 si el usuario la dejó fuera del W2W, null si nadie la asignó y el
+     texto tampoco lo declara (entonces el pase se deriva del orden). */
+  paseEfect(ref){
+    const a=Config.d.refPase||{}, k=U.refKey(ref);
+    if(Object.prototype.hasOwnProperty.call(a,k)){
+      const v=+a[k];
+      return (isFinite(v)&&v>0) ? Math.min(9,Math.floor(v)) : 0;
+    }
+    return Motor.paseDeRef(ref);
+  },
 
-  /* El importe de un ítem, de una sola fuente para toda la app. Mezclar el
-     valor de SAP en una pantalla y precio por cantidad en otra daba números
-     distintos para el mismo ítem. */
+  /* El importe de un ítem sale únicamente del maestro de ítems valorizados:
+     precio del maestro por la cantidad de la diferencia. Si el material no
+     tiene precio devuelve null y queda listado para buscarlo, en lugar de
+     taparse con el "Valor de diferencia" de SAP, que viene en otra moneda. */
   valorItem(it){
     if(it.qd===null||it.qd===undefined) return null;
     const pr = Motor.M.precios.has(it.prodK) ? Motor.M.precios.get(it.prodK) : null;
-    const vMaestro = pr===null ? null : it.qd*pr;
-    const vSap = (it.val===null||it.val===undefined) ? null : it.val;
-    return Config.d.origenVal==='sap'
-      ? (vSap!==null ? vSap : vMaestro)
-      : (vMaestro!==null ? vMaestro : vSap);
+    return pr===null ? null : it.qd*pr;
   },
 
   /* ---------- clave de agrupación para el neteo ---------- */
@@ -1898,8 +1951,8 @@ const Motor = {
 
     /* ---------- 2 · BAJADA DE CONTEOS ---------- */
     let vaciaEnUso=false; const valVacia=new Map();
+    let hayStk=false;        // ¿la bajada trae la columna Tipo de stock con datos?
     let clasMarca=0, clasContenido=0;
-    const refKeyValida = Config.d.ref ? U.refKey(Config.d.ref) : null;
     const refs=new Map(), statusSet=new Map(), props=new Set();
     const huerfanas=new Map();
     const porUbi=new Map();      // ubicación → Map(claveDoc → documento)
@@ -1907,11 +1960,20 @@ const Motor = {
     let regTot=Datos.conteos.length, regValidos=0, regFueraRef=0, sinFecha=0, sinDoc=0, sinCant=0;
 
     for(const c of Datos.conteos){
+      if(!c.u) continue;   // una fila sin ubicación no describe ninguna referencia
+      /* Cada referencia se describe para el panel de la pantalla 7: cuántos
+         registros y ubicaciones trae, en qué fechas, y a qué pase la asignó
+         el usuario. El pase asignado es el que manda. */
       const rk=U.refKey(c.ref);
-      if(!refs.has(rk)) refs.set(rk,{lbl:c.ref||'(vacía)',n:0});
-      refs.get(rk).n++;
-      if(refKeyValida && rk!==refKeyValida){ regFueraRef++; continue; }
-      if(!c.u) continue;
+      if(!refs.has(rk)) refs.set(rk,{key:rk,lbl:c.ref||'(vacía)',n:0,ubis:new Set(),
+        f1:null,f2:null,docs:new Set(),auto:Motor.paseDeRef(c.ref),pase:Motor.paseEfect(c.ref),
+        asignada:Object.prototype.hasOwnProperty.call(Config.d.refPase||{},rk)});
+      const R=refs.get(rk);
+      R.n++;
+      R.ubis.add(c.u);
+      if(c.doc) R.docs.add(c.doc);
+      if(c.f!==null){ if(R.f1===null||c.f<R.f1) R.f1=c.f; if(R.f2===null||c.f>R.f2) R.f2=c.f; }
+      if(R.pase===0){ regFueraRef++; continue; }
 
       const st=Motor.stEfectivo(c)||'(sin status)';
       if(!statusSet.has(st)) statusSet.set(st,{st,n:0,contado:Motor.statusEsContado(st)});
@@ -1956,6 +2018,7 @@ const Motor = {
       if(!c.doc) sinDoc++;
       if(c.qt===null && c.qc===null && (c.qd===null||c.qd===undefined)) sinCant++;
       if(c.prop) props.add(c.prop);
+      if(c.stk) hayStk=true;
       if(c.prod && c.um){
         const mk=U.matKey(c.prod);
         if(!umPorMat.has(mk)) umPorMat.set(mk,new Set());
@@ -1967,9 +2030,10 @@ const Motor = {
       if(!porUbi.has(c.u)) porUbi.set(c.u,new Map());
       const docs=porUbi.get(c.u);
       if(!docs.has(claveDoc)) docs.set(claveDoc,{doc:c.doc||'(sin documento)',f:c.f,h:c.h,st:c.st,usr:c.usr,
-        items:[],conCant:false,stContado:false,ord:Motor.paseDeRef(c.ref),ref:c.ref||''});
+        items:[],conCant:false,stContado:false,ord:Motor.paseEfect(c.ref),ref:c.ref||''});
       const d=docs.get(claveDoc);
-      if(d.ord===null){ d.ord=Motor.paseDeRef(c.ref); if(!d.ref) d.ref=c.ref||''; }
+      if(d.ord===null||d.ord===undefined){ d.ord=Motor.paseEfect(c.ref); }
+      if(!d.ref) d.ref=c.ref||'';
       /* Una base recién generada trae teórico, contado y diferencia en CERO
          literal y el material vacío: eso no es un conteo. Sólo cuenta si hay
          una cantidad distinta de cero o un material informado. */
@@ -2007,6 +2071,10 @@ const Motor = {
     /* Se mide en ubicaciones, que es la unidad del tablero: un documento puede
        cubrir muchas ubicaciones y una ubicación puede tener varios documentos. */
     let ubisConDoc=0, ubisSinConteo=0;
+    /* tipo de stock: el documento pide el ítem en un tipo y la carga lo sube
+       en otro, así que la cantidad está bien y SAP informa igual diferencia */
+    let stkUbis=0, stkItems=0, stkUnid=0;
+    const stkPares=new Map(), paseRepe=[]; let paseRepeN=0;
     porUbi.forEach(docs=>{
       ubisConDoc++;
       let alguna=false;
@@ -2024,13 +2092,33 @@ const Motor = {
 
     porUbi.forEach((docs,u)=>{
       const o=ubis.get(u);
+      /* El pase lo declara la referencia. El desempate es por NÚMERO DE
+         DOCUMENTO y no por fecha u hora: la bajada de SAP puede traer un
+         único valor de relleno en FeRecuentInvent y en Hora de recuento
+         (46331 · 23:59:59 en la base del W2W), y ordenar por ahí invierte
+         los pases al azar. */
       let lista=[...docs.values()].sort((a,b)=>
-        (a.ord??99)-(b.ord??99) || (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9) || U.natSort(a.doc,b.doc));
+        (a.ord??99)-(b.ord??99) || U.natSort(a.doc,b.doc) || (a.f||0)-(b.f||0) || (a.h??1e9)-(b.h??1e9));
       /* el status explícito manda: una ubicación contada vacía no trae cantidad */
       const conCant=lista.filter(d=>d.conCant||d.stContado);
       if(conCant.length<lista.length) o.docAbierto=true;
       lista=conCant;
       if(!lista.length){ o.contada=false; o.docs=[]; return; }   // queda en SIN / INAC / ACTI
+
+      /* Número de pase de cada documento: el que declara su referencia si
+         está asignada, y si no, el lugar que le toca en el orden. */
+      let maxOrd=0;
+      lista.forEach(d=>{ if(d.ord!=null && d.ord>maxOrd) maxOrd=d.ord; });
+      let libre=maxOrd;
+      const usados=new Set();
+      lista.forEach(d=>{
+        d.pase = (d.ord!=null) ? d.ord : (++libre);
+        if(usados.has(d.pase)){
+          paseRepeN++;
+          if(paseRepe.length<20) paseRepe.push(o.lbl+' · '+d.pase+'° conteo · doc '+d.doc);
+        }
+        usados.add(d.pase);
+      });
 
       /* Consolidación material por material a lo largo de los pases.
          Cuando una diferencia se contabiliza, SAP actualiza el stock: el
@@ -2039,8 +2127,7 @@ const Motor = {
          PRIMER conteo, no contra el del último pase.                        */
       const porMat=new Map();
 
-      lista.forEach((d,idx)=>{
-        d.pase=idx+1;
+      lista.forEach((d)=>{
         d.dif=false; d.difItems=0; d.difUnid=0;
 
         /* Productividad: el documento se le atribuye a quien lo registró. */
@@ -2074,9 +2161,16 @@ const Motor = {
              fila de cada pase no lo consume ninguna vista y, en un W2W real,
              son cientos de miles de objetos retenidos sin motivo. */
           const usr=c.usr||d.usr;
-          const k=U.matKey(c.prod);
+          /* La clave del ítem incluye el TIPO DE STOCK. El mismo material en
+             0F y en 1F dentro de una ubicación son dos quants distintos: con
+             la clave sólo por material se pisaban entre sí y el teórico de uno
+             quedaba contra el contado del otro, inventando la diferencia. */
+          const mk=U.matKey(c.prod), stk=U.stkKey(c.stk);
+          const k=mk+'\u0002'+stk;
           if(!porMat.has(k)) porMat.set(k,{
-            prod:c.prod, prodK:k, desc:c.desc, um:c.um, prop:c.prop,
+            prod:c.prod, prodK:mk, matK:mk, stk:stk, stkTxt:c.stkTxt||'',
+            stkCmp:0, stkPares:'', soloStk:false,
+            desc:c.desc, um:c.um, prop:c.prop,
             qtPrim:null, qcUlt:null, qdRawUlt:null, valPrim:null, mon:'', conMat:false,
             pasePrim:d.pase, paseUlt:d.pase, docPrim:d.doc, docUlt:d.doc,
             fUlt:d.f, hUlt:d.h, usr:usr, st:c.st, stDoc:'', stInv:'', stInv2:'', statusUbi:'',
@@ -2108,6 +2202,7 @@ const Motor = {
           if(!m.desc && c.desc) m.desc=c.desc;
           if(!m.um && c.um) m.um=c.um;
           if(!m.prop && c.prop) m.prop=c.prop;
+          if(!m.stkTxt && c.stkTxt) m.stkTxt=c.stkTxt;
           if(!m.tipoAlm && c.tipoAlm) m.tipoAlm=c.tipoAlm;
           if(!m.areaAlm && c.areaAlm) m.areaAlm=c.areaAlm;
           if(!m.areaAct && c.areaAct) m.areaAct=c.areaAct;
@@ -2116,7 +2211,7 @@ const Motor = {
 
       o.docs=lista;
       o.contada=lista.length>0;
-      o.pases=lista.length;
+      o.pases=usados.size;
       const ult=lista[lista.length-1];
 
       o.pase=ult.pase; o.ultF=ult.f; o.ultH=ult.h; o.usr=ult.usr||''; o.st=ult.st||'';
@@ -2124,7 +2219,7 @@ const Motor = {
       const prim=ult.items[0]||{};
       o.tipoAlm=prim.tipoAlm||''; o.areaAlm=prim.areaAlm||''; o.areaAct=prim.areaAct||''; o.prop=prim.prop||'';
 
-      /* diferencia de la auditoría por material */
+      /* diferencia de la auditoría por material y tipo de stock */
       let difAud=0, difAudUnid=0;
       porMat.forEach(m=>{
         let d=null;
@@ -2132,16 +2227,66 @@ const Motor = {
         else d=m.qdRawUlt;
         m.difAud = (d===null||!isFinite(d)) ? null : (Config.d.signo ? -d : d);
         if(m.difAud!==null && m.difAud!==0){ difAud++; difAudUnid+=Math.abs(m.difAud); }
+      });
 
+      /* ---------- DIFERENCIA POR TIPO DE STOCK ----------
+         El documento pide un ítem en una ubicación con tipo de stock 0F y la
+         carga lo sube como 1F: la cantidad física está bien, pero SAP informa
+         faltante en un tipo y sobrante en el otro. Se detecta dentro de la
+         MISMA ubicación y el MISMO material, cruzando tipos distintos, y se
+         compensa hasta la cantidad que coincide: lo que sobra de ese cruce
+         sigue siendo faltante o sobrante real.                               */
+      let stkItemsUbi=0, stkUnidUbi=0;
+      const porMaterial=(hayStk && difAud>1) ? new Map() : null;
+      if(porMaterial) porMat.forEach(m=>{
+        if(m.difAud===null||m.difAud===0) return;
+        if(!porMaterial.has(m.matK)) porMaterial.set(m.matK,[]);
+        porMaterial.get(m.matK).push(m);
+      });
+      if(porMaterial) porMaterial.forEach(gr=>{
+        if(gr.length<2) return;
+        if(new Set(gr.map(m=>m.stk)).size<2) return;          // un solo tipo: no hay cruce
+        const falt=gr.filter(m=>m.difAud<0), sobr=gr.filter(m=>m.difAud>0);
+        if(!falt.length||!sobr.length) return;
+        let tf=0, ts=0;
+        falt.forEach(m=>tf+=-m.difAud); sobr.forEach(m=>ts+=m.difAud);
+        const comp=Math.min(tf,ts);
+        if(comp<=0) return;
+        const asignar=lado=>{
+          let queda=comp;
+          lado.slice().sort((a,b)=>Math.abs(b.difAud)-Math.abs(a.difAud)).forEach(m=>{
+            const mio=Math.abs(m.difAud), c=Math.min(mio,queda);
+            queda-=c;
+            m.stkCmp=c;
+            m.soloStk = c>0 && c===mio;      // toda su diferencia la explica el tipo
+            m.stkPares=[...new Set(gr.filter(x=>x!==m && x.stk!==m.stk).map(x=>U.stkLbl(x.stk)))].join(' / ');
+          });
+        };
+        asignar(falt); asignar(sobr);
+        stkUnidUbi += comp*2;
+        gr.forEach(m=>{
+          if(!m.stkCmp) return;
+          if(m.soloStk) stkItemsUbi++;
+          const pk=U.stkLbl(m.stk)+' → '+(m.stkPares||'(sin tipo)');
+          stkPares.set(pk,(stkPares.get(pk)||0)+1);
+        });
+      });
+      o.difItemsStk=stkItemsUbi; o.difUnidStk=stkUnidUbi;
+      o.soloStk = difAud>0 && stkItemsUbi===difAud;
+      if(stkItemsUbi>0){ stkUbis++; stkItems+=stkItemsUbi; stkUnid+=stkUnidUbi; }
+
+      porMat.forEach(m=>{
         vigentes.push({
           u:o.u, lbl:o.lbl, zona:o.zona, pasillo:o.pasillo, pasilloFull:o.pasilloFull,
           sector:o.sector, col:o.col, nivel:o.nivel, pos:o.pos,
           estadoUbi:o.estadoUbi, momu:o.momu, enUniverso:o.enUniverso,
           doc:m.docUlt, docPrim:m.docPrim, f:m.fUlt, h:m.hUlt,
-          pase:m.paseUlt, pasePrim:m.pasePrim, pases:lista.length, pd:m.pd, docs:m.docs,
+          pase:m.paseUlt, pasePrim:m.pasePrim, pases:usados.size, pd:m.pd, docs:m.docs,
           statusUbi:m.statusUbi,
           confirmada:(m.paseUlt>m.pasePrim && m.qdRawUlt===0 && m.difAud!==null && m.difAud!==0),
           prod:m.prod, prodK:m.prodK, desc:m.desc,
+          stk:m.stk, stkTxt:m.stkTxt, stkCmp:m.stkCmp||0,
+          stkPares:m.stkPares||'', soloStk:!!m.soloStk,
           qt:m.qtPrim, qc:m.qcUlt, qd:m.difAud,
           val:(m.valPrim===null?null:(Config.d.signo?-m.valPrim:m.valPrim)), mon:m.mon,
           qdUlt:(m.qdRawUlt===null?null:(Config.d.signo?-m.qdRawUlt:m.qdRawUlt)),
@@ -2225,6 +2370,17 @@ const Motor = {
       ref:U.num(Datos.dupDescartadas)+' filas',
       detalle:'Había más de una fila para la misma ubicación, documento y material. Se conservó la última. '+
               'Si cargás la base completa en cada bajada, usá el modo Reemplazar.'});
+    if(stkItems) cal.push({tipo:'Diferencias explicadas por el tipo de stock',crit:'Media',
+      ref:U.num(stkItems)+' ítems en '+U.num(stkUbis)+' ubicaciones · '+U.num(stkUnid,0)+' unidades',
+      detalle:'El mismo material aparece con faltante en un tipo de stock y sobrante en otro, dentro de la '+
+        'misma ubicación y por la misma cantidad: el conteo está bien y lo que está mal es el tipo con el que '+
+        'se cargó. No hay que salir a buscar ese stock. Cruces: '+
+        [...stkPares.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>k+' ('+U.num(v)+')').join(' · ')+'.'});
+    if(paseRepeN) cal.push({tipo:'Dos documentos asignados al mismo conteo',crit:'Alta',
+      ref:U.num(paseRepeN)+' casos',
+      detalle:'Una ubicación tiene más de un documento en el mismo número de conteo, porque dos referencias '+
+        'están asignadas al mismo pase o porque el cliente generó dos documentos para la misma ubicación. '+
+        'Se toma el de número de documento más alto. Ejemplos: '+paseRepe.slice(0,5).join(', ')+'.'});
     if(sinCant) cal.push({tipo:'Conteos sin cantidades',crit:'Media',ref:U.num(sinCant)+' registros',
       detalle:'Sin teórico, contado ni diferencia el registro cuenta para el avance pero no para el resultado.'});
     if(props.size>1 && Config.d.netProp===0) cal.push({tipo:'Más de un propietario de stock',crit:'Alta',
@@ -2268,13 +2424,22 @@ const Motor = {
       ref:U.num(sapOkConDif)+' ítems',
       detalle:'Status Inv dice OK y la auditoría detecta diferencia. Ejemplos: '+ejOk.join(', ')+'.'});
 
-    /* Si las referencias declaran el pase, filtrar por una sola los esconde. */
-    const refsOrd=[...refs.values()].filter(r=>Motor.paseDeRef(r.lbl)!==null);
-    if(refsOrd.length>1 && Config.d.ref) cal.push({tipo:'Referencia filtrada a un solo pase',crit:'Alta',
-      ref:Config.d.ref,
-      detalle:'El archivo trae '+refsOrd.length+' referencias que declaran el número de conteo ('+
-              refsOrd.map(r=>r.lbl).slice(0,4).join(', ')+'). Al filtrar por una sola se pierden los demás pases. '+
-              'Dejá "Todas las referencias" en la pantalla 7.'});
+    /* Las referencias dicen a qué conteo pertenece cada documento. Una sin
+       asignar deja el pase a merced del orden, que es lo que había que evitar. */
+    const refsSin=[...refs.values()].filter(r=>!r.asignada && r.auto===null);
+    if(refsSin.length && refs.size>1) cal.push({tipo:'Referencias sin conteo asignado',crit:'Alta',
+      ref:refsSin.length+' de '+refs.size+' referencias',
+      detalle:'El texto de la referencia no declara el número de conteo y nadie se lo asignó, así que el pase '+
+        'sale del orden de los documentos. Asignalas en <b>7 · Archivos y Configuración</b>, en el panel '+
+        '"Referencias del archivo". Sin asignar: '+refsSin.map(r=>'"'+r.lbl+'"').slice(0,4).join(', ')+'.'});
+    const refsDup=new Map();
+    refs.forEach(r=>{ if(r.pase>0){ if(!refsDup.has(r.pase)) refsDup.set(r.pase,[]); refsDup.get(r.pase).push(r.lbl); } });
+    refsDup.forEach((L,p)=>{
+      if(L.length>1) cal.push({tipo:'Dos referencias en el mismo conteo',crit:'Media',
+        ref:p+'° conteo · '+L.length+' referencias',
+        detalle:'Están asignadas al mismo pase: '+L.slice(0,5).map(x=>'"'+x+'"').join(', ')+
+          '. Si es a propósito está bien; si no, corregí la asignación en la pantalla 7.'});
+    });
 
     const iniW=new Date(Config.d.ini+'T00:00:00').getTime(), finW=new Date(Config.d.fin+'T23:59:59').getTime();
     let fuera=0;
@@ -2337,6 +2502,7 @@ const Motor = {
       refs, statusSet, props, precios, monedas,
       cal, serieDia, horaMap,
       diag:{ubisConDoc,ubisSinConteo},
+      stk:{ubis:stkUbis,items:stkItems,unid:stkUnid,pares:[...stkPares.entries()].sort((a,b)=>b[1]-a[1])},
       st:{regTot,regValidos,regFueraRef,sinUbi,sinFecha,sinDoc,sinCant,
           huerfanas:huerfanas.size, ms:Math.round(performance.now()-t0)}
     };
@@ -2353,7 +2519,9 @@ Motor.neteo = function(){
   const grupos=new Map();
   let brutoUnid=0, itemsDif=0, itemsFalt=0, itemsSobr=0;
   let vFalt=0, vSobr=0, vNeto=0, vAbs=0, sinVal=0;
-  let cmpMaestro=0, cmpSap=0, cmpN=0;
+  /* diferencias que explica el tipo de stock, aparte de las reales */
+  let stkIt=0, stkUn=0, stkVal=0, stkParc=0;
+  const stkUbisSet=new Set();
   const ubisDif=new Set(), porZona=new Map();
 
   for(const it of M.vigentes){
@@ -2371,12 +2539,13 @@ Motor.neteo = function(){
     if(!g.desc && it.desc) g.desc=it.desc;
     if(!g.um && it.um) g.um=it.um;
     g.neto+=it.qd;
-    const pr=M.precios.has(it.prodK)?M.precios.get(it.prodK):null;
     const v = Motor.valorItem(it);
     it.valor = v;
-    /* se contrastan las dos fuentes para detectar monedas distintas */
-    if(pr!==null && it.val!==null && it.val!==undefined && it.qd!==0){
-      cmpMaestro += Math.abs(it.qd*pr); cmpSap += Math.abs(it.val); cmpN++;
+    if(it.stkCmp>0){
+      stkUn += it.stkCmp; stkUbisSet.add(it.u);
+      if(it.soloStk) stkIt++; else stkParc++;
+      const pr0=M.precios.has(it.prodK)?M.precios.get(it.prodK):null;
+      if(pr0!==null) stkVal += it.stkCmp*pr0;
     }
     if(v!==null){
       vAbs += Math.abs(v); vNeto += v;
@@ -2389,7 +2558,7 @@ Motor.neteo = function(){
   }
 
   let netoAbs=0, faltNeto=0, sobrNeto=0, faltNetoVal=0, sobrNetoVal=0;
-  let matNeto=0, matNetea=0, sinPrecio=[];
+  let matNeto=0, matNetea=0, sinPrecio=[], itemsSinPrecio=0;
   /* Agregados en dinero: sumar unidades entre materiales distintos no
      significa nada (un tornillo y un motor no se suman). El único agregado
      válido entre materiales es el valorizado.                              */
@@ -2411,7 +2580,7 @@ Motor.neteo = function(){
       g.sobrVal = g.precio===null ? null : g.sobr*g.precio;
     }
     faltBrutoU += g.falt; sobrBrutoU += g.sobr;
-    if(g.faltVal===null){ unidSinPrecio += g.falt+g.sobr; }
+    if(g.faltVal===null){ unidSinPrecio += g.falt+g.sobr; itemsSinPrecio += g.itemsF+g.itemsS; }
     else{
       faltBrutoV += g.faltVal; sobrBrutoV += g.sobrVal;
       netoAbsVal += Math.abs(g.netoVal);
@@ -2421,8 +2590,11 @@ Motor.neteo = function(){
     if(g.netea) matNetea++;
     if(g.neto<0){ faltNeto += -g.neto; if(g.netoVal!==null) faltNetoVal += -g.netoVal; }
     if(g.neto>0){ sobrNeto +=  g.neto; if(g.netoVal!==null) sobrNetoVal +=  g.netoVal; }
-    if(g.faltVal===null) sinPrecio.push(g);
+    if(g.precio===null) sinPrecio.push(g);
   });
+  /* Los materiales sin precio se ordenan por la magnitud que esconden, para
+     que el primero de la lista sea el que más conviene ir a buscar. */
+  sinPrecio.sort((a,b)=>(b.falt+b.sobr)-(a.falt+a.sobr));
 
   const compensado = brutoUnid - netoAbs;
   const brutoVal = faltBrutoV + sobrBrutoV;
@@ -2435,20 +2607,17 @@ Motor.neteo = function(){
     faltBrutoU, sobrBrutoU, faltBrutoV, sobrBrutoV,
     brutoVal, netoAbsVal, compensadoVal,
     pctNeteaVal: brutoVal ? compensadoVal/brutoVal*100 : 0,
-    unidSinPrecio, sinVal,
+    unidSinPrecio, sinVal, itemsSinPrecio,
     vFalt, vSobr, vNeto, vAbs,
-    cmpMaestro, cmpSap, cmpN,
-    ratio: (cmpN && cmpMaestro) ? cmpSap/cmpMaestro : null,
+    stkIt, stkParc, stkUn, stkVal, stkUbis:stkUbisSet.size,
     cobPrecio: brutoUnid ? (brutoUnid-unidSinPrecio)/brutoUnid*100 : 100,
     hayPrecios: brutoVal>0 || vAbs>0,
     itemsDif, ubisDif:ubisDif.size, itemsFalt, itemsSobr, porZona:[...porZona.entries()],
     faltVal:faltBrutoV, sobrVal:sobrBrutoV,
     matDif:grupos.size, matNeto, matNetea,
     faltNeto, sobrNeto, faltNetoVal, sobrNetoVal,
-    sinPrecio,
-    moneda: Config.d.origenVal==='sap'
-      ? ((M.vigentes.find(i=>i.mon)||{}).mon || (Datos.valor.find(v=>v.moneda)||{}).moneda || '')
-      : ((Datos.valor.find(v=>v.moneda)||{}).moneda || (M.vigentes.find(i=>i.mon)||{}).mon || ''),
+    sinPrecio, matSinPrecio:sinPrecio.length,
+    moneda: (Datos.valor.find(v=>v.moneda)||{}).moneda || '',
     variosProp
   };
 };
@@ -2457,20 +2626,26 @@ Motor.neteo = function(){
    El grupo se busca por Map y la muestra corta apenas junta las que pide
    quien llama: con decenas de miles de diferencias, recorrer la lista
    entera para cada ítem hace inusable la pantalla.                        */
-/* Contraste de las dos fuentes de importe: si no coinciden, lo más común es
-   que estén en monedas distintas y hay que elegir una. */
-Motor.avisarValor = function(){
+/* Los importes salen únicamente del maestro de ítems valorizados. Un material
+   con diferencia y sin precio no se puede valorizar, así que no entra en
+   ningún total: hay que ir a buscar el precio. Se avisa fuerte. */
+Motor.avisarPrecios = function(){
   const M=Motor.M, net=M.net;
-  if(!net || net.cmpN<20 || !net.cmpMaestro) return;
-  const r=net.ratio;
-  if(r>0.95 && r<1.05) return;
-  M.cal.push({tipo:'El valor de SAP no coincide con el precio del maestro',crit:'Alta',
-    ref:'relación '+U.num(r,2)+' a 1',
-    detalle:'Sobre '+U.num(net.cmpN)+' ítems donde existen las dos fuentes, el "Valor de diferencia" '+
-      'de la bajada suma '+U.num(net.cmpSap,0)+' y el precio del maestro por la cantidad suma '+
-      U.num(net.cmpMaestro,0)+'. Casi siempre es que están en monedas distintas. '+
-      'El tablero está usando '+(Config.d.origenVal==='sap'?'el valor de SAP':'el precio del maestro')+
-      '; se cambia en 7 · Archivos y Configuración.'});
+  if(!net) return;
+  if(!Datos.valor.length){
+    if(net.itemsDif) M.cal.push({tipo:'Falta el maestro de ítems valorizados',crit:'Alta',
+      ref:U.num(net.itemsDif)+' ítems con diferencia sin valorizar',
+      detalle:'Los importes del tablero salen sólo del maestro de ítems valorizados y no hay ninguno cargado, '+
+        'así que todo el resultado queda en unidades. Cargalo en 7 · Archivos y Configuración.'});
+    return;
+  }
+  if(!net.matSinPrecio) return;
+  M.cal.push({tipo:'Materiales con diferencia y sin precio en el maestro',crit:'Alta',
+    ref:U.num(net.matSinPrecio)+' materiales · '+U.num(net.unidSinPrecio,0)+' unidades',
+    detalle:'Tienen diferencia pero no figuran en el maestro de ítems valorizados, o figuran sin precio, '+
+      'así que quedan FUERA de todos los importes: el valor faltante, el sobrante, el neto y el absoluto '+
+      'están calculados sin ellos. La lista completa está al pie de 2 · Resultado, con botón de exportar. '+
+      'Primeros: '+net.sinPrecio.slice(0,6).map(g=>g.prod).join(', ')+'.'});
 };
 
 Motor.espejo = function(it,max){
@@ -2647,7 +2822,7 @@ Motor.recalcular = function(){
 Motor.reconstruir = function(){
   Motor.construir();
   Motor.neteo();
-  Motor.avisarValor();
+  Motor.avisarPrecios();
   UI.poblarFiltros();
   UI.pintarStatusCfg();
   Motor.recalcular();
@@ -3004,20 +3179,20 @@ const Vista = {
        se pueden sumar. Las unidades quedan como dato secundario.            */
     const $=(v)=>net.hayPrecios ? U.plata(v) : '—';
 
-    const fuente = Config.d.origenVal==='sap'
-      ? 'el <b>Valor de diferencia</b> de la bajada de SAP'
-      : 'el <b>precio del maestro de ítems</b> por la cantidad';
-    const desvio = net.ratio!==null && (net.ratio>1.05||net.ratio<0.95)
-      ? `<div class="note bad">Las dos fuentes de importe no coinciden: el valor de SAP es
-         <b>${U.num(net.ratio,2)} veces</b> el precio del maestro por la cantidad. Suele ser que están
-         en monedas distintas. Estás viendo ${fuente}; se cambia en <b>7 · Archivos</b>.</div>`
-      : `<div class="rc-mini mb12">Los importes salen de ${fuente}.</div>`;
-    avisoPrecio.innerHTML = desvio + (net.hayPrecios
-      ? (net.cobPrecio<99.95
-          ? `<div class="note warn">Cobertura de precios: <b>${U.pct(net.cobPrecio,1)}</b> de la diferencia bruta
-             tiene precio en el maestro de ítems. Las <b>${U.num(net.unidSinPrecio,0)}</b> unidades sin precio
-             quedan fuera de los importes y se listan al pie de esta pantalla.</div>`
-          : '')
+    /* Un solo origen de importe: el precio del maestro de ítems por la
+       cantidad de la diferencia. El "Valor de diferencia" de SAP no entra en
+       ningún total porque viene en otra moneda y duplicaba los números. */
+    const fuente = `<div class="rc-mini mb12">Los importes salen únicamente del
+      <b>maestro de ítems valorizados</b>: precio del maestro × cantidad de la diferencia.</div>`;
+    avisoPrecio.innerHTML = fuente + (net.hayPrecios
+      ? (net.matSinPrecio
+          ? `<div class="note bad"><b>${U.num(net.matSinPrecio)} materiales con diferencia no tienen precio</b>
+             en el maestro de ítems (${U.num(net.unidSinPrecio,0)} unidades, ${U.num(net.itemsSinPrecio)} ítems).
+             Quedan <b>fuera de todos los importes</b> de esta pantalla. La lista está al pie, con botón para
+             exportarla y buscar los precios. Cobertura actual: <b>${U.pct(net.cobPrecio,1)}</b> de la
+             diferencia bruta en unidades.</div>`
+          : `<div class="note ok mb12">Todos los materiales con diferencia tienen precio en el maestro:
+             los importes cubren el <b>100%</b> del resultado.</div>`)
       : `<div class="note bad">No hay precios cargados. Los importes aparecen vacíos y el porcentaje que netea
          se calcula en unidades, que entre materiales distintos no es comparable.
          Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 7.</div>`);
@@ -3043,8 +3218,40 @@ const Vista = {
           net.compensadoVal>0
             ? 'se compensan '+$(net.compensadoVal)+' del mismo material entre ubicaciones'
             : 'no hay nada que compensar entre ubicaciones',
-          net.compensadoVal>0?'ok':'info')
+          net.compensadoVal>0?'ok':'info'),
+      kpi('Sin precio en el maestro',U.num(net.matSinPrecio)+(net.matSinPrecio===1?' material':' materiales'),
+          net.matSinPrecio
+            ? U.num(net.unidSinPrecio,0)+' unidades sin valorizar · excluidas de los importes'
+            : 'todos los materiales con diferencia están valorizados',
+          net.matSinPrecio?'bad':'ok')
     ].join('');
+
+    /* Diferencias que explica el tipo de stock: la cantidad está bien y lo que
+       está mal es el tipo con el que se cargó, así que no hay que salir a
+       buscar ese stock. Se muestra sólo cuando aparece. */
+    document.getElementById('bloqueStk').innerHTML = net.stkUn
+      ? '<div class="rc-nivel rc-nivel-mat">Diferencias por tipo de stock — la cantidad está bien, el tipo no</div>'+
+        '<div class="note warn mb12">El documento pide el ítem con un tipo de stock y se cargó con otro: '+
+        'SAP informa faltante en uno y sobrante en el otro dentro de la <b>misma ubicación</b> y el '+
+        '<b>mismo material</b>. No hay stock que buscar; hay que corregir la carga.'+
+        (Motor.M.stk && Motor.M.stk.pares.length
+          ? ' Cruces más frecuentes: <b>'+Motor.M.stk.pares.slice(0,4)
+              .map(([k,v])=>U.esc(k)+' ('+U.num(v)+')').join('</b> · <b>')+'</b>.' : '')+
+        '</div>'+
+        '<div class="grid c4 mb12">'+[
+          kpi('Ubicaciones afectadas',U.num(net.stkUbis),'tienen al menos un cruce de tipo de stock','warn'),
+          kpi('Ítems que son sólo tipo de stock',U.num(net.stkIt),
+              'toda su diferencia la explica el tipo: no son faltante ni sobrante real','warn'),
+          kpi('Unidades cruzadas',U.num(net.stkUn,0),
+              'faltante más sobrante del cruce: '+U.num(net.stkUn/2,0)+' de mercadería contada dos veces',
+              'info'),
+          kpi('Del absoluto, es tipo de stock',net.hayPrecios?U.plata(net.stkVal):'—',
+              net.hayPrecios&&net.vAbs
+                ? U.pct(net.stkVal/net.vAbs*100,1)+' del valor absoluto sin compensar · no es mercadería perdida'
+                : 'no es mercadería perdida: está contada, mal tipificada',
+              'info')
+        ].join('')+'</div>'
+      : '';
 
     /* El neteo sólo se muestra cuando de verdad hay materiales que netean:
        si ninguno se cancela, bruto y neto son el mismo número y mostrar los
@@ -3085,10 +3292,15 @@ const Vista = {
 
     Vista.tablaNeto();
 
-    tabla('tbSinPrecio',[{t:'Material'},{t:'Descripción'},{t:'Neto',num:true},{t:'Faltante',num:true},{t:'Sobrante',num:true}],
-      net.sinPrecio.filter(g=>g.neto!==0).sort((a,b)=>Math.abs(b.neto)-Math.abs(a.neto)).slice(0,500)
-        .map(g=>[`<b class="mono">${U.esc(g.prod)}</b>`,U.esc(g.desc||'—'),signo(g.neto),U.num(g.falt),U.num(g.sobr)]));
-    sinPrecioCount.textContent=U.num(net.sinPrecio.filter(g=>g.neto!==0).length)+' materiales';
+    tabla('tbSinPrecio',[{t:'Material'},{t:'Descripción'},{t:'UM'},
+        {t:'Ubis con faltante',num:true},{t:'Ubis con sobrante',num:true},
+        {t:'Faltante u',num:true},{t:'Sobrante u',num:true},{t:'Neto u',num:true}],
+      net.sinPrecio.slice(0,1000)
+        .map(g=>[`<b class="mono">${U.esc(g.prod)}</b>`,U.esc(g.desc||'—'),U.esc(g.um||'—'),
+                 U.num(g.nF),U.num(g.nS),U.num(g.falt),U.num(g.sobr),signo(g.neto)]));
+    sinPrecioCount.textContent=net.sinPrecio.length
+      ? U.num(net.sinPrecio.length)+' materiales · '+U.num(net.unidSinPrecio,0)+' unidades sin valorizar'
+      : 'ninguno: todos los materiales con diferencia tienen precio';
   },
 
   tablaNeto(){
@@ -3141,6 +3353,9 @@ const Vista = {
     its.forEach(it=>nEsp.set(it,(it.qd===null||it.qd===0)?0:Motor.espejoN(it)));
     if(difEspejo.value==='si') its=its.filter(i=>nEsp.get(i)>0);
     if(difEspejo.value==='no') its=its.filter(i=>nEsp.get(i)===0);
+    /* las que son sólo tipo de stock no son stock a buscar: se pueden sacar */
+    if(difStk.value==='si') its=its.filter(i=>i.soloStk);
+    if(difStk.value==='no') its=its.filter(i=>!i.soloStk);
 
     const prec=m=>Motor.M.precios.has(m)?Motor.M.precios.get(m):null;
     const mag=it=>{const v=Motor.valorItem(it); return v===null?null:Math.abs(v);};
@@ -3177,14 +3392,26 @@ const Vista = {
 
     const conDif=its.filter(i=>i.qd!==null&&i.qd!==0);
     const conE=conDif.filter(i=>nEsp.get(i)>0).length;
+    const nStk=conDif.filter(i=>i.soloStk).length;
     const magTot=conDif.reduce((a,b)=>a+(mag(b)||0),0);
     const conf=conDif.filter(i=>i.confirmada).length;
     kpiDif.innerHTML=[
       kpi('Ítems listados',U.num(its.length),soloDif?'sólo los que tienen diferencia':'todos los recuentos','bad'),
       kpi('Confirmados por recuento',U.num(conf),'el último pase ya cuadra tras contabilizar','warn'),
       kpi('Con espejo',U.num(conE),'el mismo material con signo opuesto en otra ubicación','ok'),
+      kpi('Sólo tipo de stock',U.num(nStk),'la cantidad está bien: se cargó con otro tipo',nStk?'warn':'ok'),
       kpi('Magnitud listada',magTot?U.plata(magTot):'—','suma del valor absoluto, sólo para priorizar','info')
     ].join('');
+
+    const av=document.getElementById('avisoStk');
+    if(nStk && difStk.value!=='si'){
+      av.style.display='';
+      av.innerHTML='De los ítems listados, <b>'+U.num(nStk)+'</b> son diferencia por <b>tipo de stock</b>: '+
+        'el mismo material falta en un tipo y sobra en otro dentro de la misma ubicación, por la misma cantidad. '+
+        'Están marcados con <span class="st st-c2">tipo stk</span> en la columna RESULTADO. No hay que salir a '+
+        'buscarlos: hay que corregir el tipo con el que se cargaron. Para dejarlos de lado, usá el filtro '+
+        '<b>Tipo de stock → Excluir</b>.';
+    } else av.style.display='none';
 
     const lim=+difLimit.value;
     Vista._dif=its;
@@ -3196,7 +3423,7 @@ const Vista = {
     const fl=k=>oc&&oc.k===k?(oc.dir===1?' ▲':' ▼'):' <span class="ord">↕</span>';
     const th=(k,txt,extra)=>`<th rowspan="2" class="dcol ${extra||''}" data-k="${k}">${txt}${fl(k)}</th>`;
     let h1='<tr>'+th('lbl','Ubicación')+th('zona','Zona')+th('pasillo','Pasillo')+
-           th('prod','Material')+th('desc','Descripción')+th('um','UM');
+           th('prod','Material')+th('desc','Descripción')+th('um','UM')+th('stk','Tipo stk');
     let h2='<tr>';
     for(let k=1;k<=maxP;k++){
       h1+=`<th class="grp p${k}" colspan="3">${k}° recuento</th>`;
@@ -3225,13 +3452,15 @@ const Vista = {
         `<td>${U.esc(it.zona)}</td><td>${U.esc(it.pasillo)}</td>`+
         `<td><b class="mono">${U.esc(it.prod)}</b></td>`+
         `<td>${U.esc(it.desc||'—')}</td><td>${U.esc(it.um||'—')}</td>`+
+        `<td class="mono">${it.stk?U.esc(it.stk):'<span class="cero">—</span>'}</td>`+
         c+
-        `<td class="num res">${signo(it.qd)}${it.confirmada?' <span class="st st-dif">confirmada</span>':''}</td>`+
+        `<td class="num res">${signo(it.qd)}${it.confirmada?' <span class="st st-dif">confirmada</span>':''}`+
+        `${it.soloStk?' <span class="st st-c2">tipo stk</span>':(it.stkCmp>0?' <span class="st st-c3">parc. tipo stk</span>':'')}</td>`+
         `<td class="num">${mag(it)!==null?U.plata(mag(it)):'<span class="cero">—</span>'}</td>`+
         `<td class="esp">${e?('<b>'+Motor.espejo(it,2).map(o=>U.esc(o.lbl)).join('</b> · <b>')+'</b>'+(e>2?' <span class="rc-mini">+'+(e-2)+'</span>':'')):'<span class="none">—</span>'}</td>`+
         '</tr>';
     });
-    if(!its.length) body=`<tr><td colspan="${7+maxP*3+2}" style="text-align:center;color:var(--gray-2);padding:18px">Sin datos para los filtros actuales</td></tr>`;
+    if(!its.length) body=`<tr><td colspan="${8+maxP*3+2}" style="text-align:center;color:var(--gray-2);padding:18px">Sin datos para los filtros actuales</td></tr>`;
     document.getElementById('tbDif').innerHTML='<thead>'+h1+h2+'</thead><tbody>'+body+'</tbody>';
   },
 
@@ -3252,6 +3481,8 @@ const Vista = {
     detTitulo.textContent=it.lbl+' · '+it.prod;
     detCuerpo.innerHTML=
       fila('Descripción',U.esc(it.desc||'—'))+
+      fila('Tipo de stock',(it.stk?'<span class="mono">'+U.esc(it.stk)+'</span>':'(sin tipo)')+
+            (it.stkTxt?' · '+U.esc(it.stkTxt):''))+
       fila('Zona · Pasillo',U.esc(it.zona)+' · '+U.esc(it.pasillo))+
       fila('Columna · Nivel · Pos.',[it.col,it.nivel,it.pos].map(x=>U.esc(x||'—')).join(' · '))+
       (it.statusUbi?fila('Status Ubi',U.esc(it.statusUbi)):'')+
@@ -3263,11 +3494,23 @@ const Vista = {
       '<hr class="hr"><div class="rc-mini" style="margin-bottom:6px"><b>Recuentos</b></div>'+pases+
       '<hr class="hr">'+
       fila('<b>Resultado de la auditoría</b>',signo(it.qd)+' '+U.esc(it.um||''))+
-      fila('Precio unitario',p!==null?U.num(p,2):'sin precio en el maestro')+
+      fila('Precio unitario del maestro',p!==null?U.num(p,2):
+            '<span style="color:var(--red)">sin precio en el maestro de ítems</span>')+
       fila('Magnitud referencial',(p!==null&&it.qd!==null)?U.plata(Math.abs(it.qd*p)):'—')+
+      (it.val!==null&&it.val!==undefined
+        ? fila('<span class="rc-mini">Valor de diferencia de SAP</span>',
+               '<span class="rc-mini">'+U.num(it.val,2)+(it.mon?' '+U.esc(it.mon):'')+
+               ' · informativo, no entra en los totales</span>') : '')+
       (it.confirmada
         ? `<div class="note ok" style="margin:8px 0">El recuento <b>confirmó</b> la diferencia: el último pase ya
            cuadra porque el ajuste del conteo anterior se contabilizó y SAP actualizó el stock.</div>` : '')+
+      (it.stkCmp>0
+        ? `<div class="note warn" style="margin:8px 0"><b>${it.soloStk?'Diferencia por tipo de stock':'Diferencia parcial por tipo de stock'}.</b>
+           En esta misma ubicación el material ${U.esc(it.prod)} aparece con el signo opuesto en el tipo
+           <b>${U.esc(it.stkPares||'(sin tipo)')}</b> por <b>${U.num(it.stkCmp,0)}</b> ${U.esc(it.um||'unidades')}.
+           ${it.soloStk
+              ? 'Toda la diferencia de este ítem la explica el tipo de stock: la cantidad física está bien y lo que hay que corregir es el tipo con el que se cargó.'
+              : 'Esa parte la explica el tipo de stock; el resto ('+U.num(Math.abs(it.qd)-it.stkCmp,0)+') sigue siendo diferencia real.'}</div>` : '')+
       `<hr class="hr"><div class="rc-mini" style="margin-bottom:6px"><b>Espejo del material</b> — ubicaciones con el signo opuesto:</div>`+
       (esp.length
         ? '<div class="esp">'+esp.slice(0,30).map(o=>`<div><b>${U.esc(o.lbl)}</b> · ${U.esc(o.zona)} · ${signo(o.qd)}</div>`).join('')+'</div>'
@@ -3286,9 +3529,15 @@ const Vista = {
       const k=String(clave(o)||'(sin dato)');
       if(!m.has(k)) m.set(k,{k,ubis:0,ubisOk:0,items:0,itemsOk:0,difItems:0});
       const g=m.get(k);
-      g.ubis++; if(!o.difItems) g.ubisOk++;
-      g.items+=o.items||0; g.itemsOk+=Math.max(0,(o.items||0)-(o.difItems||0));
-      g.difItems+=o.difItems||0;
+      /* Una diferencia que sólo es tipo de stock es un error de registro, no
+         de cantidad. Por defecto cuenta como error; se puede excluir desde la
+         configuración, porque la cantidad física estaba bien. */
+      const dif = Config.d.stkIla===0
+        ? Math.max(0,(o.difItems||0)-(o.difItemsStk||0))
+        : (o.difItems||0);
+      g.ubis++; if(!dif) g.ubisOk++;
+      g.items+=o.items||0; g.itemsOk+=Math.max(0,(o.items||0)-dif);
+      g.difItems+=dif;
     });
     return [...m.values()].map(g=>Object.assign(g,{
       ila:g.ubis?g.ubisOk/g.ubis*100:0,
@@ -3667,26 +3916,45 @@ const Export = {
       net.grupos.map(g=>[g.prod,g.desc,g.um,g.prop,g.nF,g.nS,g.falt,g.sobr,g.neto,g.netea?'SI':'NO',
         g.precio,g.faltVal,g.sobrVal,g.netoVal,g.moneda])];
     if(cual==='sinPrecio') return [
-      ['Material','Descripcion','Neto','Faltante bruto','Sobrante bruto'],
-      net.sinPrecio.filter(g=>g.neto!==0).map(g=>[g.prod,g.desc,g.neto,g.falt,g.sobr])];
+      ['Material','Descripcion','UM','Propietario','Ubis con faltante','Ubis con sobrante',
+       'Faltante u','Sobrante u','Neto u','Items con diferencia'],
+      net.sinPrecio.map(g=>[g.prod,g.desc,g.um,g.prop,g.nF,g.nS,g.falt,g.sobr,g.neto,g.itemsF+g.itemsS])];
+    if(cual==='refs') return [
+      ['Referencia','Conteo asignado','Conteo detectado en el texto','Asignada a mano',
+       'Registros','Ubicaciones','Documentos','Primera fecha','Ultima fecha'],
+      [...Motor.M.refs.values()].map(r=>[r.lbl,
+        r.pase===0?'No incluir en el W2W':(r.pase?r.pase+'° conteo':'sin asignar'),
+        r.auto?r.auto+'° conteo':'', r.asignada?'SI':'NO',
+        r.n, r.ubis.size, r.docs.size,
+        r.f1?U.fmt(new Date(r.f1)):'', r.f2?U.fmt(new Date(r.f2)):''])];
     if(cual==='dif') return [
       ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Pase primero','Pase ultimo',
        'Documento ultimo','Fecha','Hora','Material','Descripcion','Teorico 1er conteo','Contado final',
        'Diferencia auditoria','Diferencia ultimo pase','Confirmada por recuento','UM','Propietario','Contador',
+       'Tipo de stock','Denominacion tipo de stock','Unidades cruzadas por tipo de stock',
+       'Tipo de stock contrario','Solo tipo de stock',
+       'Precio del maestro','Magnitud valorizada',
        'Status Conteo','Status de inventario','Status Inv','Status Inv2','Tipo almacen','Area almacenamiento',
        'Ubicaciones espejo','Cantidad de espejos'],
-      (Vista._dif||[]).map(it=>[it.lbl,it.zona,it.sector,it.pasillo,it.col,it.nivel,it.pos,it.pasePrim,it.pase,
+      (Vista._dif||[]).map(it=>{
+        const pr=Motor.M.precios.has(it.prodK)?Motor.M.precios.get(it.prodK):null;
+        return [it.lbl,it.zona,it.sector,it.pasillo,it.col,it.nivel,it.pos,it.pasePrim,it.pase,
         it.doc,it.f?U.fmt(new Date(it.f)):'',U.hhmm(it.h),it.prod,it.desc,it.qt,it.qc,it.qd,it.qdUlt,
         (it.pase>it.pasePrim&&it.qdUlt===0)?'SI':'NO',it.um,it.prop,it.usr,
+        it.stk,it.stkTxt,it.stkCmp||0,it.stkPares||'',it.soloStk?'SI':'NO',
+        pr===null?'':pr, (pr===null||it.qd===null)?'':Math.abs(it.qd*pr),
         it.st,it.stDoc,it.stInv,it.stInv2,it.tipoAlm,it.areaAlm,
-        Motor.espejo(it,20).map(o=>o.lbl).join(' | '),Motor.espejoN(it)])];
+        Motor.espejo(it,20).map(o=>o.lbl).join(' | '),Motor.espejoN(it)];
+      })];
     if(cual==='ubis') return [
       ['Ubicacion','Zona','Sector','Pasillo','Col','Nivel','Pos','Estado Ubi','MO/MU','En universo',
        'Estado W2W','Fase del documento','Diferencia confirmada por recuento','Pases','Ultimo conteo','Hora','Contador',
-       'Status Conteo','Materiales','Materiales con diferencia'],
+       'Status Conteo','Materiales','Materiales con diferencia',
+       'Items que son solo tipo de stock','Unidades cruzadas por tipo de stock','Solo tipo de stock'],
       V.arr.map(o=>[o.lbl,o.zona,o.sector,o.pasillo,o.col,o.nivel,o.pos,o.estadoUbi,o.momu,
         o.enUniverso?'SI':'NO',LBL_EST[o.estado],LBL_FASE[o.fase]||'',o.confirmada?'SI':'NO',o.pases||0,
-        o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),o.usr,o.st,o.items,o.difItems])];
+        o.ultF?U.fmt(new Date(o.ultF)):'',U.hhmm(o.ultH),o.usr,o.st,o.items,o.difItems,
+        o.difItemsStk||0,o.difUnidStk||0,o.soloStk?'SI':'NO'])];
     if(cual==='exactitud') return [
       ['Grupo','Ubicaciones contadas','Ubicaciones correctas','ILA %','Items contados',
        'Items correctos','IRA %','Items con diferencia'],
@@ -4085,6 +4353,8 @@ const Reporte = {
             <tr><td><b>Valor neto</b></td><td class="n"><b>${$(net.vNeto)}</b></td></tr>
             <tr><td>Valor absoluto · sin compensar</td><td class="n">${$(net.vAbs)}</td></tr>
             <tr><td><b>Valor absoluto compensado</b></td><td class="n"><b>${$(net.netoAbsVal)}</b></td></tr>
+            ${net.stkUn?`<tr><td>Diferencias por tipo de stock</td><td class="n">${U.num(net.stkIt)} ítems · ${U.num(net.stkUn,0)} u · no son stock a buscar</td></tr>`:''}
+            ${net.matSinPrecio?`<tr><td>Materiales sin precio en el maestro</td><td class="n">${U.num(net.matSinPrecio)} · ${U.num(net.unidSinPrecio,0)} u fuera de los importes</td></tr>`:''}
           </table>
           <h4>Exactitud sobre lo contado</h4>
           <table>
@@ -4108,7 +4378,9 @@ const Reporte = {
         Faltante y sobrante no se suman entre sí. Las unidades no se suman entre materiales distintos.
         El absoluto compensado netea el mismo material entre ubicaciones: ese stock está en el depósito,
         sólo que mal ubicado.
-        Los importes son referenciales, para priorizar la verificación.
+        Los importes salen únicamente del maestro de ítems valorizados y son referenciales, para priorizar la
+        verificación. Una diferencia por tipo de stock no es stock a buscar: la cantidad está bien y lo que hay
+        que corregir es el tipo con el que se cargó.
       </div>`;
   },
 
@@ -4171,13 +4443,57 @@ const UI = {
     llenar('fAreaAlm',M.arr.map(o=>o.areaAlm),'Todas');
     llenar('fContador',M.arr.map(o=>o.usr),'Todos');
 
-    /* referencias presentes en el archivo */
-    const refs=[...M.refs.entries()].sort((a,b)=>b[1].n-a[1].n);
-    const prev=Config.d.ref;
-    refSelect.innerHTML='<option value="">Todas las referencias del archivo</option>'+
-      refs.map(([k,v])=>`<option value="${U.esc(v.lbl)}"${U.refKey(prev)===k?' selected':''}>${U.esc(v.lbl)} — ${U.num(v.n)} registros</option>`).join('');
-
+    UI.pintarRefs();
     Mapa.poblarZonas();
+  },
+
+  /* ---------- panel de referencias → a qué conteo pertenece cada una ----------
+     El 1° conteo usa siempre una referencia y el 2° otra. Derivar el pase del
+     orden de fechas y horas no sirve: la bajada puede traer un único valor de
+     relleno en las dos columnas. Acá el usuario lo declara una vez. */
+  pintarRefs(){
+    const M=Motor.M;
+    const cont=document.getElementById('tbRefs');
+    if(!M||!M.refs.size){
+      cont.innerHTML='<tbody><tr><td style="padding:14px;color:var(--gray-2)">Cargá la bajada de conteos para ver las referencias que trae.</td></tr></tbody>';
+      refCount.textContent=''; return;
+    }
+    const L=[...M.refs.values()].sort((a,b)=>b.n-a.n);
+    const opt=(r,v,txt)=>`<option value="${v}"${r.pase===v?' selected':''}>${txt}</option>`;
+    cont.innerHTML='<thead><tr><th>Referencia</th><th class="num">Registros</th><th class="num">Ubicaciones</th>'+
+      '<th class="num">Documentos</th><th>Fechas</th><th>Detectado</th><th style="min-width:190px">¿A qué conteo pertenece?</th></tr></thead><tbody>'+
+      L.map(r=>{
+        const sinAsig = !r.asignada && r.auto===null;
+        return `<tr${sinAsig?' class="warn-row"':''}>`+
+          `<td><b>${U.esc(r.lbl)}</b></td>`+
+          `<td class="num">${U.num(r.n)}</td><td class="num">${U.num(r.ubis.size)}</td>`+
+          `<td class="num">${U.num(r.docs.size)}</td>`+
+          `<td class="rc-mini">${r.f1?U.fmt(new Date(r.f1))+(r.f2&&r.f2!==r.f1?' → '+U.fmt(new Date(r.f2)):''):'—'}</td>`+
+          `<td class="rc-mini">${r.auto?r.auto+'° conteo':'<span class="cero">no lo declara</span>'}</td>`+
+          `<td><select data-ref="${U.esc(r.key)}">`+
+            `<option value=""${r.pase===null||r.pase===undefined?' selected':''}>Sin asignar${r.auto?' (usa el '+r.auto+'°)':' — usa el orden'}</option>`+
+            opt(r,1,'1° conteo')+opt(r,2,'2° conteo')+opt(r,3,'3° conteo')+
+            opt(r,0,'No incluir en el W2W')+
+          `</select></td></tr>`;
+      }).join('')+'</tbody>';
+    const sin=L.filter(r=>!r.asignada && r.auto===null).length;
+    refCount.textContent=U.num(L.length)+(L.length===1?' referencia':' referencias')+
+      (sin?' · '+sin+' sin asignar':' · todas asignadas');
+  },
+  guardarRefs(){
+    const mapa={};
+    document.querySelectorAll('#tbRefs select[data-ref]').forEach(sel=>{
+      if(sel.value==='') return;            // sin asignar: no se guarda nada
+      mapa[sel.dataset.ref]=+sel.value;
+    });
+    Config.d.refPase=mapa; Config.persistir(); Motor.reconstruir();
+    const nf=Object.values(mapa).filter(v=>v===0).length;
+    U.toast('Referencias aplicadas: '+Object.keys(mapa).length+' asignadas'+
+            (nf?', '+nf+' fuera del W2W':''),'ok');
+  },
+  autoRefs(){
+    Config.d.refPase={}; Config.persistir(); Motor.reconstruir();
+    U.toast('Volvió la detección automática por el texto de la referencia','ok');
   },
 
   pintarStatusCfg(){
@@ -4273,7 +4589,7 @@ const UI = {
 
   /* ---------- controles de las vistas ---------- */
   ['netFiltro','netOrden'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.tablaNeto()));
-  ['difEspejo','difSigno','difLimit','difQue'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.diferencias()));
+  ['difEspejo','difSigno','difLimit','difQue','difStk'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.diferencias()));
   document.getElementById('difOrden').addEventListener('change',()=>{ Vista._ordCol=null; Vista.diferencias(); });
   document.getElementById('tbDif').addEventListener('click',e=>{
     const th=e.target.closest('th.dcol'); if(!th) return;
@@ -4288,10 +4604,7 @@ const UI = {
   document.getElementById('mapZona').addEventListener('change',()=>{ Mapa.poblarPasillos(); Mapa.render(); });
 
   /* referencia del W2W */
-  refSelect.addEventListener('change',()=>{
-    Config.d.ref=refSelect.value; Config.persistir(); Motor.reconstruir();
-    U.toast(refSelect.value?'Referencia aplicada':'Se usan todas las referencias','ok');
-  });
+
 
   /* clic en un material del resultado neto: baja al detalle por ubicación */
   document.getElementById('tbNeto').addEventListener('click',e=>{
