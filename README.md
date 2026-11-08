@@ -74,7 +74,8 @@ encontró, para que nunca pase inadvertido si no se está leyendo.
 
 ### Pantallas
 
-1. **Avance del W2W** — cobertura, cierre, embudo de pases, ritmo y proyección.
+1. **Avance del W2W** — cobertura, cierre, embudo de pases, ritmo y proyección
+   del cierre sobre la jornada real.
 2. **Resultado** — ubicaciones e ítems con diferencia, faltante y sobrante en
    dinero y en unidades, y el resultado por material. El bloque de neteo sólo
    aparece cuando hay materiales que realmente se cancelan entre ubicaciones.
@@ -104,6 +105,29 @@ Una diferencia que sólo es **tipo de stock** es un error de registro, no de
 cantidad. Por defecto cuenta como error; en la pantalla 7 se puede excluir, y
 entonces una ubicación cuyo único problema fue el tipo pasa a contar como
 correcta.
+
+### Jornada del conteo y previsibilidad
+
+La proyección del cierre sólo sirve si avanza por **horas de conteo reales**.
+Sumando horas corridas, un W2W que para a las 17 y vuelve a las 7 termina «a
+las 3 de la madrugada de un domingo».
+
+En la pantalla 7 se carga la jornada: dos turnos y los días en que se cuenta.
+El botón **Tomar el horario del archivo** lee en qué horas hubo actividad y
+arma los turnos solo, detectando el corte del mediodía; los **días no los
+toca**, porque son una decisión y no un dato: si el conteo arrancó un viernes,
+el archivo sólo vio viernes y sábado.
+
+Con eso la pantalla 1 muestra:
+
+- **Fin estimado** con fecha y hora, avanzando sólo por horas de jornada, y
+  cuántas jornadas faltan.
+- **Ritmo para cerrar en fecha** — las ubicaciones por hora que harían falta
+  para llegar a la fecha de cierre configurada, contra el ritmo actual. Se
+  pone en rojo cuando el ritmo de hoy no alcanza.
+
+Si la jornada se apaga o queda vacía, la proyección vuelve a sumar horas
+corridas. El reporte en PDF incluye el mismo bloque.
 
 ### Referencias y pases
 
@@ -150,6 +174,13 @@ cruzando tipos distintos, y compensa hasta la cantidad que coincide:
 | Faltante 10 en `0F` + sobrante 7 en `1F` | 7 por tipo de stock + 3 de faltante real |
 | Faltante 10 en `0F`, sin contrapartida | Faltante real |
 
+Si la columna no se está leyendo la app lo dice con nombre y apellido: avisa
+si está en el archivo pero sin asignar (criticidad alta), si el archivo no la
+trae, o si viene en blanco —que es lo normal antes de contar, porque SAP la
+completa al subir el conteo—. El botón **Qué columna está leyendo cada campo**
+de la pantalla 7 muestra la tabla completa: qué columna alimenta cada campo,
+cuánto dato trae y qué columnas del archivo quedaron sin usar.
+
 Dónde se ve: un bloque propio en la pantalla 2 —ubicaciones afectadas, ítems,
 unidades y cuánto del valor absoluto es sólo tipo de stock—, la columna **Tipo
 stk** y la marca `tipo stk` / `parc. tipo stk` en los Recuentos, un filtro para
@@ -191,6 +222,7 @@ mandarlo por mail. No necesita ninguna librería extra.
 - **Neteo entre propietarios** — por defecto no netea entre propietarios distintos.
 - **Diferencia por tipo de stock en el ILA / IRA** — por defecto cuenta como
   error de registro.
+- **Jornada del conteo** — turnos y días. De ahí sale el fin estimado.
 - **Ventana del conteo** — se ajusta sola a las fechas del archivo hasta que
   guardes la configuración a mano; a partir de ahí manda lo que fijaste. Sirve
   para probar bajadas de otros años sin tocar nada.

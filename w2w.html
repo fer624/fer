@@ -329,6 +329,11 @@ table.dt td.num,table.dt th.num{text-align:right;font-variant-numeric:tabular-nu
 .st-ok  {background:var(--green-bg);color:var(--green)}
 .st-dif {background:var(--red-bg);color:var(--red);border:1px solid var(--red)}
 html[data-theme="dark"] .st-c3{background:#2A2142;color:#B9A6F0}
+/* Aviso que se puede cerrar: correcto, pero una vez leído estorba */
+.note.cerrable{position:relative;padding-right:30px}
+.note.cerrable>.x{position:absolute;top:6px;right:7px;border:0;background:none;cursor:pointer;
+  font-size:13px;line-height:1;color:var(--gray-2);padding:2px 4px;border-radius:4px}
+.note.cerrable>.x:hover{background:rgba(0,0,0,.08);color:var(--ink)}
 /* Fila que reclama una decisión del usuario: referencia sin conteo asignado */
 .dt tbody tr.warn-row>td{background:var(--amber-bg)}
 .dt tbody tr.warn-row>td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
@@ -864,6 +869,31 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   </div>
 
   <div class="card mb12">
+    <h3>Jornada del conteo <span class="mini" id="jorResumen"></span></h3>
+    <div class="note">De acá sale la <b>previsibilidad</b>: el fin estimado avanza sólo por las horas en que
+    realmente se cuenta. Sin jornada, la proyección suma horas corridas y te dice que terminás a las 3 de la
+    mañana de un domingo. También calcula el <b>ritmo que haría falta</b> para llegar a la fecha de cierre.</div>
+    <div class="flex">
+      <div class="fl"><label>Proyección</label>
+        <select id="jorActiva">
+          <option value="1">Avanzar sólo en horas de jornada</option>
+          <option value="0">Horas corridas, sin jornada</option>
+        </select>
+      </div>
+      <div class="fl"><label>Turno mañana · desde</label><input type="time" id="jorT1i"></div>
+      <div class="fl"><label>hasta</label><input type="time" id="jorT1f"></div>
+      <div class="fl"><label>Turno tarde · desde</label><input type="time" id="jorT2i"></div>
+      <div class="fl"><label>hasta</label><input type="time" id="jorT2f"></div>
+    </div>
+    <div class="fl mt8"><label>Días que se cuenta</label><div id="jorDias" class="flex"></div></div>
+    <div class="flex mt8">
+      <button class="btn sm" onclick="UI.guardarJornada()">Aplicar y recalcular</button>
+      <button class="btn sm ghost" onclick="UI.jornadaDelArchivo()">Tomar el horario del archivo</button>
+      <span class="rc-mini" id="jorAyuda"></span>
+    </div>
+  </div>
+
+  <div class="card mb12">
     <h3>Referencias del archivo <span class="mini" id="refCount"></span></h3>
     <div class="note">Cada referencia identifica un conteo. El <b>1° conteo</b> usa siempre la misma referencia y
     el <b>2°</b> otra: deciles abajo a qué conteo pertenece cada una y el tablero ordena los pases por ahí, en
@@ -968,6 +998,10 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   <div class="card mb12">
     <h3>Columnas detectadas en la bajada de conteos</h3>
     <div class="note" id="notaConteos"></div>
+    <div class="mt8">
+      <button class="btn sm ghost" onclick="UI.verColumnas()">🔎 Qué columna está leyendo cada campo</button>
+    </div>
+    <div id="panelCols" class="mt8 hidden"></div>
     <div class="flex no-print">
       <button class="btn ghost sm" onclick="Datos.remapear('conteos')">↻ Detectar columnas de conteos</button>
       <button class="btn ghost sm" onclick="Datos.remapear('maestro')">↻ Detectar columnas del maestro</button>
@@ -1260,8 +1294,13 @@ const Config = {
     inter:0,            // las intermedias quedan fuera del universo
     refPase:{},         // referencia → pase declarado por el usuario (0 = no incluir)
     refPaseV:1,
+    /* La jornada real del conteo. Sin esto la proyección suma horas corridas
+       y da que se termina a las 3 de la mañana de un domingo. */
+    jornada:{activa:1, dias:[1,2,3,4,5,6], t1i:'07:00', t1f:'12:00', t2i:'14:00', t2f:'17:00'},
+    jornadaV:1,
     stkIla:1,           // 1 = una diferencia por tipo de stock cuenta como error en ILA/IRA
     tema:'light', nombres:{},
+    avisosOff:{},       // avisos de la pantalla 1 que el usuario cerró
     statusOK:null,      // null = auto-detección por el texto del Status Conteo
     statusV:2           // sube cuando cambia la tabla de códigos: descarta la selección vieja
   },
@@ -1295,6 +1334,13 @@ const Config = {
     if(s.ref!==undefined){ delete Config.d.ref; cambio=true; }
     if(s.origenVal!==undefined){ delete Config.d.origenVal; cambio=true; }
     if(!Config.d.refPase || typeof Config.d.refPase!=='object') Config.d.refPase={};
+    if((s.jornadaV||0) < Config.def.jornadaV){
+      Config.d.jornada=JSON.parse(JSON.stringify(Config.def.jornada));
+      Config.d.jornadaV=Config.def.jornadaV;
+      cambio=true;
+    }
+    if(!Config.d.jornada || typeof Config.d.jornada!=='object')
+      Config.d.jornada=JSON.parse(JSON.stringify(Config.def.jornada));
     if(cambio) Config.persistir();
     document.documentElement.setAttribute('data-theme',Config.d.tema);
   },
@@ -1307,6 +1353,7 @@ const Config = {
     cfgMetaIla.value=c.metaIla; cfgMetaIra.value=c.metaIra;
     cfgStkIla.value=c.stkIla;
     cfgProp.value=c.netProp; cfgInter.value=c.inter;
+    UI.jornadaAForm();
   },
   guardar(){
     const c=Config.d;
@@ -1902,6 +1949,118 @@ const Motor = {
     return pr===null ? null : it.qd*pr;
   },
 
+  /* ======================= JORNADA DE TRABAJO =======================
+     La proyección del cierre sólo sirve si avanza por horas de conteo reales.
+     Sumando horas corridas, un W2W que para a las 17 y vuelve a las 7 termina
+     "mañana a las 4 de la madrugada", que no le sirve a nadie.              */
+  jornada:{
+    hm(txt){
+      const m=String(txt||'').match(/^(\d{1,2}):(\d{2})$/);
+      if(!m) return null;
+      const v=+m[1]*60+ +m[2];
+      return (v>=0 && v<=1440) ? v : null;
+    },
+    /* Las franjas válidas del día, en minutos, ordenadas y sin solaparse. */
+    franjas(){
+      const J=Config.d.jornada||{};
+      const out=[];
+      [[J.t1i,J.t1f],[J.t2i,J.t2f]].forEach(([a,b])=>{
+        const x=Motor.jornada.hm(a), y=Motor.jornada.hm(b);
+        if(x===null||y===null||y<=x) return;
+        out.push([x,y]);
+      });
+      out.sort((a,b)=>a[0]-b[0]);
+      /* dos franjas pisadas se unen: si no, las horas se contarían dos veces */
+      const fin=[];
+      for(const f of out){
+        const u=fin[fin.length-1];
+        if(u && f[0]<=u[1]) u[1]=Math.max(u[1],f[1]); else fin.push(f.slice());
+      }
+      return fin;
+    },
+    habil(d){
+      const J=Config.d.jornada||{};
+      const dias=Array.isArray(J.dias)?J.dias:[];
+      return dias.includes(d.getDay());
+    },
+    activa(){
+      const J=Config.d.jornada||{};
+      return +J.activa===1 && Motor.jornada.franjas().length>0 &&
+             Array.isArray(J.dias) && J.dias.length>0;
+    },
+    /* Minutos de jornada disponibles en el día de `d`, a partir de su hora. */
+    restanDelDia(d,fr){
+      if(!Motor.jornada.habil(d)) return 0;
+      const min=d.getHours()*60+d.getMinutes();
+      let t=0;
+      for(const [a,b] of fr) t+=Math.max(0,b-Math.max(min,a));
+      return t;
+    },
+    /* Avanza `horas` horas de jornada desde ts. Devuelve Date, o null si la
+       jornada está vacía o haría falta más de un par de años. */
+    proyectar(ts,horas){
+      const fr=Motor.jornada.franjas();
+      if(!fr.length || !(horas>0) || !isFinite(horas)) return null;
+      let quedan=horas*60;
+      let d=new Date(ts);
+      for(let guard=0; guard<800 && quedan>0; guard++){
+        if(Motor.jornada.habil(d)){
+          const min=d.getHours()*60+d.getMinutes();
+          for(const [a,b] of fr){
+            const desde=Math.max(min,a);
+            const disp=b-desde;
+            if(disp<=0) continue;
+            if(quedan<=disp){
+              const r=new Date(d);
+              r.setHours(0,desde+quedan,0,0);
+              return r;
+            }
+            quedan-=disp;
+          }
+        }
+        d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,0,0,0,0);
+      }
+      return null;
+    },
+    /* Horas de jornada entre dos instantes. Sirve para saber cuánto tiempo
+       útil queda hasta la fecha de cierre y qué ritmo haría falta. */
+    horasEntre(ts1,ts2){
+      const fr=Motor.jornada.franjas();
+      if(!fr.length || ts2<=ts1) return 0;
+      let t=0;
+      let d=new Date(ts1);
+      const fin=new Date(ts2);
+      for(let guard=0; guard<800; guard++){
+        const mismoDia = d.getFullYear()===fin.getFullYear() && d.getMonth()===fin.getMonth()
+                      && d.getDate()===fin.getDate();
+        if(Motor.jornada.habil(d)){
+          const min=d.getHours()*60+d.getMinutes();
+          const tope=mismoDia ? (fin.getHours()*60+fin.getMinutes()) : 1440;
+          for(const [a,b] of fr) t+=Math.max(0,Math.min(b,tope)-Math.max(min,a));
+        }
+        if(mismoDia || d>fin) break;
+        d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,0,0,0,0);
+      }
+      return t/60;
+    },
+    /* Jornadas completas que entran en una cantidad de horas. */
+    horasPorDia(){
+      const fr=Motor.jornada.franjas();
+      return fr.reduce((a,[x,y])=>a+(y-x),0)/60;
+    },
+    /* Texto corto para mostrar la jornada configurada. */
+    texto(){
+      const J=Config.d.jornada||{};
+      const DN=['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+      const fr=Motor.jornada.franjas();
+      if(!Motor.jornada.activa()) return 'sin jornada configurada';
+      const hh=v=>String(Math.floor(v/60)).padStart(2,'0')+':'+String(v%60).padStart(2,'0');
+      return (Array.isArray(J.dias)?J.dias.slice().sort().map(d=>DN[d]).join(' '):'')+
+             ' · '+fr.map(([a,b])=>hh(a)+'-'+hh(b)).join(' y ')+
+             ' · '+U.num(Motor.jornada.horasPorDia(),1)+' h por día';
+    }
+  },
+
   /* ---------- clave de agrupación para el neteo ---------- */
   claveNeteo(it,variosProp){
     return (Config.d.netProp===0 && variosProp) ? it.prodK+'\u0001'+U.norm(it.prop) : it.prodK;
@@ -1951,7 +2110,7 @@ const Motor = {
 
     /* ---------- 2 · BAJADA DE CONTEOS ---------- */
     let vaciaEnUso=false; const valVacia=new Map();
-    let hayStk=false;        // ¿la bajada trae la columna Tipo de stock con datos?
+    let hayStk=false, regConStk=0;   // ¿la bajada trae Tipo de stock con datos?
     let clasMarca=0, clasContenido=0;
     const refs=new Map(), statusSet=new Map(), props=new Set();
     const huerfanas=new Map();
@@ -2018,7 +2177,7 @@ const Motor = {
       if(!c.doc) sinDoc++;
       if(c.qt===null && c.qc===null && (c.qd===null||c.qd===undefined)) sinCant++;
       if(c.prop) props.add(c.prop);
-      if(c.stk) hayStk=true;
+      if(c.stk){ hayStk=true; regConStk++; }
       if(c.prod && c.um){
         const mk=U.matKey(c.prod);
         if(!umPorMat.has(mk)) umPorMat.set(mk,new Set());
@@ -2370,6 +2529,31 @@ const Motor = {
       ref:U.num(Datos.dupDescartadas)+' filas',
       detalle:'Había más de una fila para la misma ubicación, documento y material. Se conservó la última. '+
               'Si cargás la base completa en cada bajada, usá el modo Reemplazar.'});
+    /* "No lee el tipo de stock" puede ser que la columna no esté mapeada, que
+       no venga en el archivo, o que venga en blanco. Son tres cosas distintas
+       y cada una se arregla en otro lado, así que se dicen por separado. */
+    {
+      const mpC=Datos.mapaDe('conteos')||{};
+      const heads=(Datos.meta.conteos&&Datos.meta.conteos.headers)||[];
+      const candidata=heads.find(h=>/TIPO.*STOCK|STOCK.*TYPE/.test(U.hdr(h)) && !U.hdr(h).includes('DENOMINACION'));
+      if(!mpC.tipoStk && candidata){
+        cal.push({tipo:'La columna Tipo de stock está en el archivo pero no se está leyendo',crit:'Alta',
+          ref:'columna "'+candidata+'"',
+          detalle:'Sin ella el tablero no puede separar 0F de 1F, así que un ítem pedido en un tipo y cargado '+
+            'en otro aparece como faltante y sobrante reales. Asignala en 7 · Archivos y Configuración → '+
+            'Revisar mapeo de conteos, y volvé a cargar la bajada.'});
+      }else if(!mpC.tipoStk && Datos.conteos.length){
+        cal.push({tipo:'La bajada no trae la columna Tipo de stock',crit:'Media',
+          ref:U.num(heads.length)+' columnas en el archivo',
+          detalle:'No hay ninguna columna de tipo de stock, así que no se pueden detectar las diferencias por '+
+            '0F contra 1F. Agregá "Tipo de stock" a la exportación de SAP si querés verlas.'});
+      }else if(mpC.tipoStk && !regConStk && regValidos){
+        cal.push({tipo:'La columna Tipo de stock viene vacía',crit:'Media',
+          ref:'columna "'+mpC.tipoStk+'" · '+U.num(regValidos)+' registros',
+          detalle:'Se está leyendo pero no trae ningún valor en toda la bajada. Es lo esperable antes de que '+
+            'se empiece a contar: SAP la completa recién cuando se sube el conteo.'});
+      }
+    }
     if(stkItems) cal.push({tipo:'Diferencias explicadas por el tipo de stock',crit:'Media',
       ref:U.num(stkItems)+' ítems en '+U.num(stkUbis)+' ubicaciones · '+U.num(stkUnid,0)+' unidades',
       detalle:'El mismo material aparece con faltante en un tipo de stock y sobrante en otro, dentro de la '+
@@ -2502,7 +2686,8 @@ const Motor = {
       refs, statusSet, props, precios, monedas,
       cal, serieDia, horaMap,
       diag:{ubisConDoc,ubisSinConteo},
-      stk:{ubis:stkUbis,items:stkItems,unid:stkUnid,pares:[...stkPares.entries()].sort((a,b)=>b[1]-a[1])},
+      stk:{ubis:stkUbis,items:stkItems,unid:stkUnid,regConStk,
+           pares:[...stkPares.entries()].sort((a,b)=>b[1]-a[1])},
       st:{regTot,regValidos,regFueraRef,sinUbi,sinFecha,sinDoc,sinCant,
           huerfanas:huerfanas.size, ms:Math.round(performance.now()-t0)}
     };
@@ -2793,8 +2978,32 @@ Motor.recalcular = function(){
   const ritmoHora = horasAct ? ubisEnHoras/horasAct : 0;
   const restantes = total-contadas;
   const horasRest = ritmoHora>0 ? restantes/ritmoHora : null;
-  const finEst = (horasRest!==null && ultimaAct!==null)
-    ? new Date(ultimaAct+3600000+horasRest*3600000) : null;
+
+  /* ---------- proyección del cierre sobre la jornada real ----------
+     El conteo arranca donde terminó la última hora con actividad y avanza
+     sólo por las horas de la jornada configurada. Si la jornada está
+     apagada se vuelve a sumar horas corridas, como antes.                 */
+  const conJornada = Motor.jornada.activa();
+  const arranque = ultimaAct===null ? null : ultimaAct+3600000;
+  let finEst=null;
+  if(horasRest!==null && arranque!==null){
+    finEst = conJornada
+      ? Motor.jornada.proyectar(arranque,horasRest)
+      : new Date(arranque+horasRest*3600000);
+  }
+  const hDia = Motor.jornada.horasPorDia();
+  const jornadasRest = (conJornada && horasRest!==null && hDia>0) ? horasRest/hDia : null;
+
+  /* Ritmo que haría falta para llegar a la fecha de cierre configurada. */
+  const cierreObj = new Date(Config.d.fin+'T23:59:59').getTime();
+  let horasHastaCierre=null, ritmoNecesario=null, llegaACierre=null;
+  if(arranque!==null && restantes>0){
+    horasHastaCierre = conJornada
+      ? Motor.jornada.horasEntre(arranque,cierreObj)
+      : Math.max(0,(cierreObj-arranque)/3600000);
+    ritmoNecesario = horasHastaCierre>0 ? restantes/horasHastaCierre : null;
+    llegaACierre = finEst ? finEst.getTime()<=cierreObj : null;
+  }
   const ritmoDia = dias.length ? dias.reduce((a,b)=>a+b.n,0)/dias.length : 0;
 
   /* día con más actividad, para el gráfico por hora */
@@ -2814,6 +3023,7 @@ Motor.recalcular = function(){
        c2:E.C2,c3:E.C3,ok:E.OK,dif:E.DIF,ocupadas,vacias,
        cobertura,cierre,pActiva,pConteo,
        ritmoHora,horasAct,restantes,horasRest,finEst,ritmoDia,dias,diaPico,horas,
+       conJornada,jornadasRest,horasHastaCierre,ritmoNecesario,llegaACierre,hDia,
        porZona:[...porZona.values()],porPasillo:[...porPasillo.values()]}
   };
   Vista.render();
@@ -3035,37 +3245,47 @@ const Vista = {
       .filter(([k])=>mp[k]).map(([k,t])=>t+' → «'+mp[k]+'»');
     const sts=[...Motor.M.statusSet.values()].sort((a,b)=>b.n-a.n).slice(0,8)
       .map(x=>`<b class="mono">${U.esc(x.st)}</b> ${x.contado?'contada':'no contada'} (${U.num(x.n)})`);
-    let aviso='';
+    /* Los avisos se pueden cerrar: son correctos pero una vez leídos estorban
+       arriba del tablero todos los días. El descarte se recuerda por el texto
+       del aviso, así que si el problema cambia vuelve a aparecer. */
+    const cerrados=Config.d.avisosOff||{};
+    const cajas=[];
+    const push=(id,cls,html)=>{ if(!cerrados[id]) cajas.push({id,cls,html}); };
     const NOM={maestro:'Maestro de Ubicaciones',conteos:'Bajada de Conteos',valor:'Maestro de Ítems'};
     const faltan=['maestro','conteos','valor']
       .filter(t=>Datos.meta[t] && !Datos.recargados.has(t)).map(t=>NOM[t]);
     if(Datos.mapasReseteado && faltan.length){
-      aviso+='<div class="note bad"><b>Se actualizaron las reglas de lectura de columnas.</b> '+
+      push('mapas','bad','<b>Se actualizaron las reglas de lectura de columnas.</b> '+
              'Estos archivos se leyeron con el mapeo anterior, así que sus números pueden estar mal: '+
              '<b>'+faltan.join('</b>, <b>')+'</b>. Volvé a cargarlos en '+
-             '<b>7 · Archivos y Configuración</b>.</div>';
+             '<b>7 · Archivos y Configuración</b>.');
     }
     if(Config.statusReseteado){
-      aviso+='<div class="note warn"><b>Se descartó una selección manual de Status Conteo</b> guardada con '+
+      push('stReset','warn','<b>Se descartó una selección manual de Status Conteo</b> guardada con '+
              'una versión anterior, porque podía clasificar mal. Volvió la detección automática; '+
-             'si necesitás ajustarla, está en <b>7 · Archivos</b>.</div>';
+             'si necesitás ajustarla, está en <b>7 · Archivos</b>.');
     }else if(Array.isArray(Config.d.statusOK)){
-      aviso+='<div class="note warn"><b>Hay una selección manual de Status Conteo activa.</b> '+
-             'Si los números no cierran, revisala en <b>7 · Archivos</b> o volvé a la detección automática.</div>';
+      push('stManual','warn','<b>Hay una selección manual de Status Conteo activa.</b> '+
+             'Si los números no cierran, revisala en <b>7 · Archivos</b> o volvé a la detección automática.');
     }
     if(!colsSt.length){
-      aviso+='<div class="note bad"><b>No se está leyendo ningún status.</b> Sin eso el tablero no puede '+
+      push('stNada','bad','<b>No se está leyendo ningún status.</b> Sin eso el tablero no puede '+
             'distinguir INAC, ACTI, COUN y POST. Asigná la columna en <b>7 · Archivos</b> → '+
-            '<i>Revisar mapeo de conteos</i>.</div>';
+            '<i>Revisar mapeo de conteos</i>.');
     }else if(dg.ubisConDoc && dg.ubisSinConteo===dg.ubisConDoc){
-      aviso+='<div class="note warn"><b>Todavía no se contó nada.</b> Las '+U.num(dg.ubisConDoc)+
+      push('sinContar','warn','<b>Todavía no se contó nada.</b> Las '+U.num(dg.ubisConDoc)+
             ' ubicaciones tienen documento generado, pero ninguna trae cantidad contada. '+
-            'Status leído de '+colsSt.join(' · ')+'.<br>Valores encontrados: '+sts.join(' · ')+'.</div>';
+            'Status leído de '+colsSt.join(' · ')+'.<br>Valores encontrados: '+sts.join(' · ')+'.');
     }else if(sts.length){
-      aviso+='<div class="note">Status leído de '+colsSt.join(' · ')+'. '+
-            'Valores: '+sts.join(' · ')+'. Se ajustan en <b>7 · Archivos</b>.</div>';
+      push('stOk','','Status leído de '+colsSt.join(' · ')+'. '+
+            'Valores: '+sts.join(' · ')+'. Se ajustan en <b>7 · Archivos</b>.');
     }
-    document.getElementById('avisoEstado').innerHTML=aviso;
+    document.getElementById('avisoEstado').innerHTML=cajas.map(c=>
+      `<div class="note ${c.cls} cerrable"><button class="x" title="Ocultar este aviso"
+         onclick="UI.cerrarAviso('${c.id}')">✕</button>${c.html}</div>`).join('')+
+      (Object.keys(cerrados).length
+        ? `<div class="rc-mini" style="margin:-4px 0 10px">${Object.keys(cerrados).length} aviso(s) ocultos ·
+           <a href="#" onclick="UI.verAvisos();return false">volver a mostrarlos</a></div>` : '');
 
     const porDoc = Config.d.universo!=='maestro';
     kpiAvance.innerHTML=[
@@ -3079,9 +3299,24 @@ const Vista = {
       kpi('Ritmo por hora',U.num(m.ritmoHora,0),
           m.horasAct?'ubicaciones por hora, sobre '+U.num(m.horasAct)+' horas con actividad':'sin ritmo medible','info'),
       kpi('Fin estimado',
-          m.finEst?U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—',
-          m.finEst?U.fmt(m.finEst)+' · faltan '+U.num(m.restantes)+' ubicaciones'
-                  :(m.restantes?U.num(m.restantes)+' por contar, sin ritmo':'conteo terminado'),'info')
+          m.finEst?U.fmt(m.finEst)+' '+U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—',
+          m.finEst
+            ? 'faltan '+U.num(m.restantes)+' ubicaciones'+
+              (m.jornadasRest!==null?' · '+U.num(m.jornadasRest,1)+' jornadas':'')+
+              (m.conJornada?'':' · sin jornada, horas corridas')
+            : (m.restantes?U.num(m.restantes)+' por contar, sin ritmo':'conteo terminado'),
+          m.llegaACierre===false?'bad':m.llegaACierre===true?'ok':'info'),
+      kpi('Ritmo para cerrar el '+U.fmt(new Date(Config.d.fin+'T12:00:00')),
+          m.ritmoNecesario!==null?U.num(m.ritmoNecesario,0):'—',
+          m.ritmoNecesario!==null
+            ? 'ubicaciones por hora · quedan '+U.num(m.horasHastaCierre,1)+' h de jornada'+
+              (m.ritmoHora>0?' · hoy vas a '+U.num(m.ritmoHora,0):'')
+            : (!m.restantes ? 'conteo terminado'
+               : Config.d.ventanaAuto
+                 ? 'la fecha de cierre sigue el archivo · fijala en 7 · Configuración'
+                 : 'la fecha de cierre ya pasó'),
+          (m.ritmoNecesario!==null&&m.ritmoHora>0)
+            ? (m.ritmoHora>=m.ritmoNecesario?'ok':'bad') : 'info')
     ].join('');
 
     pgCob.style.width=Math.min(100,m.cobertura)+'%';
@@ -3140,11 +3375,23 @@ const Vista = {
             datasets:[{label:'Ubicaciones',data:m.dias.map(d=>d.n),backgroundColor:'#0057B8'}]},
       options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 
+    /* Sólo el tramo con actividad: con las 24 horas, dos tercios del gráfico
+       son barras en cero y el número de la barra más alta se come el título. */
+    let hs=m.horas;
+    const act=hs.map((x,i)=>x.n>0?i:-1).filter(i=>i>=0);
+    if(act.length) hs=hs.slice(Math.max(0,act[0]-1), Math.min(24,act[act.length-1]+2));
+    const pico=hs.reduce((a,b)=>Math.max(a,b.n),0);
     chart('chHora',{type:'bar',
-      data:{labels:m.horas.map(h=>String(h.h).padStart(2,'0')+'h'),
-            datasets:[{label:'Ubicaciones',data:m.horas.map(h=>h.n),backgroundColor:'#00A3E0'}]},
-      options:{plugins:{legend:{display:false},title:{display:!!m.diaPico,text:m.diaPico?'Día '+m.diaPico.iso:''}},
-               scales:{y:{beginAtZero:true}}}});
+      data:{labels:hs.map(h=>String(h.h).padStart(2,'0')+'h'),
+            datasets:[{label:'Ubicaciones',data:hs.map(h=>h.n),backgroundColor:'#00A3E0',
+                       borderRadius:3,maxBarThickness:52}]},
+      options:{layout:{padding:{top:26,right:12}},
+               plugins:{legend:{display:false},
+                        title:{display:!!m.diaPico,color:'#5A6474',font:{size:11,weight:'600'},
+                               padding:{bottom:10},
+                               text:m.diaPico?'Día '+m.diaPico.iso+' · pico '+U.num(pico)+' ubicaciones':''}},
+               scales:{y:{beginAtZero:true,grace:'18%',ticks:{precision:0}},
+                       x:{grid:{display:false}}}}});
 
     const zs=m.porZona.slice().sort((a,b)=>U.natSort(a.k,b.k));
     chart('chZona',{type:'bar',
@@ -3179,23 +3426,13 @@ const Vista = {
        se pueden sumar. Las unidades quedan como dato secundario.            */
     const $=(v)=>net.hayPrecios ? U.plata(v) : '—';
 
-    /* Un solo origen de importe: el precio del maestro de ítems por la
-       cantidad de la diferencia. El "Valor de diferencia" de SAP no entra en
-       ningún total porque viene en otra moneda y duplicaba los números. */
-    const fuente = `<div class="rc-mini mb12">Los importes salen únicamente del
-      <b>maestro de ítems valorizados</b>: precio del maestro × cantidad de la diferencia.</div>`;
-    avisoPrecio.innerHTML = fuente + (net.hayPrecios
-      ? (net.matSinPrecio
-          ? `<div class="note bad"><b>${U.num(net.matSinPrecio)} materiales con diferencia no tienen precio</b>
-             en el maestro de ítems (${U.num(net.unidSinPrecio,0)} unidades, ${U.num(net.itemsSinPrecio)} ítems).
-             Quedan <b>fuera de todos los importes</b> de esta pantalla. La lista está al pie, con botón para
-             exportarla y buscar los precios. Cobertura actual: <b>${U.pct(net.cobPrecio,1)}</b> de la
-             diferencia bruta en unidades.</div>`
-          : `<div class="note ok mb12">Todos los materiales con diferencia tienen precio en el maestro:
-             los importes cubren el <b>100%</b> del resultado.</div>`)
+    /* Los importes salen sólo del maestro de ítems. Lo que falta de precio se
+       dice en el KPI "Sin precio en el maestro" y en la tabla del pie: el
+       cartel arriba repetía lo mismo y tapaba el tablero. */
+    avisoPrecio.innerHTML = net.hayPrecios ? ''
       : `<div class="note bad">No hay precios cargados. Los importes aparecen vacíos y el porcentaje que netea
          se calcula en unidades, que entre materiales distintos no es comparable.
-         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 7.</div>`);
+         Cargá el <b>Maestro de Ítems Valorizados</b> en la pantalla 7.</div>`;
 
     const nF=net.itemsFalt, nS=net.itemsSobr;
     kpiBruto.innerHTML=[
@@ -3657,7 +3894,8 @@ const Vista = {
       (st.sinDoc?` · <span style="color:var(--ceva-red)">sin N° de documento: <b>${U.num(st.sinDoc)}</b></span>`:'')+
       (st.sinFecha?` · <span style="color:var(--ceva-red)">sin fecha: <b>${U.num(st.sinFecha)}</b></span>`:'')+
       (st.huerfanas?` · ubicaciones contadas que no están en el maestro: <b>${U.num(st.huerfanas)}</b>`:'')+
-      `.<br>El pase se deriva ordenando los documentos de cada ubicación por fecha, hora y número.`;
+      `.<br>El pase lo declara la referencia asignada en esta pantalla; dentro de un mismo conteo los `+
+      `documentos se ordenan por número.`;
   }
 };
 
@@ -4195,16 +4433,29 @@ const Prod = {
       kpi('Mayor volumen',mejor?(mejor.nombre||mejor.usr):'—',mejor?U.num(mejor.ubis)+' ubicaciones':'','ok')
     ].join('');
 
-    const top=L.slice().sort((a,b)=>b.ubis-a.ubis).slice(0,18);
+    /* Todos los contadores, no los primeros 18: con autoSkip Chart.js tiraba
+       uno de cada dos nombres y quedaban barras sin dueño. El alto del marco
+       crece con la cantidad para que entren las etiquetas. */
+    const top=L.slice().sort((a,b)=>b.ubis-a.ubis);
     const et=x=>x.nombre||x.usr;
+    const alto=Math.max(320,top.length*30+56)+'px';
+    ['chProdUbi','chProdOcu'].forEach(id=>{
+      const w=document.getElementById(id).parentElement;
+      if(w) w.style.height=alto;
+    });
+    const ejeY={ticks:{autoSkip:false,font:{size:11},crossAlign:'far'},grid:{display:false}};
     chart('chProdUbi',{type:'bar',
-      data:{labels:top.map(et),datasets:[{label:'Ubicaciones',data:top.map(x=>x.ubis),backgroundColor:'#0057B8'}]},
-      options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
+      data:{labels:top.map(et),datasets:[{label:'Ubicaciones',data:top.map(x=>x.ubis),
+            backgroundColor:'#0057B8',borderRadius:3}]},
+      options:{indexAxis:'y',plugins:{legend:{display:false}},
+               scales:{x:{beginAtZero:true,grace:'8%',ticks:{precision:0}},y:ejeY}}});
     chart('chProdOcu',{type:'bar',
       data:{labels:top.map(et),datasets:[
         {label:'Ocupadas',data:top.map(x=>x.ocu),backgroundColor:'#E8A33D',stack:'s'},
         {label:'Vacías',data:top.map(x=>x.vac),backgroundColor:'#8A94A6',stack:'s'}]},
-      options:{indexAxis:'y',scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0}},y:{stacked:true}}}});
+      options:{indexAxis:'y',
+               scales:{x:{stacked:true,beginAtZero:true,grace:'8%',ticks:{precision:0}},
+                       y:Object.assign({stacked:true},ejeY)}}});
 
     Prod.tabla(L);
     Prod.editor(L);
@@ -4333,7 +4584,7 @@ const Reporte = {
         <div><span>Pendientes</span><b>${U.num(m.pend)}</b></div>
         <div><span>Cerradas</span><b>${U.num(m.cerradas)}</b></div>
         <div><span>En recuento</span><b>${U.num(m.E.C2+m.E.C3)}</b></div>
-        <div><span>Fin estimado</span><b>${m.finEst?U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—'}</b></div>
+        <div><span>Fin estimado</span><b>${m.finEst?U.fmt(m.finEst)+' '+U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—'}</b></div>
       </div>
 
       <div class="rep-cols">
@@ -4355,6 +4606,12 @@ const Reporte = {
             <tr><td><b>Valor absoluto compensado</b></td><td class="n"><b>${$(net.netoAbsVal)}</b></td></tr>
             ${net.stkUn?`<tr><td>Diferencias por tipo de stock</td><td class="n">${U.num(net.stkIt)} ítems · ${U.num(net.stkUn,0)} u · no son stock a buscar</td></tr>`:''}
             ${net.matSinPrecio?`<tr><td>Materiales sin precio en el maestro</td><td class="n">${U.num(net.matSinPrecio)} · ${U.num(net.unidSinPrecio,0)} u fuera de los importes</td></tr>`:''}
+          </table>
+          <h4>Proyección del cierre · ${U.esc(Motor.jornada.texto())}</h4>
+          <table>
+            <tr><td>Ritmo actual · faltan</td><td class="n">${U.num(m.ritmoHora,0)} ubic/hora · ${U.num(m.restantes)} ubicaciones${m.jornadasRest!==null?' · '+U.num(m.jornadasRest,1)+' jornadas':''}</td></tr>
+            <tr><td><b>Fin estimado</b></td><td class="n"><b>${m.finEst?U.fmt(m.finEst)+' '+U.hhmm(m.finEst.getHours()*60+m.finEst.getMinutes()):'—'}</b></td></tr>
+            ${m.ritmoNecesario!==null?`<tr><td>Para cerrar el ${Config.d.fin} hace falta</td><td class="n">${U.num(m.ritmoNecesario,0)} ubic/hora · quedan ${U.num(m.horasHastaCierre,1)} h de jornada</td></tr>`:''}
           </table>
           <h4>Exactitud sobre lo contado</h4>
           <table>
@@ -4419,6 +4676,52 @@ const UI = {
     Config.d.tema=n; Config.persistir();
     if(Motor.V) Vista.render();
   },
+  /* Qué columna del archivo alimenta cada campo, y qué columnas quedaron sin
+     usar. Es la respuesta directa a "no me está leyendo tal cosa". */
+  verColumnas(){
+    const el=document.getElementById('panelCols');
+    if(!el.classList.contains('hidden')){ el.classList.add('hidden'); return; }
+    const meta=Datos.meta.conteos, mp=Datos.mapaDe('conteos');
+    if(!meta||!mp){ U.toast('Cargá la bajada de conteos primero','err'); return; }
+    const usadas=new Set(Object.values(mp).filter(Boolean));
+    const lleno={}, N=Math.min((meta.muestra||[]).length,200);
+    (meta.headers||[]).forEach(h=>{
+      let c=0;
+      for(let i=0;i<N;i++){
+        const v=(meta.muestra[i]||{})[h];
+        if(v!==undefined&&v!==null&&String(v).trim()!=='') c++;
+      }
+      lleno[h]=N?c/N:0;
+    });
+    const fila=(a,b,c)=>`<tr><td>${a}</td><td>${b}</td><td class="rc-mini">${c}</td></tr>`;
+    const campos=CAMPOS.conteos.map(d=>{
+      const col=mp[d.k];
+      const dato=col?(lleno[col]>0?U.pct(lleno[col]*100,0)+' con dato':'<b style="color:var(--ceva-red)">viene vacía</b>')
+                    :'<span class="cero">—</span>';
+      return fila(U.esc(d.lbl),
+        col?('<b class="mono">'+U.esc(col)+'</b>'):'<span style="color:var(--ceva-red)">sin asignar</span>',
+        dato);
+    }).join('');
+    const sueltas=(meta.headers||[]).filter(h=>!usadas.has(h));
+    el.classList.remove('hidden');
+    el.innerHTML=
+      '<div class="tbl-scroll" style="max-height:340px"><table class="dt">'+
+      '<thead><tr><th>Campo del tablero</th><th>Columna del archivo</th><th>Contenido</th></tr></thead>'+
+      '<tbody>'+campos+'</tbody></table></div>'+
+      (sueltas.length
+        ? '<div class="rc-mini mt8"><b>'+sueltas.length+' columnas del archivo sin usar:</b> '+
+          sueltas.map(h=>U.esc(h)).join(' · ')+'</div>'
+        : '<div class="rc-mini mt8">Todas las columnas del archivo están asignadas.</div>')+
+      '<div class="rc-mini mt8">Para cambiar una asignación: <b>Revisar mapeo de conteos</b>, y después volvé '+
+      'a cargar la bajada para que se aplique.</div>';
+  },
+
+  cerrarAviso(id){
+    const c=Object.assign({},Config.d.avisosOff||{}); c[id]=1;
+    Config.d.avisosOff=c; Config.persistir(); Vista.avance();
+  },
+  verAvisos(){ Config.d.avisosOff={}; Config.persistir(); Vista.avance(); },
+
   pill(){
     const M=Motor.M;
     if(!M||!Datos.conteos.length){ statusPill.textContent='Sin datos cargados'; return; }
@@ -4444,7 +4747,77 @@ const UI = {
     llenar('fContador',M.arr.map(o=>o.usr),'Todos');
 
     UI.pintarRefs();
+    try{ UI.jornadaAForm(); }catch(e){}
     Mapa.poblarZonas();
+  },
+
+  /* ---------- jornada de trabajo ---------- */
+  DIAS:['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'],
+  jornadaAForm(){
+    const J=Config.d.jornada||{};
+    jorActiva.value=String(+J.activa===1?1:0);
+    jorT1i.value=J.t1i||''; jorT1f.value=J.t1f||'';
+    jorT2i.value=J.t2i||''; jorT2f.value=J.t2f||'';
+    const sel=Array.isArray(J.dias)?J.dias:[];
+    jorDias.innerHTML=[1,2,3,4,5,6,0].map(d=>
+      `<label class="chk"><input type="checkbox" data-dia="${d}"${sel.includes(d)?' checked':''}>
+       <span>${UI.DIAS[d]}</span></label>`).join('');
+    jorResumen.textContent=Motor.jornada.texto();
+  },
+  guardarJornada(){
+    const dias=[...jorDias.querySelectorAll('input[type=checkbox]')]
+      .filter(c=>c.checked).map(c=>+c.dataset.dia);
+    const J={activa:+jorActiva.value, dias,
+      t1i:jorT1i.value, t1f:jorT1f.value, t2i:jorT2i.value, t2f:jorT2f.value};
+    Config.d.jornada=J; Config.d.jornadaV=Config.def.jornadaV;
+    Config.persistir();
+    if(+J.activa===1 && (!dias.length || !Motor.jornada.franjas().length)){
+      U.toast('La jornada quedó vacía: sin días o sin horarios válidos, la proyección usa horas corridas','err');
+    }
+    Motor.reconstruir();
+    UI.jornadaAForm();
+    U.toast('Jornada aplicada: '+Motor.jornada.texto(),'ok');
+  },
+  /* Lee del propio archivo en qué horas y qué días se contó y arma la
+     jornada: la franja va de la primera a la última hora con actividad, y el
+     hueco más largo del medio se toma como el corte del almuerzo. */
+  jornadaDelArchivo(){
+    const M=Motor.M;
+    if(!M||!M.horaMap.size){ U.toast('Cargá la bajada de conteos primero','err'); return; }
+    const porHora=new Array(24).fill(0), dias=new Set();
+    M.horaMap.forEach((set,kh)=>{
+      const [iso,h]=kh.split('|');
+      porHora[+h]+=set.size;
+      dias.add(new Date(iso+'T12:00:00').getDay());
+    });
+    const act=porHora.map((v,i)=>v>0?i:-1).filter(i=>i>=0);
+    if(!act.length){ U.toast('El archivo no tiene horas de recuento utilizables','err'); return; }
+    const ini=act[0], fin=act[act.length-1]+1;
+    /* hueco interno más largo: es el corte entre turnos */
+    let g0=-1,g1=-1,c0=-1;
+    for(let h=ini;h<fin;h++){
+      if(porHora[h]===0){ if(c0<0) c0=h; }
+      else if(c0>=0){ if(g0<0 || (h-c0)>(g1-g0)){ g0=c0; g1=h; } c0=-1; }
+    }
+    const hh=v=>String(v).padStart(2,'0')+':00';
+    const prev=Config.d.jornada||{};
+    /* Los DÍAS no se tocan: son una decisión, no un dato. Si el conteo arrancó
+       un viernes, el archivo sólo vio viernes y sábado, y tomarlo al pie de la
+       letra proyecta el cierre dos semanas tarde. */
+    const J={activa:1, dias:Array.isArray(prev.dias)&&prev.dias.length
+                            ? prev.dias.slice() : Config.def.jornada.dias.slice()};
+    if(g0>=0 && (g1-g0)>=1){
+      J.t1i=hh(ini); J.t1f=hh(g0); J.t2i=hh(g1); J.t2f=hh(fin);
+    }else{
+      J.t1i=hh(ini); J.t1f=hh(fin); J.t2i=''; J.t2f='';
+    }
+    Config.d.jornada=J; Config.d.jornadaV=Config.def.jornadaV;
+    Config.persistir(); Motor.reconstruir(); UI.jornadaAForm();
+    U.toast('Horario tomado del archivo: '+Motor.jornada.texto(),'ok');
+    const DN=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    jorAyuda.innerHTML='Se tomaron las <b>horas</b> del archivo. Los <b>días</b> quedaron como estaban: '+
+      'el archivo sólo vio '+[...dias].sort().map(d=>DN[d]).join(', ')+
+      ', y marcar sólo esos atrasaría el cierre proyectado. Revisalos vos.';
   },
 
   /* ---------- panel de referencias → a qué conteo pertenece cada una ----------
