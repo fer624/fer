@@ -367,6 +367,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <p class="hint">Minutos por unidad. El HC por sector se usa para la saturación.</p>
       <div class="tw"><table id="tCfg"></table></div>
     </div>
+    <div class="panel"><h2>Referencias del inventario</h2>
+      <p class="hint">Cómo se separan los conteos del plan de las auditorías de ubicación. Busca el texto dentro de la referencia; podés poner varias separadas por punto y coma.</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+        <div class="fld"><label>Conteo cíclico</label><input id="cRefC" value="CONTEO CICLICO"></div>
+        <div class="fld"><label>Auditoría de ubicaciones</label><input id="cRefA" value="AUDITORIA"></div>
+      </div></div>
+    <div class="panel"><h2>Usuarios que cuentan</h2>
+      <p class="hint">Quién aparece en las bases y cuántos registros tiene cada uno. Destildá a quien no deba sumar.</p>
+      <div id="usersBox"></div></div>
     <div class="panel"><h2>Estructura de ubicaciones</h2>
       <p class="hint">Mezzanine es trabajo de piso; rack necesita máquina. Esta tabla decide si una tarea es s/MHE o c/MHE.</p>
       <div id="estrBox"></div>
@@ -388,16 +397,17 @@ const PROC=[
  {id:'pickM',   n:'Picking c/MHE',            resp:'Maq',     sec:'DES', un:'Líneas',      aj:3.19,  src:'tar', cat:'prep',  est:'Rack'},
  {id:'ctrl',    n:'Control',                  resp:'Oper',    sec:'DES', un:'Líneas',      aj:2.27,  src:'tar', cat:'ctrl'},
  {id:'cargaCam',n:'Carga de camiones',        resp:'Maq',     sec:'DES', un:'Carga',       aj:42.04, src:'man', mk:'mCrg'},
- {id:'contM',   n:'Conteo cíclico c/MHE',     resp:'Maq',     sec:'INV', un:'Líneas',      aj:3.32,  src:'inv', est:'Rack'},
- {id:'contS',   n:'Conteo cíclico',           resp:'Oper',    sec:'INV', un:'Líneas',      aj:1.829, src:'inv', est:'Mezz'},
- {id:'aud',     n:'Auditoría ubicaciones',    resp:'Oper-Maq',sec:'INV', un:'Ubicaciones', aj:0.71,  src:'inv', audit:1},
+ {id:'contM',   n:'Conteo cíclico c/MHE',     resp:'Maq',     sec:'INV', un:'Líneas',      aj:3.32,  src:'inv', cat:'inv', est:'Rack'},
+ {id:'contS',   n:'Conteo cíclico',           resp:'Oper',    sec:'INV', un:'Líneas',      aj:1.829, src:'inv', cat:'inv', est:'Mezz'},
+ {id:'aud',     n:'Auditoría ubicaciones',    resp:'Oper-Maq',sec:'INV', un:'Ubicaciones', aj:0.71,  src:'inv', cat:'aud'},
  {id:'mov',     n:'Movimientos internos',     resp:'Oper',    sec:'INV', un:'Líneas',      aj:11.16, src:'tar', cat:'mov'}
 ];
 const SEC={REC:{n:'Recepción',hc:4},DES:{n:'Despacho',hc:8},INV:{n:'Inventarios',hc:2}};
 const CATN={prep:'Picking',ctrl:'Control',guard:'Guardado',desco:'Desconsolidado',mov:'Mov. interno',
-            carga:'Carga (UM)',desc:'Descarga (UM)',zixd:'Cross dock'};
-const CATC={prep:'--s1',ctrl:'--s2',guard:'--s3',desco:'--s4',mov:'--s5',carga:'--s6',zixd:'--s7',desc:'--s8'};
-const CFG={sup:1.15,jor:405,burst:30,cap:1800,hc:{REC:4,DES:8,INV:2},target:6.75};
+            carga:'Carga (UM)',desc:'Descarga (UM)',zixd:'Cross dock',inv:'Conteo cíclico',aud:'Auditoría ubic.'};
+const CATC={prep:'--s1',ctrl:'--s2',guard:'--s3',desco:'--s4',mov:'--s5',carga:'--s6',zixd:'--s7',desc:'--s8',inv:'--s7',aud:'--s8'};
+const CFG={sup:1.15,jor:405,burst:30,cap:1800,hc:{REC:4,DES:8,INV:2},target:6.75,
+  invRef:'CONTEO CICLICO',invAud:'AUDITORIA'};
 
 /* Legajos del maestro de personal */
 const PERS={'1':'LANGONE','5':'RUSSO','7':'MARTINEZ','8':'LOBO','9':'PETRAGLIA','12':'SILVA','17':'HERRERA',
@@ -565,7 +575,6 @@ function procTareas(rows){
   const ev=[],cnt={},desc={},vistos=new Set();
   let nOtra=0,nExU=0,nExS=0,nInt=0;
   const push=(c,T)=>{
-    if(!OKU.has(T.u)){nExU++;desc['usuario fuera de lista']=(desc['usuario fuera de lista']||0)+1;return;}
     cnt[c]=(cnt[c]||0)+1;
     const est=(c==='guard')?estructura(T.ubd):((c==='prep'||c==='mov')?estructura(T.ubo):null);
     ev.push({u:T.u,s:T.s,c:c,est:est,ubo:T.ubo,ubd:T.ubd,
@@ -624,8 +633,8 @@ function medir(ev){
 </script>
 <script>
 /* ===================== Estado ===================== */
-let ST={fecha:null,ev:[],cnt:{},desc:{},med:null,inv:null,bk:null,diag:null,vol:{},
-        man:{mCam:null,mCnt:null,mCtl:null,mCrg:null},sinEstr:{prep:0,guard:0}};
+let ST={fecha:null,ev:[],evTar:[],evInv:[],cnt:{},desc:{},med:null,invDiag:null,bk:null,diag:null,
+        vol:{},users:{},usersInc:{},man:{mCam:null,mCnt:null,mCtl:null,mCrg:null},sinEstr:{prep:0,guard:0}};
 const CSS=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const HRAMP=['--h0','--h1','--h2','--h3','--h4','--h5','--h6','--h7'];
 function heat(v,max){if(!v)return CSS('--h0');
@@ -639,8 +648,8 @@ function calcular(){
   const vol={};
   PROC.forEach(p=>{
     if(p.src==='man'){vol[p.id]=ST.man[p.mk];return;}
-    if(p.src==='inv'){vol[p.id]=ST.inv?(p.audit?ST.inv.aud:(ST.inv[p.est==='Rack'?'rack':'mezz']||0)):null;return;}
-    vol[p.id]=p.est?(c[p.cat+'|'+p.est]||0):(ev.filter(e=>e.c===p.cat).length);
+    const nv=p.est?(c[p.cat+'|'+p.est]||0):ev.filter(e=>e.c===p.cat).length;
+    vol[p.id]=(p.src==='inv'&&!ST.evInv.length)?null:nv;
   });
   ST.vol=vol;
   const r=[];let hsT=0;
@@ -743,7 +752,7 @@ function renderProc(M){
       <td class="n">${fmt(hs,1)}</td><td class="n">${fmt(fte,2)}</td></tr>`;
     fs.forEach(f=>{
       const d=f.desemp,cls=d==null?'':d>=1?'g':d>=.85?'a':'r';
-      h+=`<tr><td>${esc(f.p.n)}${f.p.src==='man'?' <span class="pill m">manual</span>':''}${f.p.src==='inv'&&!ST.inv?' <span class="pill">sin base</span>':''}</td>
+      h+=`<tr><td>${esc(f.p.n)}${f.p.src==='man'?' <span class="pill m">manual</span>':''}${f.p.src==='inv'&&!ST.evInv.length?' <span class="pill">sin base</span>':''}</td>
         <td>${f.p.resp}</td><td>${f.p.un}</td>
         <td class="n">${f.vol==null?'—':fmt(f.vol)}</td>
         <td class="n">${fmt(f.p.aj,2)}</td>
@@ -759,9 +768,14 @@ function renderProc(M){
   $('#tProc').innerHTML=h;
   const n=[];
   if(ST.sinEstr.prep||ST.sinEstr.guard)n.push(`${ST.sinEstr.prep} tareas de picking y ${ST.sinEstr.guard} de guardado no tienen ubicación resoluble, así que no se reparten entre s/MHE y c/MHE.`);
-  if(!ST.inv)n.push('Conteo cíclico y auditoría quedan vacíos hasta que cargues la base de inventario.');
+  if(!ST.evInv.length)n.push('Conteo cíclico y auditoría quedan vacíos hasta que cargues la base de inventario.');
+  else if(ST.invDiag&&Object.keys(ST.invDiag.desc).length)n.push('Referencias del inventario que no entran en ningún proceso: '+Object.entries(ST.invDiag.desc).map(e=>e[0]+' ('+e[1]+')').join(', ')+'.');
   const faltan=PROC.filter(p=>p.src==='man'&&ST.man[p.mk]==null).map(p=>p.n);
   if(faltan.length)n.push('Sin dato manual: '+faltan.join(', ')+'.');
+  const fuera=Object.keys(ST.users||{}).filter(u=>!ST.usersInc[u]);
+  if(fuera.length){
+    const tot=fuera.reduce((a,u)=>a+ST.users[u],0);
+    n.push('Hay '+fuera.length+' usuario'+(fuera.length===1?'':'s')+' sin tildar, con '+fmt(tot)+' registros que no suman en ningún total: '+fuera.map(u=>u+' ('+ST.users[u]+')').join(', ')+'. Se tildan en Estándares.');}
   n.push('El control se confirma por pedido entero; el reparto por ráfaga le asigna el tiempo del bloque, pero su MTM real es el menos confiable de la tabla.');
   $('#nProc').innerHTML=n.map(esc).join(' ');}
 
@@ -1016,11 +1030,12 @@ function renderCfg(){
 
 /* ===================== Refresco general ===================== */
 function refresh(){
-  if(!ST.ev.length){return;}
+  recomputeUsers();
+  if(!ST.ev.length){renderUsers();return;}
   ST.med=medir(ST.ev);
   const M=calcular();
   renderKPI(M);renderHoras(M);renderSat(M);renderPorHora();
-  renderProc(M);renderOper();renderOperMTM();renderHM();renderBox();renderCfg();
+  renderProc(M);renderOper();renderOperMTM();renderHM();renderBox();renderCfg();renderUsers();
   const us=[...new Set(ST.ev.map(e=>e.u))].sort();
   const cur=$('#pOper').value;
   $('#pOper').innerHTML='<option value="">Todos (sin recorrido)</option>'
@@ -1055,32 +1070,65 @@ async function cargar(kind,file){
     if(kind==='tar'){
       const r=procTareas(rows);
       if(r.err)throw new Error(r.err);
-      ST.fecha=r.fecha;ST.ev=r.ev;ST.cnt=r.cnt;ST.desc=r.desc;ST.diag=r;
+      ST.fecha=r.fecha;ST.evTar=r.ev;ST.cnt=r.cnt;ST.desc=r.desc;ST.diag=r;
       setRes('dTar',`${r.fecha} · ${fmt(r.ev.length)} tareas físicas de ${fmt(r.filas)} filas`);
       renderDiag();refresh();
       $$('.tabs button')[1].click();
     }else{
       const r=procInv(rows);
       if(r.err)throw new Error(r.err);
-      ST.inv=r;
-      setRes('dInv',`${fmt(r.mezz+r.rack)} conteos · ${fmt(r.aud)} auditorías`);
+      ST.evInv=r.ev;ST.invDiag=r;
+      const fuera=Object.entries(r.desc).map(e=>e[0]+' ('+e[1]+')').join(', ');
+      setRes('dInv',`${fmt(r.cnt.inv)} conteos · ${fmt(r.cnt.aud)} auditorías${fuera?' · fuera: '+fuera:''}`);
       refresh();}
   }catch(e){setRes(DROPS[kind==='tar'?'dTar':kind==='inv'?'dInv':'dBk'],'No se pudo leer: '+e.message,1);}}
 
-const COLSI={ref:['referencia'],st:['estado','status'],fec:['fecha de conteo','fecha'],
-  usr:['contado por','usuario'],ubic:['ubicacion','ubicación']};
+const COLSI={fec:['ferecuentinvent','fecha de conteo'],ub:['ubicacion'],ref:['refer.','referencia'],
+  st:['status de inventario'],usr:['contador','contado por'],hor:['hora de recuento']};
+const refList=t=>String(t||'').split(/[;\n|]+/).map(x=>norm(x)).filter(Boolean);
 function procInv(rows){
-  const h=Object.keys(rows[0]||{});
-  const find=c=>h.find(x=>c.includes(norm(x)));
-  const cU=find(COLSI.ubic),cR=find(COLSI.ref);
-  if(!cU)return{err:'falta la columna de ubicación'};
-  let mezz=0,rack=0,aud=0;
+  const mp=colmap(rows,COLSI);
+  if(!mp.ub)return{err:'falta la columna Ubicacion'};
+  if(!mp.ref)return{err:'falta la columna de referencia (Refer.)'};
+  const fechas={};
+  rows.forEach(r=>{const f=mp.fec?xDate(r[mp.fec]):null;if(f)fechas[f]=(fechas[f]||0)+1;});
+  const F=ST.fecha||Object.keys(fechas).sort((a,b)=>fechas[b]-fechas[a])[0]||null;
+  const refC=refList(CFG.invRef),refA=refList(CFG.invAud);
+  const ev=[],desc={},vistas=new Set(),cnt={inv:0,aud:0};let otra=0;
   rows.forEach(r=>{
-    const ref=norm(r[cR]||''),u=V(r[cU]);
-    if(ref.includes('auditoria')){aud++;return;}
-    const e=estructura(u);
-    if(e==='Rack')rack++;else mezz++;});
-  return{mezz:mezz,rack:rack,aud:aud};}
+    const f=mp.fec?xDate(r[mp.fec]):null;
+    if(f&&F&&f!==F){otra++;return;}
+    const ref=norm(r[mp.ref]),ub=V(r[mp.ub]),u=V(r[mp.usr]).toUpperCase();
+    const s=mp.hor?xSec(r[mp.hor]):null,est=estructura(ub);
+    if(refA.length&&refA.some(x=>ref.includes(x))){
+      if(vistas.has(ub))return; vistas.add(ub);
+      cnt.aud++; ev.push({u:u,s:s,c:'aud',est:est,ub:ub,ubo:ub,ubd:''}); return;}
+    if(refC.length&&refC.some(x=>ref.includes(x))){
+      cnt.inv++; ev.push({u:u,s:s,c:'inv',est:est,ub:ub,ubo:ub,ubd:''}); return;}
+    const k=V(r[mp.ref])||'(sin referencia)';
+    desc[k]=(desc[k]||0)+1;});
+  return{ev:ev,cnt:cnt,desc:desc,filas:rows.length,fecha:F,otra:otra};}
+
+/* ===================== Usuarios incluidos ===================== */
+function recomputeUsers(){
+  const all=ST.evTar.concat(ST.evInv),seen={};
+  all.forEach(e=>{seen[e.u]=(seen[e.u]||0)+1;});
+  Object.keys(seen).forEach(u=>{if(ST.usersInc[u]===undefined)ST.usersInc[u]=OKU.has(u);});
+  ST.users=seen;
+  ST.ev=all.filter(e=>ST.usersInc[e.u]);}
+function renderUsers(){
+  const us=Object.keys(ST.users||{}).sort((a,b)=>ST.users[b]-ST.users[a]);
+  if(!us.length){$('#usersBox').innerHTML='<p class="note">Carga una base y aca aparece quien trabajo.</p>';return;}
+  $('#usersBox').innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">`
+    +us.map(u=>{const nom=PERS[u.replace('FINARG','')];
+      return `<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:5px 0">
+        <input type="checkbox" data-usr="${esc(u)}" ${ST.usersInc[u]?'checked':''} style="accent-color:var(--acc2)">
+        <span class="num" style="font-weight:600">${esc(u)}</span>
+        <span style="color:var(--ink3)">${esc(nom||'sin legajo')}</span>
+        <b class="num" style="margin-left:auto;color:var(--ink2)">${fmt(ST.users[u])}</b></label>`;}).join('')
+    +`</div><p class="note">Los destildados no suman en ningun total. Por defecto se marcan los legajos del maestro de personal y DGUILLEN; el resto queda afuera hasta que lo decidas.</p>`;
+  $$('#usersBox input[data-usr]').forEach(i=>i.onchange=()=>{
+    ST.usersInc[i.dataset.usr]=i.checked;refresh();});}
 
 function renderDiag(){
   if(!ST.diag)return;
@@ -1123,6 +1171,9 @@ $$('.tabs button').forEach(b=>b.onclick=()=>{
   if(id==='cJor'){CFG.jor=v;CFG.target=v/60;$('#cTgt').value=(v/60).toFixed(2);}
   if(id==='cBurst')CFG.burst=v;if(id==='cCap')CFG.cap=v*60;if(id==='cTgt')CFG.target=v;
   if(ST.ev.length)refresh();else renderCfg();});
+['cRefC','cRefA'].forEach(id=>$('#'+id).onchange=()=>{
+  if(id==='cRefC')CFG.invRef=$('#'+id).value; else CFG.invAud=$('#'+id).value;
+  toast('Volve a cargar la base de inventario para aplicar las referencias');});
 ['pAct','pOper'].forEach(id=>$('#'+id).onchange=renderPlano);
 $('#pHora').oninput=()=>{$('#pHoraV').textContent=$('#pHora').value;renderPlano();};
 $('#btnTema').onclick=()=>{
@@ -1132,7 +1183,7 @@ $('#btnTema').onclick=()=>{
   if(ST.ev.length)refresh();else renderPlano();};
 
 /* arranque: el plano se dibuja vacío, con la geometría real */
-renderCfg();
+renderCfg();renderUsers();
 $('#rampP').innerHTML=HRAMP.map(c=>`<i style="background:${CSS(c)}"></i>`).join('');
 $('#rampA').innerHTML=HRAMP.map(c=>`<i style="background:${CSS(c)}"></i>`).join('');
 renderPlano();
