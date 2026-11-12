@@ -290,6 +290,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <p class="hint">Turno según la primera y última tarea confirmada en SAP, que no es el horario fichado.</p>
       <div class="tw"><table id="tOper"></table></div>
     </div>
+    <div class="panel"><h2>MTM real por legajo</h2>
+      <p class="hint">Minutos por tarea de cada persona en cada proceso. El color compara contra el estándar; el número chico es la cantidad de observaciones. Con menos de 10 el dato no alcanza para juzgar a nadie y aparece atenuado.</p>
+      <div class="hmwrap" id="tOperMTM"></div>
+      <div class="legend"><span><i style="background:var(--good)"></i>igual o mejor que el estándar</span>
+        <span><i style="background:var(--warn)"></i>hasta 15% por debajo</span>
+        <span><i style="background:var(--bad)"></i>más de 15% por debajo</span></div></div>
     <div class="panel"><h2>Mezcla de actividades</h2><div id="chMix"></div></div>
   </div>
 </section>
@@ -587,7 +593,7 @@ function procTareas(rows){
 /* ===================== Medición: reparto por ráfaga ===================== */
 function medir(ev){
   const byU={};
-  ev.forEach(e=>{if(e.s==null)return;(byU[e.u]=byU[e.u]||[]).push(e);});
+  ev.forEach(e=>{e.t=null;if(e.s==null)return;(byU[e.u]=byU[e.u]||[]).push(e);});
   const dur={},span={};
   Object.keys(byU).forEach(u=>{
     const L=byU[u].slice().sort((a,b)=>a.s-b.s);
@@ -768,12 +774,13 @@ function renderOper(){
   us.forEach(u=>{
     const s=sp[u],span=(s.fin-s.ini)/3600,std=hsStd(u),d=span?std/span:null;
     const num=u.replace('FINARG','');
-    const cls=d==null?'':d>=.9?'g':d>=.7?'a':'r';
+    const poco=s.n<10||span<1;
+    const cls=d==null?'':poco?'':d>=.9?'g':d>=.7?'a':'r';
     h+=`<tr><td class="num">${esc(u)}</td><td>${esc(PERS[num]||'—')}</td>
       <td class="num" style="color:var(--ink2)">${HM(s.ini)} → ${HM(s.fin)}</td>
       <td class="n">${fmt(span,2)}</td><td class="n">${fmt(s.n)}</td>
       <td class="n">${fmt(std,2)}</td>
-      <td class="n">${d==null?'—':`<span class="pill ${cls}">${fmt(d*100,0)}%</span>`}</td>
+      <td class="n" title="${poco?'Pocas tareas o turno muy corto: el porcentaje no es representativo':''}">${d==null?'—':poco?`<span style="color:var(--ink3)">${fmt(d*100,0)}%</span>`:`<span class="pill ${cls}">${fmt(d*100,0)}%</span>`}</td>
       <td class="n" style="color:var(--ink3)">${fmt(s.asig/3600,1)} h</td></tr>`;});
   h+='</tbody>';$('#tOper').innerHTML=h;
   const cats=[...new Set(ST.ev.map(e=>e.c))];
@@ -784,6 +791,42 @@ function renderOper(){
         ${cats.map(c=>m[c]?`<i title="${esc(CATN[c]||c)}: ${m[c]}" style="width:${m[c]/t*100}%;background:${CSS(CATC[c]||'--s1')}"></i>`:'').join('')}</span>
       <b class="num" style="font-size:11.5px;min-width:34px;text-align:right">${t}</b></div>`;}).join('')
     +`<div class="legend">${cats.map(c=>`<span><i style="background:${CSS(CATC[c]||'--s1')}"></i>${esc(CATN[c]||c)}</span>`).join('')}</div>`;}
+
+/* ===================== MTM real por legajo ===================== */
+function renderOperMTM(){
+  const M={},TOT={};
+  ST.ev.forEach(e=>{if(e.t==null)return;
+    const ks=[e.c]; if(e.est)ks.push(e.c+'|'+e.est);
+    const A=M[e.u]=M[e.u]||{};
+    TOT[e.u]=(TOT[e.u]||0)+1;
+    ks.forEach(k=>{const B=A[k]=A[k]||{n:0,s:0};B.n++;B.s+=e.t;});});
+  const us=Object.keys(M).sort((a,b)=>TOT[b]-TOT[a]);
+  const cols=PROC.filter(p=>p.cat).filter(p=>{
+    const k=p.est?p.cat+'|'+p.est:p.cat;
+    return us.some(u=>M[u][k]&&M[u][k].n>0);});
+  if(!us.length||!cols.length){$('#tOperMTM').innerHTML='<p class="note">Todavía no hay tiempos medidos.</p>';return;}
+  const cell=(p,c)=>{
+    if(!c||!c.n)return '<td class="n" style="color:var(--ink3)">—</td>';
+    const mtm=c.s/c.n/60,d=p.aj/mtm,flojo=c.n<10;
+    const tono=d>=1?'--good':d>=.85?'--warn':'--bad';
+    return `<td class="n" style="background:color-mix(in srgb,var(${tono}) ${flojo?8:20}%,transparent);${flojo?'opacity:.62;':''}"
+      title="${esc(p.n)} · ${fmt(mtm,2)} min contra ${fmt(p.aj,2)} de estándar · ${c.n} observaciones">
+      ${fmt(mtm,2)}<span style="font-size:9.5px;color:var(--ink3);margin-left:3px">${c.n}</span></td>`;};
+  let h=`<table><thead><tr><th>Legajo</th><th>Nombre</th>
+    ${cols.map(p=>`<th class="n" title="${esc(p.n)}">${esc(p.n.replace('Movimientos internos','Mov. int.').replace('Desconsolidado','Descons.'))}</th>`).join('')}
+    <th class="n">Σ obs.</th></tr></thead><tbody>`;
+  us.forEach(u=>{
+    const tot=TOT[u]||0;
+    h+=`<tr><td class="num">${esc(u)}</td><td>${esc(PERS[u.replace('FINARG','')]||'—')}</td>
+      ${cols.map(p=>cell(p,M[u][p.est?p.cat+'|'+p.est:p.cat])).join('')}
+      <td class="n" style="color:var(--ink3)">${fmt(tot)}</td></tr>`;});
+  h+=`<tr class="tot"><td colspan="2">Operación</td>
+    ${cols.map(p=>{const k=p.est?p.cat+'|'+p.est:p.cat,s=ST.med.stat[k];
+      return s?`<td class="n">${fmt(s.avg/60,2)}<span style="font-size:9.5px;color:var(--ink3);margin-left:3px">${s.n}</span></td>`:'<td></td>';}).join('')}
+    <td></td></tr>
+    <tr><td colspan="2" style="color:var(--ink3);font-size:11px">Estándar</td>
+    ${cols.map(p=>`<td class="n" style="color:var(--ink3);font-size:11px">${fmt(p.aj,2)}</td>`).join('')}<td></td></tr></tbody></table>`;
+  $('#tOperMTM').innerHTML=h;}
 
 /* ===================== Mapa de calor por hora ===================== */
 function renderHM(){
@@ -947,7 +990,7 @@ function refresh(){
   ST.med=medir(ST.ev);
   const M=calcular();
   renderKPI(M);renderHoras(M);renderSat(M);renderPorHora();
-  renderProc(M);renderOper();renderHM();renderBox();renderCfg();
+  renderProc(M);renderOper();renderOperMTM();renderHM();renderBox();renderCfg();
   const us=[...new Set(ST.ev.map(e=>e.u))].sort();
   const cur=$('#pOper').value;
   $('#pOper').innerHTML='<option value="">Todos (sin recorrido)</option>'
