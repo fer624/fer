@@ -289,6 +289,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <p class="hint">Turno según la primera y última tarea confirmada en SAP, que no es el horario fichado.</p>
       <div class="tw"><table id="tOper"></table></div>
     </div>
+    <div class="panel"><h2>Horas hombre contra target</h2>
+      <p class="hint">Horas hombre producidas: la suma de tareas por su MTM ajustado, en minutos, pasada a horas. El target es la jornada efectiva de una persona.</p>
+      <div id="chHH"></div></div>
     <div class="panel"><h2>MTM real por legajo</h2>
       <p class="hint">Minutos por tarea de cada persona en cada proceso. El color compara contra el estándar; el número chico es la cantidad de observaciones. Con menos de 10 el dato no alcanza para juzgar a nadie y aparece atenuado.</p>
       <div class="hmwrap" id="tOperMTM"></div>
@@ -356,6 +359,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <div class="fld"><label>Jornada efectiva (min)</label><input id="cJor" class="num" value="405"></div>
         <div class="fld"><label>Ráfaga: corte (seg)</label><input id="cBurst" class="num" value="30"></div>
         <div class="fld"><label>Hueco máximo (min)</label><input id="cCap" class="num" value="30"></div>
+        <div class="fld"><label>Target HH por persona</label><input id="cTgt" class="num" value="6.75"></div>
       </div>
       <p class="note">El corte de ráfaga agrupa confirmaciones hechas de golpe y reparte el tiempo del bloque entre sus tareas. Sin eso, el control —que se confirma por pedido entero— mediría segundos en vez de minutos.</p>
     </div>
@@ -393,7 +397,7 @@ const SEC={REC:{n:'Recepción',hc:4},DES:{n:'Despacho',hc:8},INV:{n:'Inventarios
 const CATN={prep:'Picking',ctrl:'Control',guard:'Guardado',desco:'Desconsolidado',mov:'Mov. interno',
             carga:'Carga (UM)',desc:'Descarga (UM)',zixd:'Cross dock'};
 const CATC={prep:'--s1',ctrl:'--s2',guard:'--s3',desco:'--s4',mov:'--s5',carga:'--s6',zixd:'--s7',desc:'--s8'};
-const CFG={sup:1.15,jor:405,burst:30,cap:1800,hc:{REC:4,DES:8,INV:2}};
+const CFG={sup:1.15,jor:405,burst:30,cap:1800,hc:{REC:4,DES:8,INV:2},target:6.75};
 
 /* Legajos del maestro de personal */
 const PERS={'1':'LANGONE','5':'RUSSO','7':'MARTINEZ','8':'LOBO','9':'PETRAGLIA','12':'SILVA','17':'HERRERA',
@@ -730,7 +734,7 @@ function renderPorHora(){
 /* ===================== Tabla de procesos ===================== */
 function renderProc(M){
   let h=`<thead><tr><th>Proceso</th><th>Resp.</th><th>Unidad</th><th class="n">Volumen</th>
-    <th class="n">MTM aj.</th><th class="n">MTM real</th><th class="n">n</th><th class="n">Desempeño</th>
+    <th class="n">MTM aj. min</th><th class="n">MTM real min</th><th class="n">n</th><th class="n">Desempeño</th>
     <th class="n">Hs nec.</th><th class="n">FTE</th></tr></thead><tbody>`;
   Object.keys(SEC).forEach(s=>{
     const fs=M.filas.filter(f=>f.p.sec===s);
@@ -768,20 +772,47 @@ function renderOper(){
   const mix={};ST.ev.forEach(e=>{(mix[e.u]=mix[e.u]||{})[e.c]=((mix[e.u]||{})[e.c]||0)+1;});
   const hsStd=u=>ST.ev.filter(e=>e.u===u).reduce((a,e)=>{
     const p=PROC.find(x=>x.cat===e.c&&(!x.est||x.est===e.est));return a+(p?p.aj/60:0);},0);
-  let h=`<thead><tr><th>Legajo</th><th>Nombre</th><th>Turno</th><th class="n">Span</th><th class="n">Tareas</th>
-    <th class="n">Hs est.</th><th class="n">Desempeño</th><th class="n">Asignado</th></tr></thead><tbody>`;
+  let h=`<thead><tr><th>Legajo</th><th>Nombre</th><th>Turno</th><th class="n">Span h</th><th class="n">Tareas</th>
+    <th class="n">HH prod.</th><th class="n">Target</th><th class="n">% target</th><th class="n">% turno</th>
+    <th class="n">Asignado</th></tr></thead><tbody>`;
+  let hhT=0;
   us.forEach(u=>{
     const s=sp[u],span=(s.fin-s.ini)/3600,std=hsStd(u),d=span?std/span:null;
+    const tg=std/CFG.target;hhT+=std;
     const num=u.replace('FINARG','');
     const poco=s.n<10||span<1;
     const cls=d==null?'':poco?'':d>=.9?'g':d>=.7?'a':'r';
+    const ct=poco?'':tg>=1?'g':tg>=.85?'a':'r';
     h+=`<tr><td class="num">${esc(u)}</td><td>${esc(PERS[num]||'—')}</td>
       <td class="num" style="color:var(--ink2)">${HM(s.ini)} → ${HM(s.fin)}</td>
       <td class="n">${fmt(span,2)}</td><td class="n">${fmt(s.n)}</td>
-      <td class="n">${fmt(std,2)}</td>
-      <td class="n" title="${poco?'Pocas tareas o turno muy corto: el porcentaje no es representativo':''}">${d==null?'—':poco?`<span style="color:var(--ink3)">${fmt(d*100,0)}%</span>`:`<span class="pill ${cls}">${fmt(d*100,0)}%</span>`}</td>
+      <td class="n" style="font-weight:600">${fmt(std,2)}</td>
+      <td class="n" style="color:var(--ink3)">${fmt(CFG.target,2)}</td>
+      <td class="n" title="${poco?'Pocas tareas o turno muy corto: no es representativo':'Horas hombre producidas sobre el target'}">${poco?`<span style="color:var(--ink3)">${fmt(tg*100,0)}%</span>`:`<span class="pill ${ct}">${fmt(tg*100,0)}%</span>`}</td>
+      <td class="n" title="${poco?'Pocas tareas o turno muy corto: no es representativo':'Horas hombre sobre el tiempo que estuvo'}">${d==null?'—':poco?`<span style="color:var(--ink3)">${fmt(d*100,0)}%</span>`:`<span class="pill ${cls}">${fmt(d*100,0)}%</span>`}</td>
       <td class="n" style="color:var(--ink3)">${fmt(s.asig/3600,1)} h</td></tr>`;});
+  const tgT=us.length*CFG.target;
+  h+=`<tr class="tot"><td colspan="5">Total · ${us.length} legajos</td>
+    <td class="n">${fmt(hhT,1)}</td><td class="n">${fmt(tgT,1)}</td>
+    <td class="n">${fmt(hhT/tgT*100,0)}%</td><td colspan="2"></td></tr>`;
   h+='</tbody>';$('#tOper').innerHTML=h;
+  /* barras de HH contra target */
+  const maxHH=Math.max(CFG.target,...us.map(hsStd))*1.08;
+  $('#chHH').innerHTML=us.map(u=>{const std=hsStd(u),tg=std/CFG.target;
+    const q=sp[u],flojo=q.n<10||(q.fin-q.ini)/3600<1;
+    const col=flojo?CSS('--line2'):tg>=1?CSS('--good'):tg>=.85?CSS('--warn'):CSS('--bad');
+    return `<div style="display:grid;grid-template-columns:minmax(92px,22%) 1fr auto;gap:9px;align-items:center;margin-bottom:6px">
+      <span style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        <b class="num">${esc(u)}</b> <span style="color:var(--ink3)">${esc(PERS[u.replace('FINARG','')]||'')}</span></span>
+      <span style="position:relative;height:16px;background:var(--surf2);border-radius:3px;display:block">
+        <i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100,std/maxHH*100)}%;background:${col};border-radius:3px"></i>
+        <i style="position:absolute;left:${CFG.target/maxHH*100}%;top:-2px;bottom:-2px;width:0;border-left:2px dashed ${CSS('--ink2')}"></i>
+      </span>
+      <b class="num" style="font-size:11.5px;min-width:84px;text-align:right;${flojo?'color:var(--ink3);font-weight:400':''}">${fmt(std,2)} h · ${fmt(tg*100,0)}%</b>
+    </div>`;}).join('')
+    +`<div class="legend"><span><i style="background:var(--ink2)"></i>target de ${fmt(CFG.target,2)} h</span>
+      <span><i style="background:var(--line2)"></i>pocas tareas: no representativo</span>
+      <span style="color:var(--ink3)">horas hombre producidas por legajo</span></div>`;
   const cats=[...new Set(ST.ev.map(e=>e.c))];
   $('#chMix').innerHTML=us.map(u=>{const m=mix[u]||{},t=Object.values(m).reduce((a,b)=>a+b,0);
     return `<div style="display:grid;grid-template-columns:86px 1fr auto;gap:9px;align-items:center;margin-bottom:5px">
@@ -1086,10 +1117,11 @@ $$('.tabs button').forEach(b=>b.onclick=()=>{
 ['mCam','mCnt','mCtl','mCrg'].forEach(id=>$('#'+id).oninput=()=>{
   const v=parseFloat($('#'+id).value.replace(',','.'));
   ST.man[id]=isNaN(v)?null:v;if(ST.ev.length)refresh();});
-['cSup','cJor','cBurst','cCap'].forEach(id=>$('#'+id).onchange=()=>{
+['cSup','cJor','cBurst','cCap','cTgt'].forEach(id=>$('#'+id).onchange=()=>{
   const v=parseFloat($('#'+id).value.replace(',','.'));if(isNaN(v)||v<=0)return;
-  if(id==='cSup')CFG.sup=v;if(id==='cJor')CFG.jor=v;
-  if(id==='cBurst')CFG.burst=v;if(id==='cCap')CFG.cap=v*60;
+  if(id==='cSup')CFG.sup=v;
+  if(id==='cJor'){CFG.jor=v;CFG.target=v/60;$('#cTgt').value=(v/60).toFixed(2);}
+  if(id==='cBurst')CFG.burst=v;if(id==='cCap')CFG.cap=v*60;if(id==='cTgt')CFG.target=v;
   if(ST.ev.length)refresh();else renderCfg();});
 ['pAct','pOper'].forEach(id=>$('#'+id).onchange=renderPlano);
 $('#pHora').oninput=()=>{$('#pHoraV').textContent=$('#pHora').value;renderPlano();};
