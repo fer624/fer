@@ -158,6 +158,50 @@ table.hm td.obc{background:#dce6f4!important;color:#0f2744!important;font-weight
 .mq-ev .d i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 .mq-ev .n{color:var(--ink)}.mq-ev .n small{color:var(--muted)}
 .mq-none{font-size:13px;color:var(--muted)}
+/* ---------- Informe de máquinas (aparte del Activity Report) ---------- */
+#mqsheets{display:none}
+@media print{
+  body[data-pm=maq] #v-rep{display:none!important}
+  body[data-pm=maq] #v-maq{display:block!important}
+  body[data-pm=maq] #maq{display:none!important}
+  body[data-pm=maq] #mqsheets{display:block!important}
+}
+.mqr-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
+.mqr-sum div{border:1px solid #dde3ea;border-left:4px solid #c3ccd8;border-radius:6px;padding:1.6mm 3mm;display:flex;align-items:baseline;gap:3mm}
+.mqr-sum div.ok{border-left-color:#2e8b57}.mqr-sum div.mt{border-left-color:#f2c200}.mqr-sum div.fs{border-left-color:#d0452b}
+.mqr-sum small{font-size:10.5px;color:#5b6574;flex:1}
+.mqr-sum b{font-family:var(--num);font-size:24px;font-weight:600;line-height:1.1}.mqr-sum b i{font-style:normal;font-size:12px;color:#8a94a3;font-weight:400;margin-left:2px}
+.mqr-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:3mm;flex:1;min-height:0}
+.mqr-card{border:1px solid #dde3ea;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.mqr-ph{position:relative;height:26mm;background:#dfe5ee;overflow:hidden;flex:none}
+.mqr-ph img{width:100%;height:100%;object-fit:cover;object-position:50% 62%;display:block}
+.mqr-ph.wrap{background:#fff}.mqr-ph.wrap img{object-fit:contain}
+.mqr-ph .n{position:absolute;left:2mm;top:2mm;background:rgba(15,39,68,.85);color:#fff;font-size:9.5px;font-weight:700;border-radius:3px;padding:.3mm 2mm}
+.mqr-ph .s{position:absolute;right:2mm;top:2mm;color:#fff;font-size:9.5px;font-weight:700;border-radius:8px;padding:.3mm 2.2mm}
+.mqr-ph .s.OK{background:#2e8b57}.mqr-ph .s.MT{background:#e3a21a}.mqr-ph .s.FS{background:#d0452b}.mqr-ph .s.NU,.mqr-ph .s.NA{background:#6b7686}
+.mqr-b{padding:2mm 2.5mm;display:flex;flex-direction:column;gap:1.6mm;min-height:0;overflow:hidden}
+.mqr-b .t{font-family:var(--num);font-weight:600;font-size:13px;color:var(--navy);line-height:1.1}
+.mqr-b .t small{display:block;font-family:var(--font);font-weight:400;font-size:8.5px;color:#8a94a3}
+.mqr-b .k{display:grid;grid-template-columns:repeat(4,1fr);gap:1mm;text-align:center;font-size:8px;color:#5b6574}
+.mqr-b .k span{background:#f3f5f8;border-radius:3px;padding:.5mm 0}
+.mqr-b .k b{display:block;font-family:var(--num);font-size:12px;color:#16202e;line-height:1.1}
+.mqr-b .k .ok b{color:#2e8b57}.mqr-b .k .mt b{color:#b07d0a}.mqr-b .k .fs b{color:#d0452b}
+.mqr-b .mq-tl i{height:9px}
+.mqr-b ul{list-style:none;margin:0;padding:0;font-size:9px;line-height:1.25;color:#16202e}
+.mqr-b li{display:block;margin-bottom:.8mm}
+.mqr-b li i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}
+.mqr-b li.none{color:#8a94a3}
+.mqr-leg{display:flex;gap:5mm;font-size:9.5px;color:#5b6574;align-items:center}
+.mqr-leg span{display:inline-flex;align-items:center;gap:3px}
+.mqr-leg i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+.mqr-t{border-collapse:collapse;width:100%;font-size:11px}
+.mqr-t th{text-align:left;background:#eef1f5;color:#5b6574;font-size:10px;padding:1.6mm 2mm;border-bottom:1px solid #c9d0da}
+.mqr-t td{padding:1.8mm 2mm;border-bottom:1px solid #e8ecf1;vertical-align:top}
+.mqr-t td.c{text-align:center}
+.mqr-t small{display:block;color:#8a94a3;font-size:8.5px}
+.mqr-t .st{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.mqr-t .st.OK{background:#2e8b57}.mqr-t .st.MT{background:#f2c200}.mqr-t .st.FS{background:#d0452b}.mqr-t .st.NU{background:#9aa5b4}
+.mqr-t .none{color:#8a94a3}
 /* ---------- App shell ---------- */
 :root{--num:Bahnschrift,"DIN Alternate","Segoe UI",Calibri,sans-serif;--surf:#f3f5f8}
 body{background:var(--surf)}
@@ -773,7 +817,7 @@ table.hm td.rl .ico{width:13px;height:13px;color:#6b7686;margin-right:4px;vertic
 
 
 <!-- ================= HISTORIAL ================= -->
-<section class="view" id="v-maq"><main id="maq"></main></section>
+<section class="view" id="v-maq"><main id="maq"></main><div id="mqsheets" class="rpwrap"></div></section>
 
 <section class="view" id="v-hist">
   <div class="panel">
@@ -1799,37 +1843,71 @@ function maqType(e){const t=norm(e[2]||'');if(/orderpicker|order|picker/.test(t)
   const n=norm(e[1]+' '+e[0]);if(/order|picker/.test(n))return'op';if(/reach|apilador/.test(n))return'reach';if(/enfilm/.test(n))return'wrap';return'fork'}
 const MAQ_TXT={OK:'Ok',MT:'Anomalía leve',FS:'Fuera de servicio',NU:'No utilizado',NA:'Sin registro'};
 function mheReg(d){return !!d&&(d.mheOk||Object.keys(d.mhe||{}).length>0)}
-function renderMaq(){
+/* datos de la pestaña y del informe de máquinas (el informe de máquinas es aparte del Activity Report) */
+function maqData(){
   const c=S.cfg,regDays=Object.keys(S.days).filter(f=>f<=F&&mheReg(S.days[f])).sort();
   const win=[];for(let i=maqWin-1;i>=0;i--)win.push(addD(F,-i));
   const st=(f,code)=>{const d=S.days[f];return mheReg(d)?mheOf(d,code):null};
   const last=regDays.length?regDays[regDays.length-1]:null;
-  const cur=c.mhe.map(e=>last?st(last,e[0]):null);
-  const cnt=k=>cur.filter(x=>x===k).length,nOp=cur.filter(x=>x==='OK'||x==='MT').length;
-  let h=`<div class="mq-top"><h2>Máquinas industriales</h2><p>Estado de cada máquina día a día. El historial se arma con el estado y la novedad que se cargan en <b>Carga del día → Equipos MHE</b>.</p>
-    <div class="mq-win">${[7,30,90].map(n=>`<button data-win="${n}" class="${n===maqWin?'on':''}">${n} días</button>`).join('')}</div></div>`;
-  h+=`<div class="mq-sum"><div><small>Operativas${last?' al '+dshort(last):''}</small><b>${last?nOp:'—'}<i>/ ${c.mhe.length}</i></b></div>
-    <div class="ok"><small>Ok</small><b>${last?cnt('OK'):'—'}</b></div><div class="mt"><small>Anomalía leve</small><b>${last?cnt('MT'):'—'}</b></div><div class="fs"><small>Fuera de servicio</small><b>${last?cnt('FS'):'—'}</b></div></div>`;
-  h+='<div class="mq-grid">';
-  c.mhe.forEach((e,i)=>{
-    const code=e[0],type=maqType(e),now=cur[i]||'NA';
-    // historial completo (solo días registrados), agrupando días seguidos con el mismo estado y novedad
+  const items=c.mhe.map((e,i)=>{
+    const code=e[0],now=last?st(last,code):null,cur=now||'NA';
     const ev=[];regDays.forEach(f=>{const s=mheOf(S.days[f],code),n=((S.days[f].mheNote||{})[code]||'').trim();if(s==='OK'&&!n)return;
-      const p=ev[ev.length-1],ri=regDays.indexOf(f);if(p&&p.s===s&&p.n===n&&p.ri===ri-1){p.to=f;p.ri=ri;p.days++}else ev.push({from:f,to:f,s,n,ri,days:1})});
+      const pv=ev[ev.length-1],ri=regDays.indexOf(f);if(pv&&pv.s===s&&pv.n===n&&pv.ri===ri-1){pv.to=f;pv.ri=ri;pv.days++}else ev.push({from:f,to:f,s,n,ri,days:1,i})});
     const inWin=ev.filter(x=>x.to>=win[0]);
-    let streak=0;for(let k=regDays.length-1;k>=0;k--){if(mheOf(S.days[regDays[k]],code)===now&&now!=='OK')streak++;else break}
+    let streak=0;for(let k=regDays.length-1;k>=0;k--){if(mheOf(S.days[regDays[k]],code)===cur&&cur!=='OK')streak++;else break}
     const stats={OK:0,MT:0,FS:0,reg:0};win.forEach(f=>{const s=st(f,code);if(s){stats.reg++;if(stats[s]!=null)stats[s]++}});
     const disp=stats.reg?Math.round((stats.OK+stats.MT)/stats.reg*100):null;
-    const tl=win.map(f=>{const s=st(f,code),n=((S.days[f]||{}).mheNote||{})[code];return`<i class="${s||''}${f===F?' cur':''}" title="${esc(dshort(f)+' · '+(s?MAQ_TXT[s]:'Sin registro')+(n?' · '+n:''))}"></i>`}).join('');
+    const tl=win.map(f=>{const s=st(f,code),n=((S.days[f]||{}).mheNote||{})[code];return{f,s,n}});
+    return{e,i,code,type:maqType(e),cur,streak,stats,disp,tl,inWin};
+  });
+  const cnt=k=>items.filter(x=>x.cur===k).length;
+  return{c,win,last,items,nOp:items.filter(x=>x.cur==='OK'||x.cur==='MT').length,cnt};
+}
+function tlHTML(tl){return tl.map(({f,s,n})=>`<i class="${s||''}${f===F?' cur':''}" title="${esc(dshort(f)+' · '+(s?MAQ_TXT[s]:'Sin registro')+(n?' · '+n:''))}"></i>`).join('')}
+function renderMaq(){
+  const D=maqData(),{c,win,last,items}=D;
+  let h=`<div class="mq-top"><h2>Máquinas industriales</h2><p>Estado de cada máquina día a día. El historial se arma con el estado y la novedad que se cargan en <b>Carga del día → Equipos MHE</b>.</p>
+    <div class="mq-win">${[7,30,90].map(n=>`<button data-win="${n}" class="${n===maqWin?'on':''}">${n} días</button>`).join('')}</div><button class="btn" id="mqPdf" title="Informe aparte del Activity Report">PDF de máquinas</button></div>`;
+  h+=`<div class="mq-sum"><div><small>Operativas${last?' al '+dshort(last):''}</small><b>${last?D.nOp:'—'}<i>/ ${c.mhe.length}</i></b></div>
+    <div class="ok"><small>Ok</small><b>${last?D.cnt('OK'):'—'}</b></div><div class="mt"><small>Anomalía leve</small><b>${last?D.cnt('MT'):'—'}</b></div><div class="fs"><small>Fuera de servicio</small><b>${last?D.cnt('FS'):'—'}</b></div></div>`;
+  h+='<div class="mq-grid">';
+  items.forEach(m=>{
+    const {e,i,code,type,cur,streak,stats,disp,tl,inWin}=m;
     const evl=inWin.slice().reverse().slice(0,5).map(x=>`<li><span class="d"><i style="background:${MHE_SEM[x.s]||MHE_SEM.NU}"></i>${x.from===x.to?dshort(x.from):dshort(x.from)+'–'+dshort(x.to)}${x.days>1?` · ${x.days} d`:''}</span><span class="n">${esc(MAQ_TXT[x.s])}${x.n?` — ${esc(x.n)}`:''}</span></li>`).join('');
-    h+=`<div class="mq-card"><div class="mq-ph ${type==='wrap'?'wrap':''}">${MAQ_IMG[type]?`<img src="${MAQ_IMG[type]}" alt="${esc(e[1])}">`:ic('forklift')}<span class="mq-num">Máq. ${i+1}</span><span class="mq-st ${now}">${MAQ_TXT[now]}${streak>1?` · ${streak} d`:''}</span></div>
+    h+=`<div class="mq-card"><div class="mq-ph ${type==='wrap'?'wrap':''}">${MAQ_IMG[type]?`<img src="${MAQ_IMG[type]}" alt="${esc(e[1])}">`:ic('forklift')}<span class="mq-num">Máq. ${i+1}</span><span class="mq-st ${cur}">${MAQ_TXT[cur]}${streak>1?` · ${streak} d`:''}</span></div>
       <div class="mq-b"><h3>${esc(e[1]||code)}<small>${esc(code)}</small></h3>
       <div class="mq-kp"><div><b>${disp!=null?disp+'%':'—'}</b><small>Disponib.</small></div><div class="ok"><b>${stats.OK}</b><small>Ok</small></div><div class="mt"><b>${stats.MT}</b><small>Anomalía</small></div><div class="fs"><b>${stats.FS}</b><small>F. serv.</small></div></div>
-      <div><div class="mq-tl">${tl}</div><div class="mq-cap"><span>${dshort(win[0])}</span><span>${dshort(F)}</span></div></div>
+      <div><div class="mq-tl">${tlHTML(tl)}</div><div class="mq-cap"><span>${dshort(win[0])}</span><span>${dshort(F)}</span></div></div>
       ${evl?`<ul class="mq-ev">${evl}</ul>${inWin.length>5?`<div class="mq-none">+ ${inWin.length-5} novedades más en el período</div>`:''}`:`<div class="mq-none">Sin novedades en los últimos ${maqWin} días${stats.reg?'':' (sin registros cargados)'}.</div>`}</div></div>`});
   h+='</div>';
   $('#maq').innerHTML=h;
 }
+/* Informe de máquinas: hojas aparte (no forman parte del Activity Report) */
+function headM(sub){return`<div class="hd"><h1>Máquinas industriales<small>${sub}</small></h1><div class="dt"><b>${dlong(F)} ${F.slice(0,4)}</b><span>Semana ${isoWeek(F)} · Site Finning Cat - Ceva Logistics Argentina</span></div><div class="lg">${logoN()}</div></div>`}
+function buildMaqSheets(){
+  const D=maqData(),{c,win,last,items}=D;const sub=`Historial de estado · últimos ${maqWin} días`;
+  const foot=(n,t)=>`<div class="foot2"><span>Fuente: registro operativo (estado y novedades de equipos cargados día a día) · Site Finning Cat - Ceva Logistics Argentina</span><span>Emitido ${dshort(ymd(new Date()))}/${new Date().getFullYear()} · Hoja ${n} de ${t}</span></div>`;
+  // novedades de todas las máquinas, mas recientes primero
+  const nov=[];items.forEach(m=>m.inWin.forEach(x=>nov.push({...x,e:m.e,code:m.code})));nov.sort((a,b)=>b.to.localeCompare(a.to)||a.i-b.i);
+  const PER=15,pgsN=Math.max(1,Math.ceil(nov.length/PER)),total=1+(nov.length?pgsN:0);
+  let p1=headM(sub);
+  p1+=`<div class="mqr-sum"><div><small>Operativas${last?' al '+dshort(last):''}</small><b>${last?D.nOp:'—'}<i>/ ${c.mhe.length}</i></b></div><div class="ok"><small>Ok</small><b>${last?D.cnt('OK'):'—'}</b></div><div class="mt"><small>Anomalía leve</small><b>${last?D.cnt('MT'):'—'}</b></div><div class="fs"><small>Fuera de servicio</small><b>${last?D.cnt('FS'):'—'}</b></div></div>`;
+  p1+='<div class="mqr-grid">'+items.map(m=>{const {e,i,code,type,cur,streak,stats,disp,tl,inWin}=m;
+    const ev=inWin.slice().reverse().slice(0,2).map(x=>`<li><i style="background:${MHE_SEM[x.s]||MHE_SEM.NU}"></i><b>${x.from===x.to?dshort(x.from):dshort(x.from)+'–'+dshort(x.to)}</b> ${esc(MAQ_TXT[x.s])}${x.n?` · ${esc(x.n)}`:''}</li>`).join('');
+    return`<div class="mqr-card"><div class="mqr-ph ${type==='wrap'?'wrap':''}">${MAQ_IMG[type]?`<img src="${MAQ_IMG[type]}" alt="">`:''}<span class="n">Máq. ${i+1}</span><span class="s ${cur}">${MAQ_TXT[cur]}${streak>1?` · ${streak} d`:''}</span></div>
+      <div class="mqr-b"><div class="t">${esc(e[1]||code)}<small>${esc(code)}</small></div>
+      <div class="k"><span><b>${disp!=null?disp+'%':'—'}</b>Disp.</span><span class="ok"><b>${stats.OK}</b>Ok</span><span class="mt"><b>${stats.MT}</b>Anom.</span><span class="fs"><b>${stats.FS}</b>F.S.</span></div>
+      <div class="mq-tl">${tlHTML(tl)}</div>
+      <ul>${ev||'<li class="none">Sin novedades en el período</li>'}</ul></div></div>`}).join('')+'</div>';
+  p1+=`<div class="mqr-leg"><b>Referencia:</b><span><i style="background:${MHE_SEM.OK}"></i>Ok</span><span><i style="background:${MHE_SEM.MT}"></i>Anomalía leve (sigue operativa)</span><span><i style="background:${MHE_SEM.FS}"></i>Fuera de servicio</span><span><i style="background:#e3e8ef"></i>Sin registro</span><span style="margin-left:auto">Disp. = días Ok + anomalía leve ÷ días registrados</span></div>`+foot(1,total);
+  let out=`<div class="rp">${p1}</div>`;
+  for(let pg=0;pg<(nov.length?pgsN:0);pg++){
+    const rows=nov.slice(pg*PER,(pg+1)*PER).map(x=>`<tr><td>${x.from===x.to?dshort(x.from):dshort(x.from)+' – '+dshort(x.to)}</td><td class="c">${x.days}</td><td><b>Máq. ${x.i+1}</b> · ${esc(x.e[1]||x.code)}<small>${esc(x.code)}</small></td><td><span class="st ${x.s}"></span>${esc(MAQ_TXT[x.s])}</td><td>${esc(x.n)||'<span class="none">—</span>'}</td></tr>`).join('');
+    out+=`<div class="rp">${headM('Detalle de novedades · últimos '+maqWin+' días')}<table class="mqr-t"><tr><th style="width:34mm">Fecha</th><th style="width:14mm">Días</th><th style="width:70mm">Máquina</th><th style="width:40mm">Estado</th><th>Novedad</th></tr>${rows}</table>${foot(pg+2,total)}</div>`}
+  $('#mqsheets').innerHTML=out;
+}
+function printMaq(){buildMaqSheets();document.body.dataset.pm='maq';const t=document.title;document.title=`Maquinas industriales ${F}`;window.print();setTimeout(()=>{document.title=t;delete document.body.dataset.pm},1000)}
+document.addEventListener('click',e=>{if(e.target.closest('#mqPdf'))printMaq()});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-win]');if(!b)return;maqWin=+b.dataset.win;renderMaq()});
 function renderHist(){
   const ks=Object.keys(S.days).sort().reverse();
