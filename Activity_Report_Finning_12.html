@@ -158,6 +158,75 @@ table.hm td.obc{background:#dce6f4!important;color:#0f2744!important;font-weight
 .mq-ev .d i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 .mq-ev .n{color:var(--ink)}.mq-ev .n small{color:var(--muted)}
 .mq-none{font-size:13px;color:var(--muted)}
+/* ---------- Máquinas: línea de tiempo y calendario ---------- */
+.mq-box{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 3px rgba(15,39,68,.1);margin-bottom:16px}
+.mq-box h3{margin:0 0 8px;font-family:var(--num);font-size:16px;color:var(--navy)}
+.gt{position:relative;font-size:12px}
+.gt-row{display:grid;grid-template-columns:var(--lw) repeat(var(--n),minmax(0,1fr)) 52px;align-items:stretch;position:relative}
+.gt-h1 .gt-mon{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.4px;border-left:1px solid #dde3ea;padding:0 4px}
+.gt-dh{text-align:center;font-size:10px;color:var(--muted);line-height:1.15;padding:2px 0 4px}
+.gt-dh span{display:block;font-size:9px}.gt-dh b{display:block;font-family:var(--num);font-size:11px;color:var(--ink)}
+.gt-dh.we{color:#aab3c0}.gt-dh.cur b{background:var(--navy);color:#fff;border-radius:4px}
+.gt-d{text-align:center;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.gt-d b{font-family:var(--num);font-size:13px;color:var(--ink)}
+.gt-body{position:relative;border-top:1px solid #e8ecf1}
+.gt-r{border-bottom:1px solid #eef1f5;min-height:54px}
+.gt-l{display:flex;align-items:center;gap:10px;padding:6px 10px 6px 0;min-width:0}
+.gt-l img{width:56px;height:40px;object-fit:cover;border-radius:6px;flex:none;background:#fff}
+.gt-l b{display:block;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gt-l small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gt-l u{text-decoration:none;font-weight:700}.gt-l u.OK{color:#2e8b57}.gt-l u.MT{color:#b07d0a}.gt-l u.FS{color:#d0452b}.gt-l u.NA{color:#8a94a3}
+.gt-b{align-self:center;height:30px;margin:0 1px;border-radius:5px;background:#e9edf3;font-size:11px;font-weight:600;color:#fff;display:flex;align-items:center;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;z-index:1}
+.gt-b.OK{background:#2e8b57}.gt-b.MT{background:#f2c200;color:#4a3a00}.gt-b.FS{background:#d0452b}.gt-b.NU{background:#9aa5b4}.gt-b.NA{background:#eef1f5}
+.gt-we{position:absolute;top:0;bottom:0;background:rgba(15,39,68,.045);z-index:0}
+.gt-today{position:absolute;top:-4px;bottom:0;width:2px;margin-left:-1px;background:var(--navy);opacity:.55;z-index:2;pointer-events:none}
+.mq-leg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12px;color:var(--muted);margin-top:12px}
+.mq-leg span{display:inline-flex;align-items:center;gap:5px}.mq-leg i{width:11px;height:11px;border-radius:3px;display:inline-block}.mq-leg .r{margin-left:auto}
+.mq-nt{width:100%;border-collapse:collapse;font-size:13px}
+.mq-nt th{text-align:left;color:var(--muted);font-size:11.5px;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line)}
+.mq-nt td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
+.mq-nt td small{color:var(--muted);margin-left:4px}
+.mq-nt .st{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.mq-nt .st.OK{background:#2e8b57}.mq-nt .st.MT{background:#f2c200}.mq-nt .st.FS{background:#d0452b}.mq-nt .st.NU{background:#9aa5b4}
+.mq-nt .none{color:var(--muted)}
+.mq-calbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.mq-calbar b{font-family:var(--num);font-size:18px;min-width:170px;text-align:center;color:var(--navy)}
+.mq-calbar label{margin-left:auto;font-size:13px;color:var(--muted)}.mq-calbar select{padding:6px 8px;border-radius:6px;border:1px solid var(--line);font-size:13px;margin-left:6px}
+.mq-cal{border:1px solid #e1e6ee;border-radius:10px;overflow:hidden}
+.mq-cw,.mq-cr{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.mq-cw div{background:#f3f5f8;text-align:center;font-size:12px;font-weight:600;color:var(--muted);padding:6px 0}
+.mq-cd{min-height:84px;border-top:1px solid #e8ecf1;border-left:1px solid #e8ecf1;padding:5px 6px;display:flex;flex-direction:column;gap:3px;cursor:pointer;background:#fff;position:relative}
+.mq-cr .mq-cd:first-child{border-left:0}
+.mq-cd.empty{background:#fafbfc;cursor:default}
+.mq-cd>b{font-family:var(--num);font-size:13px;color:var(--ink)}
+.mq-cd.we{background:#f8f9fb}.mq-cd.na{color:#aab3c0}.mq-cd.na>b{color:#aab3c0}
+.mq-cd.cur>b{background:var(--navy);color:#fff;border-radius:5px;padding:0 6px;align-self:flex-start}
+.mq-cd.sel{box-shadow:inset 0 0 0 2px var(--navy)}
+.mq-cd .t{font-size:11.5px;font-weight:700}.mq-cd .t.ok{color:#2e8b57}
+.mq-cd .n{font-size:11px;color:var(--ink);line-height:1.2}
+.mq-cd .chip{font-size:10.5px;font-weight:700;border-radius:9px;padding:1px 7px;color:#fff;align-self:flex-start}
+.mq-cd .chip.MT{background:#e3a21a}.mq-cd .chip.FS{background:#d0452b}.mq-cd .chip.NU{background:#6b7686}
+.mq-cd.OK{background:#e5f4ea}.mq-cd.OK .t{color:#2e8b57}.mq-cd.MT{background:#fff4cf}.mq-cd.MT .t{color:#8a6500}.mq-cd.FS{background:#fbe3dd}.mq-cd.FS .t{color:#c03a22}.mq-cd.NU{background:#eef1f5}
+.mq-cd.bFS{background:#fdf0ec}.mq-cd.bMT{background:#fffaea}.mq-cd.bOK{background:#f4faf6}
+.mq-dd{margin-top:14px;border-top:1px solid #e8ecf1;padding-top:10px}.mq-dd h4{margin:0 0 6px;font-family:var(--num);font-size:15px;color:var(--navy)}
+/* gantt en el PDF */
+.mqr-gt{flex:1;min-height:0}
+.gt.pr{font-size:9px}
+.gt.pr .gt-row{grid-template-columns:var(--lw) repeat(var(--n),minmax(0,1fr)) 12mm}
+.gt.pr .gt-r{min-height:15.5mm}
+.gt.pr .gt-l{gap:2.5mm;padding-right:2mm}.gt.pr .gt-l img{width:15mm;height:10.5mm;border-radius:2px}
+.gt.pr .gt-l b{font-size:10.5px}.gt.pr .gt-l small{font-size:8.5px}
+.gt.pr .gt-b{height:8.5mm;font-size:8.5px;border-radius:2px;padding:0 1.6mm}
+.gt.pr .gt-dh{font-size:8px}.gt.pr .gt-dh b{font-size:9px}.gt.pr .gt-dh span{font-size:7.5px}
+.gt.pr .gt-h1 .gt-mon{font-size:8.5px}
+.gt.pr .gt-d{font-size:8.5px}.gt.pr .gt-d b{font-size:10.5px}
+.gt.pr .gt-today{top:-1mm}
+.mq-leg.pr{font-size:9.5px;margin-top:0}
+.mqr-nv{border:1px solid #dde3ea;border-radius:6px;padding:2mm 3mm;font-size:10px;display:grid;gap:.9mm;margin-bottom:1mm}
+.mqr-nv>b{font-family:var(--num);font-size:11px;color:var(--navy)}
+.mqr-nv i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.mqr-nv .f{display:inline-block;min-width:20mm;color:#5b6574}
+.mqr-nv small{color:#8a94a3}
 /* ---------- Informe de máquinas (aparte del Activity Report) ---------- */
 #mqsheets{display:none}
 @media print{
@@ -1864,13 +1933,68 @@ function maqData(){
   return{c,win,last,items,nOp:items.filter(x=>x.cur==='OK'||x.cur==='MT').length,cnt};
 }
 function tlHTML(tl){return tl.map(({f,s,n})=>`<i class="${s||''}${f===F?' cur':''}" title="${esc(dshort(f)+' · '+(s?MAQ_TXT[s]:'Sin registro')+(n?' · '+n:''))}"></i>`).join('')}
-function renderMaq(){
-  const D=maqData(),{c,win,last,items}=D;
-  let h=`<div class="mq-top"><h2>Máquinas industriales</h2><p>Estado de cada máquina día a día. El historial se arma con el estado y la novedad que se cargan en <b>Carga del día → Equipos MHE</b>.</p>
-    <div class="mq-win">${[7,30,90].map(n=>`<button data-win="${n}" class="${n===maqWin?'on':''}">${n} días</button>`).join('')}</div><button class="btn" id="mqPdf" title="Informe aparte del Activity Report">PDF de máquinas</button></div>`;
-  h+=`<div class="mq-sum"><div><small>Operativas${last?' al '+dshort(last):''}</small><b>${last?D.nOp:'—'}<i>/ ${c.mhe.length}</i></b></div>
-    <div class="ok"><small>Ok</small><b>${last?D.cnt('OK'):'—'}</b></div><div class="mt"><small>Anomalía leve</small><b>${last?D.cnt('MT'):'—'}</b></div><div class="fs"><small>Fuera de servicio</small><b>${last?D.cnt('FS'):'—'}</b></div></div>`;
-  h+='<div class="mq-grid">';
+let maqView='gantt',maqMonth=null,maqSel='all',maqDay=null;
+const WD1=['L','M','X','J','V','S','D'],MESC=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+/* ---------- Línea de tiempo (Gantt): una fila por máquina, una columna por día ---------- */
+function ganttHTML(D,pr){
+  const {win,items}=D,N=win.length,lw=pr?'50mm':'230px';
+  const idxF=win.indexOf(F);
+  const dayOf=f=>(pd(f).getDay()+6)%7;
+  // meses
+  const mon=[];win.forEach((f,i)=>{const m=f.slice(0,7);const l=mon[mon.length-1];if(l&&l.m===m)l.n++;else mon.push({m,n:1,f})});
+  const lbl=(f,i)=>N<=31?`<span>${WD1[dayOf(f)]}</span><b>${+f.slice(8)}</b>`:(dayOf(f)===0?`<b>${+f.slice(8)}</b>`:'');
+  let h=`<div class="gt${pr?' pr':''}" style="--lw:${lw};--n:${N}">`;
+  h+=`<div class="gt-row gt-h1"><div class="gt-l"></div>${mon.map(x=>`<div class="gt-mon" style="grid-column:span ${x.n}">${MESC[+x.m.slice(5)-1]} ${x.m.slice(2,4)}</div>`).join('')}<div class="gt-d"></div></div>`;
+  h+=`<div class="gt-row gt-h2"><div class="gt-l"></div>${win.map((f,i)=>`<div class="gt-dh${dayOf(f)>4?' we':''}${f===F?' cur':''}">${lbl(f,i)}</div>`).join('')}<div class="gt-d">Disp.</div></div>`;
+  h+='<div class="gt-body">';
+  // fines de semana y dia del informe como columnas de fondo
+  win.forEach((f,i)=>{if(dayOf(f)>4)h+=`<div class="gt-we" style="left:calc(var(--lw) + (100% - var(--lw) - ${pr?'12mm':'52px'})*${i}/${N});width:calc((100% - var(--lw) - ${pr?'12mm':'52px'})/${N})"></div>`});
+  if(idxF>=0)h+=`<div class="gt-today" style="left:calc(var(--lw) + (100% - var(--lw) - ${pr?'12mm':'52px'})*${idxF+.5}/${N})"></div>`;
+  items.forEach(m=>{
+    const {e,i,code,type,cur,tl,disp}=m;
+    // tramos consecutivos con el mismo estado
+    const runs=[];tl.forEach((x,k)=>{const l=runs[runs.length-1];if(l&&l.s===x.s&&!(x.n&&x.n!==l.n&&x.s!=='OK'&&false)){l.n2=l.n2||x.n;l.to=k;l.len++}else runs.push({s:x.s,from:k,to:k,len:1,n2:x.n,f:x.f})});
+    h+=`<div class="gt-row gt-r"><div class="gt-l">${MAQ_IMG[type]?`<img src="${MAQ_IMG[type]}" alt="">`:''}<div><b>Máq. ${i+1} · ${esc(e[1]||code)}</b><small>${esc(code)} · <u class="${cur}">${MAQ_TXT[cur]}</u></small></div></div>`;
+    h+=runs.map(r=>{const fit=r.s&&r.s!=='OK'&&r.n2&&r.n2.length<=r.len*(pr?217/N/1.55:900/N/6.4)-1;const txt=fit?esc(r.n2):'';
+      const tip=r.s?`${dshort(win[r.from])}${r.len>1?' – '+dshort(win[r.to]):''} · ${MAQ_TXT[r.s]}${r.len>1?' ('+r.len+' d)':''}${r.n2?' · '+r.n2:''}`:'';
+      return`<div class="gt-b ${r.s||'NA'}" style="grid-column:span ${r.len}" title="${esc(tip)}">${txt}</div>`}).join('');
+    h+=`<div class="gt-d"><b>${disp!=null?disp+'%':'—'}</b></div></div>`});
+  h+='</div></div>';
+  return h;
+}
+function novTable(D,limit){
+  const nov=[];D.items.forEach(m=>m.inWin.forEach(x=>nov.push({...x,e:m.e,code:m.code})));nov.sort((a,b)=>b.to.localeCompare(a.to)||a.i-b.i);
+  return{nov,html:nov.length?`<table class="mq-nt"><tr><th>Fecha</th><th>Máquina</th><th>Estado</th><th>Novedad</th></tr>${nov.slice(0,limit).map(x=>`<tr><td>${x.from===x.to?dshort(x.from):dshort(x.from)+' – '+dshort(x.to)}${x.days>1?` <small>${x.days} d</small>`:''}</td><td><b>Máq. ${x.i+1}</b> ${esc(x.e[1]||x.code)}</td><td><i class="st ${x.s}"></i>${esc(MAQ_TXT[x.s])}</td><td>${esc(x.n)||'<span class="none">—</span>'}</td></tr>`).join('')}</table>${nov.length>limit?`<div class="mq-none">+ ${nov.length-limit} novedades más en el período (están todas en el PDF)</div>`:''}`:`<div class="mq-none">Sin novedades en los últimos ${maqWin} días.</div>`};
+}
+/* ---------- Calendario mensual ---------- */
+function calHTML(D){
+  const m=maqMonth||F.slice(0,7);const y=+m.slice(0,4),mo=+m.slice(5)-1;
+  const first=new Date(y,mo,1),ndays=new Date(y,mo+1,0).getDate(),lead=(first.getDay()+6)%7;
+  const cells=[];for(let i=0;i<lead;i++)cells.push(null);for(let d=1;d<=ndays;d++)cells.push(`${m}-${pad(d)}`);while(cells.length%7)cells.push(null);
+  const sel=maqSel==='all'?null:+maqSel;
+  const dayInfo=f=>{const d=S.days[f];if(!mheReg(d)||f>F)return null;
+    return S.cfg.mhe.map((e,i)=>({i,e,s:mheOf(d,e[0]),n:((d.mheNote||{})[e[0]]||'').trim()}))};
+  let h=`<div class="mq-calbar"><button class="btn sec2 sm" data-mcal="-1">‹</button><b>${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mo]} ${y}</b><button class="btn sec2 sm" data-mcal="1">›</button>
+    <label>Máquina <select id="mqSel"><option value="all">Todas</option>${S.cfg.mhe.map((e,i)=>`<option value="${i}" ${sel===i?'selected':''}>Máq. ${i+1} · ${esc(e[1]||e[0])}</option>`).join('')}</select></label></div>`;
+  h+=`<div class="mq-cal"><div class="mq-cw">${WD1.map(x=>`<div>${x}</div>`).join('')}</div>`;
+  for(let r=0;r<cells.length;r+=7){h+='<div class="mq-cr">'+cells.slice(r,r+7).map((f,c)=>{
+    if(!f)return'<div class="mq-cd empty"></div>';
+    const info=dayInfo(f);let body='',cls='';
+    if(!info){cls='na'}
+    else if(sel!=null){const x=info[sel];if(x){cls=x.s;body=`<span class="t">${MAQ_TXT[x.s]}</span>${x.n?`<span class="n">${esc(x.n)}</span>`:''}`}}
+    else{const bad=info.filter(x=>x.s==='MT'||x.s==='FS'||x.s==='NU'&&false);
+      cls=bad.some(x=>x.s==='FS')?'bFS':bad.length?'bMT':'bOK';
+      body=bad.length?bad.map(x=>`<span class="chip ${x.s}" title="${esc(x.e[1]+' · '+MAQ_TXT[x.s]+(x.n?' · '+x.n:''))}">Máq. ${x.i+1}</span>`).join(''):'<span class="t ok">Todo Ok</span>'}
+    return`<div class="mq-cd ${cls}${f===F?' cur':''}${f===maqDay?' sel':''}${c>4?' we':''}" data-mday="${f}"><b>${+f.slice(8)}</b>${body}</div>`}).join('')+'</div>'}
+  h+='</div>';
+  // detalle del dia elegido
+  const dd=maqDay&&maqDay.slice(0,7)===m?maqDay:null;
+  if(dd){const info=dayInfo(dd);h+=`<div class="mq-dd"><h4>${dlong(dd)} ${dd.slice(0,4)}</h4>${info?`<table class="mq-nt"><tr><th>Máquina</th><th>Estado</th><th>Novedad</th></tr>${info.slice().sort((a,b)=>(b.s!=='OK')-(a.s!=='OK')||a.i-b.i).map(x=>`<tr><td><b>Máq. ${x.i+1}</b> ${esc(x.e[1]||x.e[0])}</td><td><i class="st ${x.s}"></i>${esc(MAQ_TXT[x.s])}</td><td>${esc(x.n)||'<span class="none">—</span>'}</td></tr>`).join('')}</table>`:'<div class="mq-none">Ese día no se cargó el estado de los equipos.</div>'}</div>`}
+  else h+='<div class="mq-none" style="margin-top:10px">Tocá un día para ver el estado y las novedades de todas las máquinas.</div>';
+  return h;
+}
+function cardsHTML(D){
+  const {win,items}=D;let h='<div class="mq-grid">';
   items.forEach(m=>{
     const {e,i,code,type,cur,streak,stats,disp,tl,inWin}=m;
     const evl=inWin.slice().reverse().slice(0,5).map(x=>`<li><span class="d"><i style="background:${MHE_SEM[x.s]||MHE_SEM.NU}"></i>${x.from===x.to?dshort(x.from):dshort(x.from)+'–'+dshort(x.to)}${x.days>1?` · ${x.days} d`:''}</span><span class="n">${esc(MAQ_TXT[x.s])}${x.n?` — ${esc(x.n)}`:''}</span></li>`).join('');
@@ -1878,28 +2002,35 @@ function renderMaq(){
       <div class="mq-b"><h3>${esc(e[1]||code)}<small>${esc(code)}</small></h3>
       <div class="mq-kp"><div><b>${disp!=null?disp+'%':'—'}</b><small>Disponib.</small></div><div class="ok"><b>${stats.OK}</b><small>Ok</small></div><div class="mt"><b>${stats.MT}</b><small>Anomalía</small></div><div class="fs"><b>${stats.FS}</b><small>F. serv.</small></div></div>
       <div><div class="mq-tl">${tlHTML(tl)}</div><div class="mq-cap"><span>${dshort(win[0])}</span><span>${dshort(F)}</span></div></div>
-      ${evl?`<ul class="mq-ev">${evl}</ul>${inWin.length>5?`<div class="mq-none">+ ${inWin.length-5} novedades más en el período</div>`:''}`:`<div class="mq-none">Sin novedades en los últimos ${maqWin} días${stats.reg?'':' (sin registros cargados)'}.</div>`}</div></div>`});
-  h+='</div>';
+      ${evl?`<ul class="mq-ev">${evl}</ul>`:`<div class="mq-none">Sin novedades en los últimos ${maqWin} días.</div>`}</div></div>`});
+  return h+'</div>';
+}
+const LEGEND=`<div class="mq-leg"><b>Referencia:</b><span><i style="background:${MHE_SEM.OK}"></i>Ok</span><span><i style="background:${MHE_SEM.MT}"></i>Anomalía leve (sigue operativa)</span><span><i style="background:${MHE_SEM.FS}"></i>Fuera de servicio</span><span><i style="background:#e3e8ef"></i>Sin registro</span><span class="r">Disp. = días Ok + anomalía leve ÷ días registrados</span></div>`;
+function renderMaq(){
+  const D=maqData(),{c,win,last}=D;
+  let h=`<div class="mq-top"><h2>Máquinas industriales</h2><p>Estado de cada máquina día a día. El historial se arma con el estado y la novedad que se cargan en <b>Carga del día → Equipos MHE</b>.</p>
+    <div class="mq-win">${[['gantt','Línea de tiempo'],['cal','Calendario'],['cards','Fichas']].map(([k,l])=>`<button data-mview="${k}" class="${k===maqView?'on':''}">${l}</button>`).join('')}</div>
+    ${maqView!=='cal'?`<div class="mq-win">${[7,30,90].map(n=>`<button data-win="${n}" class="${n===maqWin?'on':''}">${n} días</button>`).join('')}</div>`:''}
+    <button class="btn" id="mqPdf" title="Informe aparte del Activity Report">PDF de máquinas</button></div>`;
+  h+=`<div class="mq-sum"><div><small>Operativas${last?' al '+dshort(last):''}</small><b>${last?D.nOp:'—'}<i>/ ${c.mhe.length}</i></b></div>
+    <div class="ok"><small>Ok</small><b>${last?D.cnt('OK'):'—'}</b></div><div class="mt"><small>Anomalía leve</small><b>${last?D.cnt('MT'):'—'}</b></div><div class="fs"><small>Fuera de servicio</small><b>${last?D.cnt('FS'):'—'}</b></div></div>`;
+  if(maqView==='gantt'){h+=`<div class="mq-box">${ganttHTML(D,false)}${LEGEND}</div><div class="mq-box"><h3>Novedades del período</h3>${novTable(D,12).html}</div>`}
+  else if(maqView==='cal')h+=`<div class="mq-box">${calHTML(D)}${LEGEND}</div>`;
+  else h+=cardsHTML(D);
   $('#maq').innerHTML=h;
 }
 /* Informe de máquinas: hojas aparte (no forman parte del Activity Report) */
 function headM(sub){return`<div class="hd"><h1>Máquinas industriales<small>${sub}</small></h1><div class="dt"><b>${dlong(F)} ${F.slice(0,4)}</b><span>Semana ${isoWeek(F)} · Site Finning Cat - Ceva Logistics Argentina</span></div><div class="lg">${logoN()}</div></div>`}
 function buildMaqSheets(){
-  const D=maqData(),{c,win,last,items}=D;const sub=`Historial de estado · últimos ${maqWin} días`;
+  const D=maqData(),{c,last}=D;const sub=`Historial de estado · últimos ${maqWin} días`;
   const foot=(n,t)=>`<div class="foot2"><span>Fuente: registro operativo (estado y novedades de equipos cargados día a día) · Site Finning Cat - Ceva Logistics Argentina</span><span>Emitido ${dshort(ymd(new Date()))}/${new Date().getFullYear()} · Hoja ${n} de ${t}</span></div>`;
-  // novedades de todas las máquinas, mas recientes primero
-  const nov=[];items.forEach(m=>m.inWin.forEach(x=>nov.push({...x,e:m.e,code:m.code})));nov.sort((a,b)=>b.to.localeCompare(a.to)||a.i-b.i);
-  const PER=15,pgsN=Math.max(1,Math.ceil(nov.length/PER)),total=1+(nov.length?pgsN:0);
+  const {nov}=novTable(D,0);
+  const PER=14,pgsN=Math.max(1,Math.ceil(nov.length/PER)),total=nov.length?1+pgsN:1;
   let p1=headM(sub);
   p1+=`<div class="mqr-sum"><div><small>Operativas${last?' al '+dshort(last):''}</small><b>${last?D.nOp:'—'}<i>/ ${c.mhe.length}</i></b></div><div class="ok"><small>Ok</small><b>${last?D.cnt('OK'):'—'}</b></div><div class="mt"><small>Anomalía leve</small><b>${last?D.cnt('MT'):'—'}</b></div><div class="fs"><small>Fuera de servicio</small><b>${last?D.cnt('FS'):'—'}</b></div></div>`;
-  p1+='<div class="mqr-grid">'+items.map(m=>{const {e,i,code,type,cur,streak,stats,disp,tl,inWin}=m;
-    const ev=inWin.slice().reverse().slice(0,2).map(x=>`<li><i style="background:${MHE_SEM[x.s]||MHE_SEM.NU}"></i><b>${x.from===x.to?dshort(x.from):dshort(x.from)+'–'+dshort(x.to)}</b> ${esc(MAQ_TXT[x.s])}${x.n?` · ${esc(x.n)}`:''}</li>`).join('');
-    return`<div class="mqr-card"><div class="mqr-ph ${type==='wrap'?'wrap':''}">${MAQ_IMG[type]?`<img src="${MAQ_IMG[type]}" alt="">`:''}<span class="n">Máq. ${i+1}</span><span class="s ${cur}">${MAQ_TXT[cur]}${streak>1?` · ${streak} d`:''}</span></div>
-      <div class="mqr-b"><div class="t">${esc(e[1]||code)}<small>${esc(code)}</small></div>
-      <div class="k"><span><b>${disp!=null?disp+'%':'—'}</b>Disp.</span><span class="ok"><b>${stats.OK}</b>Ok</span><span class="mt"><b>${stats.MT}</b>Anom.</span><span class="fs"><b>${stats.FS}</b>F.S.</span></div>
-      <div class="mq-tl">${tlHTML(tl)}</div>
-      <ul>${ev||'<li class="none">Sin novedades en el período</li>'}</ul></div></div>`}).join('')+'</div>';
-  p1+=`<div class="mqr-leg"><b>Referencia:</b><span><i style="background:${MHE_SEM.OK}"></i>Ok</span><span><i style="background:${MHE_SEM.MT}"></i>Anomalía leve (sigue operativa)</span><span><i style="background:${MHE_SEM.FS}"></i>Fuera de servicio</span><span><i style="background:#e3e8ef"></i>Sin registro</span><span style="margin-left:auto">Disp. = días Ok + anomalía leve ÷ días registrados</span></div>`+foot(1,total);
+  p1+=`<div class="mqr-gt">${ganttHTML(D,true)}</div>`;
+  if(nov.length)p1+=`<div class="mqr-nv"><b>Últimas novedades</b>${nov.slice(0,4).map(x=>`<div><i style="background:${MHE_SEM[x.s]||MHE_SEM.NU}"></i><span class="f">${x.from===x.to?dshort(x.from):dshort(x.from)+'–'+dshort(x.to)}</span><b>Máq. ${x.i+1}</b> ${esc(x.e[1]||x.code)} · ${esc(MAQ_TXT[x.s])}${x.n?' — '+esc(x.n):''}</div>`).join('')}${nov.length>4?`<small>+ ${nov.length-4} más en las hojas siguientes</small>`:''}</div>`;
+  p1+=LEGEND.replace('class="mq-leg"','class="mq-leg pr"')+foot(1,total);
   let out=`<div class="rp">${p1}</div>`;
   for(let pg=0;pg<(nov.length?pgsN:0);pg++){
     const rows=nov.slice(pg*PER,(pg+1)*PER).map(x=>`<tr><td>${x.from===x.to?dshort(x.from):dshort(x.from)+' – '+dshort(x.to)}</td><td class="c">${x.days}</td><td><b>Máq. ${x.i+1}</b> · ${esc(x.e[1]||x.code)}<small>${esc(x.code)}</small></td><td><span class="st ${x.s}"></span>${esc(MAQ_TXT[x.s])}</td><td>${esc(x.n)||'<span class="none">—</span>'}</td></tr>`).join('');
@@ -1907,7 +2038,11 @@ function buildMaqSheets(){
   $('#mqsheets').innerHTML=out;
 }
 function printMaq(){buildMaqSheets();document.body.dataset.pm='maq';const t=document.title;document.title=`Maquinas industriales ${F}`;window.print();setTimeout(()=>{document.title=t;delete document.body.dataset.pm},1000)}
-document.addEventListener('click',e=>{if(e.target.closest('#mqPdf'))printMaq()});
+document.addEventListener('click',e=>{if(e.target.closest('#mqPdf'))return printMaq();
+  const v=e.target.closest('[data-mview]');if(v){maqView=v.dataset.mview;return renderMaq()}
+  const mc=e.target.closest('[data-mcal]');if(mc){const m=maqMonth||F.slice(0,7);const d=new Date(+m.slice(0,4),+m.slice(5)-1+(+mc.dataset.mcal),1);maqMonth=d.getFullYear()+'-'+pad(d.getMonth()+1);return renderMaq()}
+  const md=e.target.closest('[data-mday]');if(md){maqDay=md.dataset.mday;return renderMaq()}});
+document.addEventListener('change',e=>{if(e.target.id==='mqSel'){maqSel=e.target.value;renderMaq()}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-win]');if(!b)return;maqWin=+b.dataset.win;renderMaq()});
 function renderHist(){
   const ks=Object.keys(S.days).sort().reverse();
