@@ -68,6 +68,12 @@ sigue esa secuencia por el status del documento:
 | `COUN` · Contada | Contada |
 | `POST` · Contabilizada | Contada |
 
+Una ubicación cierra cuando el recuento coincide con el **teórico del primer
+conteo**: ahí el conteo anterior se equivocó, no hay nada que buscar y no va a
+un pase más. Importa porque, si la diferencia del primer pase se contabiliza,
+SAP baja el stock y el segundo conteo vuelve a informar diferencia contra el
+teórico ya ajustado aunque la cantidad física siempre estuvo bien.
+
 El status decide si la ubicación está contada o pendiente, pero el avance se
 informa sólo por ubicación: **total, contadas y pendientes**. Un documento sin
 cantidad contada no es un conteo, aunque el status diga otra cosa. La fase del
@@ -94,8 +100,10 @@ encontró, para que nunca pase inadvertido si no se está leyendo.
    usa para dibujar: suele ser un correlativo de todo el depósito —541 valores
    distintos en este W2W— y abría una columna por valor.
 5. **Productividad** — por contador: ubicaciones contadas, ocupadas y vacías,
-   documentos, ítems, ritmo por hora y franja horaria trabajada. Los nombres de
-   los contadores se cargan a mano o se pegan desde Excel.
+   documentos, ítems, ritmo por hora y franja horaria trabajada, con **filtro
+   por fecha** propio —un botón por jornada con conteo, o un rango— que
+   recalcula las horas activas y el ritmo sobre el período elegido y arrastra
+   al CSV. Los nombres de los contadores se cargan a mano o se pegan desde Excel.
 6. **Exactitud** — ILA e IRA sobre lo contado, con metas, desglose por zona,
    pasillo, tipo de almacén y contador.
 7. **Archivos y Configuración** — carga, panel de referencias, Status Conteo,

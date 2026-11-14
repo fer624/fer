@@ -765,6 +765,17 @@ html[data-theme="dark"] table.dt td.res{background:rgba(0,163,224,.12)}
   </div>
   <div id="p5Empty"></div>
   <div id="p5Body">
+    <div class="card mb12 no-print">
+      <div class="flex" style="align-items:flex-end">
+        <div class="fl"><label>Desde</label><input type="date" id="prodDesde"></div>
+        <div class="fl"><label>Hasta</label><input type="date" id="prodHasta"></div>
+        <button class="btn sm ghost" onclick="Prod.limpiarFecha()">Todas las fechas</button>
+        <div class="fl" style="flex:1"><label>Jornadas con conteo</label>
+          <div id="prodDias" class="flex"></div>
+        </div>
+      </div>
+      <div class="rc-mini mt8" id="prodRango"></div>
+    </div>
     <div class="grid kpis mb12" id="kpiProd"></div>
 
     <div class="grid c2 mb12">
@@ -2527,7 +2538,16 @@ const Motor = {
       }
       if(vac!==null){ o.ocupada=!vac; clasMarca++; }
       else { o.ocupada=[...porMat.values()].some(m=>m.conMat); clasContenido++; }
-      if(ult.dif){
+      if(difAud===0 && o.pases>1){
+        /* El recuento coincidió con el teórico del PRIMER conteo: el pase
+           anterior se había equivocado y no hay nada que buscar. Cierra acá.
+           Sin esto, cuando la diferencia del primer pase se contabiliza SAP
+           baja el stock, y el segundo conteo vuelve a informar diferencia
+           contra el teórico ya ajustado aunque la cantidad física siempre
+           estuvo bien: la ubicación se iba a tercer conteo y hundía el
+           porcentaje de cierre. */
+        o.estado='OK'; o.confirmada=false;
+      }else if(ult.dif){
         o.estado = ult.pase===1 ? 'C2' : ult.pase===2 ? 'C3' : 'DIF';
         o.confirmada=false;
       }else if(difAud>0){
@@ -4532,8 +4552,58 @@ const Estructura = {
 const Prod = {
   nombre(u){ return (Config.d.nombres||{})[u] || ''; },
 
+  /* Rango de fechas propio de esta pantalla: la barra de filtros de arriba no
+     se muestra en productividad, y acá lo que se mira es la jornada. */
+  rango(){
+    const a=(typeof prodDesde!=='undefined'&&prodDesde)?prodDesde.value:'';
+    const b=(typeof prodHasta!=='undefined'&&prodHasta)?prodHasta.value:'';
+    return {
+      d1:a?new Date(a+'T00:00:00').getTime():null,
+      d2:b?new Date(b+'T23:59:59').getTime():null,
+      hay:!!(a||b), a, b
+    };
+  },
+  limpiarFecha(){
+    prodDesde.value=''; prodHasta.value=''; Prod.render();
+  },
+  verDia(iso){
+    prodDesde.value=iso; prodHasta.value=iso; Prod.render();
+  },
+  /* Rehace el agregado por contador para un rango. Sólo corre cuando hay
+     filtro puesto: sin filtro se usa el que ya armó el motor y no se paga
+     recorrer otra vez todos los documentos. */
+  porRango(d1,d2){
+    const M=Motor.M, map=new Map();
+    M.arr.forEach(o=>{
+      (o.docs||[]).forEach(d=>{
+        if(d.f===null) return;                       // sin fecha no entra en ningún rango
+        if(d1!==null && d.f<d1) return;
+        if(d2!==null && d.f>d2) return;
+        const u=d.usr||'(sin contador)';
+        if(!map.has(u)) map.set(u,{usr:u,ubis:new Set(),ocu:new Set(),vac:new Set(),
+          items:0,dif:0,horas:new Set(),min:null,max:null,docs:0});
+        const P=map.get(u);
+        P.ubis.add(o.u); P.docs++;
+        if(o.ocupada===true) P.ocu.add(o.u); else if(o.ocupada===false) P.vac.add(o.u);
+        const ts=d.f+(d.h||0)*60000;
+        if(P.min===null||ts<P.min) P.min=ts;
+        if(P.max===null||ts>P.max) P.max=ts;
+        if(d.h!==null) P.horas.add(U.iso(new Date(d.f))+'|'+Math.floor(d.h/60));
+        d.items.forEach(c=>{
+          const qd=Motor.dif(c);
+          /* una ubicación contada vacía no tiene registro de material */
+          if(!c.prod && (c.qt===null||c.qt===0) && (c.qc===null||c.qc===0) && (qd===null||qd===0)) return;
+          P.items++; if(qd!==null && qd!==0) P.dif++;
+        });
+      });
+    });
+    return [...map.values()];
+  },
+
   filas(){
-    const L=(Motor.M&&Motor.M.prod)||[];
+    if(!Motor.M) return [];
+    const r=Prod.rango();
+    const L = r.hay ? Prod.porRango(r.d1,r.d2) : (Motor.M.prod||[]);
     return L.map(P=>{
       const horas=P.horas.size || (P.min!==null&&P.max!==null?Math.max(1,Math.round((P.max-P.min)/3600000)):0);
       return {
@@ -4559,6 +4629,7 @@ const Prod = {
     }
     document.getElementById('p5Empty').innerHTML='';
     document.getElementById('p5Body').classList.remove('hidden');
+    Prod.pintarDias();
 
     const tot=L.reduce((a,b)=>({ubis:a.ubis+b.ubis,ocu:a.ocu+b.ocu,vac:a.vac+b.vac,
       items:a.items+b.items,dif:a.dif+b.dif}),{ubis:0,ocu:0,vac:0,items:0,dif:0});
@@ -4599,6 +4670,27 @@ const Prod = {
 
     Prod.tabla(L);
     Prod.editor(L);
+  },
+
+  /* Un botón por jornada con conteo, para no tener que tipear las fechas. */
+  pintarDias(){
+    const M=Motor.M; if(!M) return;
+    const r=Prod.rango();
+    const dias=(M.serieDia||[]).slice().sort((a,b)=>a.iso<b.iso?-1:1);
+    prodDias.innerHTML = dias.length
+      ? dias.map(d=>{
+          const act = r.a===d.iso && r.b===d.iso;
+          return `<button class="btn sm ${act?'':'ghost'}" onclick="Prod.verDia('${d.iso}')">`+
+                 `${d.iso.slice(8,10)}/${d.iso.slice(5,7)} <span class="rc-mini">${U.num(d.n)}</span></button>`;
+        }).join('')
+      : '<span class="rc-mini">Sin fechas de recuento en el archivo.</span>';
+    const tot=dias.reduce((a,b)=>a+b.n,0);
+    prodRango.innerHTML = r.hay
+      ? `Mostrando <b>${r.a?U.fmt(new Date(r.a+'T12:00:00')):'el inicio'}</b> a `+
+        `<b>${r.b?U.fmt(new Date(r.b+'T12:00:00')):'el final'}</b>. `+
+        `Las horas activas y el ritmo se recalculan sobre ese rango.`
+      : `Mostrando <b>todas las fechas</b>: ${dias.length} jornada(s) con conteo, `+
+        `${U.num(tot)} ubicaciones tocadas.`;
   },
 
   tabla(L){
@@ -5135,6 +5227,7 @@ const UI = {
   document.getElementById('exAgrup').addEventListener('change',()=>Vista.tablaExact());
   ['fCalTipo','fCalCrit'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Vista.calidad()));
   ['mapVista','mapPasillo','mapCelda'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Mapa.render()));
+  ['prodDesde','prodHasta'].forEach(i=>document.getElementById(i).addEventListener('change',()=>Prod.render()));
   document.getElementById('mapZona').addEventListener('change',()=>{ Mapa.poblarPasillos(); Mapa.render(); });
 
   /* referencia del W2W */
