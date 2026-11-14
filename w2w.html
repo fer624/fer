@@ -2352,11 +2352,15 @@ const Motor = {
       lista.forEach((d)=>{
         d.dif=false; d.difItems=0; d.difUnid=0;
 
-        /* Productividad: el documento se le atribuye a quien lo registró. */
-        const pu=d.usr||'(sin contador)';
-        if(!prodMap.has(pu)) prodMap.set(pu,{usr:pu,ubis:new Set(),ocu:new Set(),vac:new Set(),
+        /* Productividad: el documento se le atribuye a quien lo registró.
+           Sólo cuentan las ubicaciones del universo: con una bajada que trae
+           todo el depósito, el contador sumaba ubicaciones de inventarios
+           ajenos al W2W. */
+        const pu = o.enUniverso ? (d.usr||'(sin contador)') : null;
+        if(pu!==null && !prodMap.has(pu)) prodMap.set(pu,{usr:pu,ubis:new Set(),ocu:new Set(),vac:new Set(),
           items:0,dif:0,horas:new Set(),min:null,max:null,docs:0,pend:[]});
-        const P=prodMap.get(pu);
+        const P=pu===null?null:prodMap.get(pu);
+        if(P){
         P.ubis.add(o.u); P.docs++;
         if(d.f!==null){
           const ts=d.f+(d.h||0)*60000;
@@ -2366,6 +2370,7 @@ const Motor = {
         }
         /* la clasificación la resuelve la ubicación una sola vez, más abajo */
         P.pend.push(o.u);
+        }
 
         d.items.forEach(c=>{
           const qd=Motor.dif(c);
@@ -2377,7 +2382,7 @@ const Motor = {
           const sinRegistro = !c.prod && (c.qt===null||c.qt===0) && (c.qc===null||c.qc===0)
                               && (qd===null||qd===0);
           if(sinRegistro) return;
-          P.items++; if(qd!==null && qd!==0) P.dif++;
+          if(P){ P.items++; if(qd!==null && qd!==0) P.dif++; }
 
           /* Sólo se guarda el consolidado por material: el detalle fila por
              fila de cada pase no lo consume ninguna vista y, en un W2W real,
@@ -2980,6 +2985,11 @@ Motor.recalcular = function(){
 
   /* el listado de ítems respeta los filtros; el NETO siempre es global */
   const vig=M.vigentes.filter(it=>{
+    /* Fuera del universo no es del W2W: no tiene que aparecer en el listado
+       de diferencias ni en su CSV, igual que no aparece en el avance ni en el
+       resultado. Si no, se sale a buscar stock de ubicaciones que el inventario
+       nunca incluyó. */
+    if(!it.enUniverso) return false;
     if(!set.has(it.u)) return false;
     if(f.usr && it.usr!==f.usr) return false;
     if(f.q){
@@ -3345,6 +3355,26 @@ const Vista = {
     }else if(Array.isArray(Config.d.statusOK)){
       push('stManual','warn','<b>Hay una selección manual de Status Conteo activa.</b> '+
              'Si los números no cierran, revisala en <b>7 · Archivos</b> o volvé a la detección automática.');
+    }
+    /* La bajada puede traer el depósito entero: documentos de otros
+       inventarios, zonas que no entran al W2W. Si hay maestro cargado, el
+       maestro es el alcance y hay que poder dejarlo así de un clic. */
+    const ALC=Motor.M.alcance||{};
+    if(Datos.maestro.length && ALC.soloDoc>0 && Config.d.universo!=='maestro'){
+      push('fueraMaestro','bad',
+        '<b>'+U.num(ALC.soloDoc)+' ubicaciones de la bajada no están en tu maestro</b> y hoy están contando '+
+        'en el avance, en el resultado y en la productividad. Si bajaste la base completa de SAP, son '+
+        'documentos de otros inventarios. '+
+        '<button class="btn sm" style="margin-left:6px" onclick="UI.universoMaestro()">'+
+        'Tomar sólo las del maestro</button> '+
+        '<span class="rc-mini">Ejemplos: '+U.esc((ALC.ejSoloDoc||[]).slice(0,4).join(', '))+'</span>');
+    }
+    if(Config.d.universo==='maestro' && ALC.soloDoc>0){
+      push('soloMaestro','',
+        'El alcance es tu <b>maestro de ubicaciones</b>: '+U.num(ALC.soloDoc)+' ubicaciones de la bajada quedan '+
+        'afuera por no estar en él. El detalle está en <b>Alcance</b>, acá abajo. '+
+        '<button class="btn sm ghost" style="margin-left:6px" onclick="UI.universoDoc()">'+
+        'Volver a tomar todo lo que tenga documento</button>');
     }
     if(!colsSt.length){
       push('stNada','bad','<b>No se está leyendo ningún status.</b> Sin eso el tablero no puede '+
@@ -4575,6 +4605,7 @@ const Prod = {
   porRango(d1,d2){
     const M=Motor.M, map=new Map();
     M.arr.forEach(o=>{
+      if(!o.enUniverso) return;                      // fuera del W2W no suma a nadie
       (o.docs||[]).forEach(d=>{
         if(d.f===null) return;                       // sin fecha no entra en ningún rango
         if(d1!==null && d.f<d1) return;
@@ -4961,6 +4992,21 @@ const UI = {
     document.getElementById('cardEstr').classList.remove('hidden');
     document.getElementById('estrLink').classList.add('hidden');
     document.getElementById('cardEstr').scrollIntoView({behavior:'smooth',block:'center'});
+  },
+
+  universoMaestro(){
+    Config.d.universo='maestro';
+    const c=Object.assign({},Config.d.avisosOff||{}); delete c.fueraMaestro; delete c.soloMaestro;
+    Config.d.avisosOff=c;
+    Config.persistir(); Config.aForm(); Motor.reconstruir();
+    U.toast('El alcance del W2W pasa a ser tu maestro de ubicaciones','ok');
+  },
+  universoDoc(){
+    Config.d.universo='doc';
+    const c=Object.assign({},Config.d.avisosOff||{}); delete c.fueraMaestro; delete c.soloMaestro;
+    Config.d.avisosOff=c;
+    Config.persistir(); Config.aForm(); Motor.reconstruir();
+    U.toast('El alcance vuelve a ser todo lo que tenga documento de inventario','ok');
   },
 
   cerrarAviso(id){

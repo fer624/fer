@@ -54,7 +54,17 @@ coordenadas— y es **opcional**: sin él hay avance y resultado, falta el mapa.
 La pantalla 1 muestra el **Alcance**: cuántas del maestro entraron, cuántas
 quedaron afuera y cuántas se contaron sin datos del maestro.
 
-En la pantalla 7 se puede volver al criterio anterior (físicas del maestro).
+Cuando la bajada es **la base completa de SAP** —con documentos de otros
+inventarios y zonas que no entran al W2W— el alcance pasa a ser el maestro.
+La pantalla 1 avisa cuántas ubicaciones de la bajada no están en el maestro y
+trae un botón para dejar sólo esas de un clic; el camino de vuelta está en el
+mismo lugar, y el selector completo en **7 · Universo del W2W**.
+
+Lo que queda fuera del universo no cuenta en ningún lado: ni en el avance, ni
+en el resultado, ni en los recuentos, ni en el ILA/IRA, ni en la productividad
+de cada contador. Se sigue viendo en el panel **Alcance** y en su CSV, que
+están justamente para saber qué quedó afuera, y en el mapa como gris
+«fuera del alcance».
 
 ### Cómo decide los estados
 
